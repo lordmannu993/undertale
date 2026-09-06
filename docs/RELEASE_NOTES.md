@@ -4,25 +4,29 @@ This prerelease makes the current `.love` package downloadable from GitHub. It
 contains the converted Lua and the assets supplied in this repository. **It is
 not a completed or native-device-verified game, and it is not an APK.**
 
-## v0.1.1 fixes
+## v0.1.2 fixes
 
-- Preserve omitted original room slot **159**. Flowey goes to room **307**, normal
-  battles to **306**, and game-over to **310** instead of unrelated rooms.
-- Add the actual first-door/Flowey dialogue-to-battle route to regression tests;
-  assert that the enemy, dialogue and four correctly positioned borders exist.
-- Increase the phone game area using narrower side rails and full-area **Fit**
-  scaling. PAUSE → SCALE can opt into integer-pixel scaling.
-- Require a native Linux LÖVE test of the packaged archive, driven through touch
-  callbacks, with actual Flowey/border/SOUL pixel checks and screenshot capture.
+- Restore reference-guided opening scenery: the chamber floor, light rings,
+  corridor and doorway. Original flower tiles and collision are unchanged.
+  This is an explicit reconstruction, not a claim of recovered original tiles.
+- Correct decompiler-reversed dialogue labels: Flowey now explains the SOUL,
+  rather than showing Undyne's chair question. Repair the verified item/phone/
+  encounter/Papyrus-call tables with exact source-hash guards as well.
+- Fix font IDs for the main/damage/HUD/Sans/Papyrus/Wingdings roles and malformed
+  decimal-comma arguments that shifted text speed/sound/line spacing.
+- Require exact dialogue-content and text-bounds assertions, plus native floor,
+  light-ring and doorway pixels and five scene screenshots.
+- Retain the v0.1.1 room-ID gap, proper Flowey/battle/game-over routing and larger
+  phone Fit viewport.
 
 Close the old running LÖVE game before opening the new versioned file. The same
-save identity is retained. Android's rotated/dimmed recent-app thumbnail is not
-an in-game rendering setting. The sparse flower-room scenery is still the supplied
-export, not a fabricated replacement map.
+save identity is retained. Flowey's alternate greetings on repeat attempts are
+normal saved-history behaviour, not scrambled dialogue. Android's rotated/dimmed
+recent-app thumbnail is not an in-game rendering setting.
 
 ## Download and try
 
-1. Download **`undertale-love-v0.1.1-experimental.love`** from the assets below
+1. Download **`undertale-love-v0.1.2-experimental.love`** from the assets below
    (approximately 124 MB). Do not download GitHub's automatic “Source code” ZIP
    if you want to try the packaged game.
 2. Install the official **LÖVE 11.5 runtime** for your platform:

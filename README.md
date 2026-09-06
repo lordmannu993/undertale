@@ -12,9 +12,9 @@ this workspace. See [port status](docs/PORTING.md) and [validation](docs/VALIDAT
 
 ## Download the experimental `.love` file
 
-[**Download `undertale-love-v0.1.1-experimental.love` (~124 MB)**](https://github.com/lordmannu993/undertale/releases/download/love-v0.1.1-experimental/undertale-love-v0.1.1-experimental.love)
+[**Download `undertale-love-v0.1.2-experimental.love` (~124 MB)**](https://github.com/lordmannu993/undertale/releases/download/love-v0.1.2-experimental/undertale-love-v0.1.2-experimental.love)
 
-[Release notes, SHA-256 checksum, and conversion report](https://github.com/lordmannu993/undertale/releases/tag/love-v0.1.1-experimental)
+[Release notes, SHA-256 checksum, and conversion report](https://github.com/lordmannu993/undertale/releases/tag/love-v0.1.2-experimental)
 
 Download the **`.love` asset**, not GitHub's automatic “Source code” ZIP. It
 contains the generated Lua and supplied assets; you do not need Python or
@@ -26,7 +26,19 @@ missing resources and native-testing limitations described above still apply.
 The large archive is hosted as a GitHub Release asset rather than committed to
 Git. To regenerate it yourself, follow the build instructions below.
 
-### Fixed in v0.1.1
+### Fixed in v0.1.2
+
+- Restore the missing opening chamber floor, light rings, corridor and doorway
+  using the supplied reference views, palette and room coordinates. These are
+  explicitly reconstructed backdrops, not recovered original tile records.
+- Repair the damaged export's reversed switch-label bindings: Flowey now says
+  the SOUL tutorial, not Undyne's chair prompt. Verified item/phone/encounter and
+  Papyrus-call tables are repaired too, with source-hash guards.
+- Correct original font IDs and malformed text-setup spacing arguments.
+- Check the actual dialogue words and bubble bounds, plus native floor/ring/door
+  pixels and five scene screenshots. **143 automated tests** now pass.
+
+### Also fixed in v0.1.1
 
 - Flowey now enters the tutorial room, rather than an empty test battle: the
   converter preserves missing original room ID 159 instead of shifting later IDs.
@@ -38,8 +50,10 @@ Git. To regenerate it yourself, follow the build instructions below.
 
 Close the old running game and open the new, versioned download; resuming the old
 Android recent-app card will keep running v0.1.0. Your save identity is unchanged.
-The first flower room still uses the sparse supplied layout: disabled backgrounds
-and flowerbed tiles. No replacement scenery or missing path data has been invented.
+The original flower tiles and gameplay collision layout are retained. v0.1.2 adds
+reference-guided backdrop artwork only to the two incomplete opening rooms;
+other rooms are not replaced by a generic background. Missing path data remains
+unresolved.
 
 ## Run with LÖVE
 

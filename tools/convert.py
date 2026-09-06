@@ -382,8 +382,9 @@ class Converter:
                 # These two room exports lack the ground/entrance backdrop.
                 # Reconstruct only the known sparse versions, never overpaint a
                 # future complete export or change room collision/game logic.
-                expected = (680, 260, 20) if name == "room_area1" else (320, 420, 0)
-                if (meta["width"], meta["height"], len(room.findall("tiles/tile"))) != expected or any(b["visible"] for b in meta["backgrounds"]):
+                expected_hashes = {'room_area1': 'ff40c1898c1412e881fc9f5b5490017c0906d9da6da2f84c853d68d5788f136e', 'room_area1_2': 'ed4dedfff917d5ae1d979284686a1d3b058ca1bcbc8e1262110d0d2a35422b79'}
+                actual_hash = hashlib.sha256(ET.tostring(room, encoding="utf-8")).hexdigest()
+                if actual_hash != expected_hashes[name] or any(b["visible"] for b in meta["backgrounds"]):
                     raise CompileError(f"{name}: room data changed; review reconstructed opening backdrop")
                 meta["port_backdrop"] = name
                 self.report.setdefault("reconstructed_backdrops", []).append({"room": name, "basis": "user reference screenshots, original room bounds/door positions, supplied palette; original flower tiles retained"})

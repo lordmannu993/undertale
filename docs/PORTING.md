@@ -37,7 +37,7 @@ This omission must not shift the IDs of the 334 rooms that are supplied.
    converter recovers annotations, `with` comments, room instance order and music
    aliases. Unidentified *named* assets receive synthetic IDs outside the legacy
    range; it never assigns an arbitrary alphabetic asset to a numeric reference.
-   The report currently lists **87 unresolved IDs in statically recognizable
+   The report currently lists **86 unresolved IDs in statically recognizable
    reference positions**. This is not an exhaustive dynamic data-flow analysis.
    Queries for an unknown object return no match with a warning; creation of an
    unknown object stops. Unknown image/audio cues warn and cannot be reproduced.
@@ -99,6 +99,18 @@ included. ZIP timestamps and permissions are normalized and a SHA-256 is emitted
 
 The original GameMaker files have not been changed.
 
+- The supplied decompiler bound switch labels in reverse to their branch bodies.
+  `tools/source_repairs.py` repairs nine verified script tables, with exact source
+  SHA-256 guards. `SCR_TEXT` keeps its terminal case 0 debug branch in place;
+  the other 472 labels are reassigned to the ascending original IDs. For example,
+  200 selects Flowey's greeting, 666 the SOUL tutorial, and 706 Undyne's chair
+  question. Tests check the words, not merely the presence of drawn text.
+- Verified inventory/phone/encounter/Papyrus-call tables receive the same scoped
+  repair, preserving their bodies and fall-through. This is not a general GML
+  rule or an unchecked rewrite of arbitrary switches.
+- Malformed decimal-comma shake values in `SCR_TEXTTYPE` and `_f` are repaired so
+  the ten text-setup arguments do not shift into sound/spacing fields.
+
 - Editor instance IDs give relative room order, **not contiguous original IDs**.
   Version 0.1.0 incorrectly compacted missing room slot **159**; all later numeric
   room references were shifted. The exporter now preserves that hole and checks
@@ -109,7 +121,9 @@ The original GameMaker files have not been changed.
   adjacent `// object_name` / `with(id)` comments.
 - Music IDs are recovered from `scr_getmusindex` and explicit, documented
   exceptions. `port/resource_overrides.json` records additional reconstructed
-  font, interaction-parent, default-dialogue and menu IDs. These inferences need
+  font, interaction-parent, default-dialogue and menu IDs. Font anchors now include
+  Wingdings=0, main=1, damage=6, HUD/Courier=7, Comic Sans=8 and Papyrus=9, matching
+  the Gaster/Sans/Papyrus typer and glyph-spacing call sites. These inferences need
   reference validation; annotations and overrides are distinguished in the report.
 - Glyph labels such as `320, 321, ... 3210` are the malformed concatenation of
   `"32"` and an index. When the entire atlas matches that pattern, the export uses
@@ -159,12 +173,23 @@ The original GameMaker files have not been changed.
 5. Only then remove the experimental designation and prepare release signing,
    current Android SDK/NDK/page-size compatibility, icons and distribution rights.
 
-## The initial flower room
+## Reference-guided opening backdrops (v0.1.2)
 
 The supplied `room_area1` has eight disabled background layers and 20 tile records;
 only the flowerbed-related records fall inside its initial camera view. The next
-room has no tile records. v0.1.1 does not invent walls or paint a replacement room.
-The larger viewport and corrected encounter address the reported presentation/
-battle bugs, but matching all scenery still requires comparison with a complete
-original export. Android's recent-apps thumbnail also shrinks/dims/rotates the
-landscape preview; use the running app to judge the display.
+room has no tile records. The user's reference screenshots establish the missing
+chamber/platform and light rings, and the corridor's arched doorway.
+
+`port/opening_backdrops.lua` reconstructs these two opening backdrops using those
+references, the existing collision/door coordinates and the exact supplied palette
+(floor 58/57/72, rings 95/94/119 and 200/194/226, green 34/177/76). The original flower
+tiles and gameplay collision remain untouched. The doorway ornament is reconstructed
+line art, not a claimed pixel-identical recovery of an absent source image. The
+second chamber follows its supplied stepped collision boundaries.
+
+The report explicitly lists `reconstructed_backdrops`. The exporter refuses to
+apply this reconstruction if these rooms gain background layers or a different
+layout, so a future complete export will not silently be painted over. Other rooms
+retain their own original tiles/backgrounds. Full-game scenery fidelity is still
+not certified. Android's recent-app thumbnail is also scaled, rotated and dimmed;
+judge the new rendering inside the running app.

@@ -7,12 +7,16 @@ Validation date: **2026-09-06**.
 - Converted all **20,285** source units with **zero parse failures**.
 - Compiled every generated Lua chunk, runtime module, `main.lua` and `conf.lua`
   with both **LuaJIT 2.1** and **Lua 5.1** (through Lupa).
-- **121 tests passed** in the automated pytest suite; it covers:
+- **143 tests passed** in the automated pytest suite; it covers:
   - GML expressions, strings/comments, numeric booleans, zero-based/2D arrays,
     post-increment, loops, break/continue, switch fall-through and large-switch
     partitioning, `with`/`other`, locals, inheritance and script arguments.
   - The actual converted opening story, title, naming grid, initial overworld
     movement, C menu, X cancel, first doorway, and original save/load scripts.
+  - Correct dialogue catalog contents (Howdy, SOUL, LOVE/pellets and reactions),
+    no Undyne chair prompt in Flowey, and character glyph bounds inside the bubble.
+  - Item/phone label associations, character fonts, decimal argument repair and
+    source-hash guards for the nine damaged switch tables.
   - The complete normal-input route into Flowey's tutorial: enemy, four nonzero
     borders, and dialogue are present; the test/utility room is never entered.
   - The missing room-159 gap, later original room IDs, and game-over routing.
@@ -45,7 +49,9 @@ python3 -m pytest -q
 geometry. The release workflow separately requires a native Linux LÖVE run of the
 packaged archive, using real touch callbacks, native pixel masks and rendering.
 It checks Flowey, all four border edges and the supplied dark-red SOUL texture,
-and records flower-room, battle and integer-mode PNGs. This is software OpenGL
+and records flower-room, corridor, greeting, battle and integer-mode PNGs. It also
+checks actual floor/ring/doorway colours and the expected SOUL dialogue contents
+and glyph bounds; the earlier presence-only tests did not catch incorrect text. This is software OpenGL
 under Xvfb with a null audio device, not Android hardware or full-game-route QA.
 
 ## Native LÖVE coverage and remaining work
@@ -110,7 +116,7 @@ bash tools/native_smoke.sh
 
 The opt-in `--smoke-test` driver uses real touch callbacks, normal game ticks,
 and native rendering from the packaged archive. It requests screenshots of the
-flower room, Flowey tutorial and integer scaling, and checks border/enemy/SOUL
+flower room, corridor, first greeting, Flowey tutorial and integer scaling, and checks border/enemy/SOUL
 pixels. It uses a separate LÖVE identity and in-memory game saves, and does not
 modify your playthrough. Xvfb focus changes are ignored in this test mode only;
 this is not an Android lifecycle test. Outputs go to `port-test-output/`.

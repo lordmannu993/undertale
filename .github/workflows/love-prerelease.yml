@@ -12,12 +12,12 @@ permissions:
   contents: read
 
 concurrency:
-  group: love-v0.1.1-experimental-publication
+  group: love-v0.1.2-experimental-publication
   cancel-in-progress: false
 
 env:
-  RELEASE_TAG: love-v0.1.1-experimental
-  ASSET_BASE: undertale-love-v0.1.1-experimental
+  RELEASE_TAG: love-v0.1.2-experimental
+  ASSET_BASE: undertale-love-v0.1.2-experimental
 
 jobs:
   publish:
@@ -84,7 +84,7 @@ jobs:
           notes += f'- **{report["converted_code_units"]:,} source units** translated without parse failures.\n'
           notes += f'- **{len(report["missing_paths"])} missing movement paths**, **{len(report["unresolved_numeric_references"])} unresolved static numeric asset references**, and **{len(report["missing_external_files"])} missing literal external file paths** remain.\n'
           notes += f'- **{len(report.get("missing_rooms", []))} original room is missing**; its ID is preserved rather than compacted.\n'
-          notes += '- Native Linux LOVE smoke: packaged archive, touch callbacks, Flowey/border/SOUL pixels, and three screenshots. Android device validation remains outstanding.\n'
+          notes += '- Native Linux LOVE smoke: packaged archive, touch callbacks, opening backdrop colours, exact SOUL text, glyph bounds and Flowey/border/SOUL pixels, and five screenshots. Android device validation remains outstanding.\n'
           notes += '\n## SHA-256\n\n```text\n' + checksum + '\n```\n'
           Path('build').mkdir(exist_ok=True)
           Path('build/release-notes.md').write_text(notes)
@@ -103,10 +103,10 @@ jobs:
         run: |
           gh release edit "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" \
             --target "$GITHUB_SHA" --prerelease --latest=false \
-            --title 'LOVE v0.1.1 — Flowey and phone display fixes (experimental)' \
+            --title 'LOVE v0.1.2 — Opening scenery and dialogue fixes (experimental)' \
             --notes-file build/release-notes.md
           gh release upload "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --clobber \
-            "artifacts/$ASSET_BASE.love#LOVE v0.1.1 (experimental)" \
+            "artifacts/$ASSET_BASE.love#LOVE v0.1.2 (experimental)" \
             "artifacts/$ASSET_BASE.love.sha256#SHA-256 checksum" \
             "artifacts/$ASSET_BASE.conversion-report.json#Conversion report and missing resources"
           gh api "repos/$GITHUB_REPOSITORY/releases/$RELEASE_ID" > build/release-assets.json
