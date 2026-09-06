@@ -2,6 +2,7 @@ local Input=require("port.input")
 local Touch=require("port.touch")
 local Runtime=require("port.runtime")
 local Presentation=require("port.presentation")
+local Version=require("port.version")
 local input,touch,game
 local smoke,smokeMode=nil,false
 local accumulator=0
@@ -153,7 +154,7 @@ function love.draw()
     -- Visible status is intentional: a generated archive is not proof of a
     -- complete, device-tested conversion. Details are included in the archive.
     g.setColor(0.38,0.43,0.49,1)
-    if touch.w>650 then g.printf("EXPERIMENTAL LOVE PORT",160,10,touch.w-320,"center") end
+    if touch.w>650 then g.printf("EXPERIMENTAL LOVE "..Version.number,160,10,touch.w-320,"center") end
     g.pop()
     touch:draw()
     if smoke then

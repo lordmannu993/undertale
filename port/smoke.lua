@@ -80,7 +80,9 @@ function Smoke:draw(viewport)
         end end
         assert(colored>80,"Flowey's native image is blank")
         local r,gg,b=data:getPixel(315,319)
-        assert(r>0.6 and gg<0.3 and b<0.3,"The native SOUL pixel is missing")
+        -- The supplied base SOUL texture uses red=128/255; its flashing frame
+        -- uses 255/255. Validate the actual palette, not assumed retail colors.
+        assert(r>0.47 and gg<0.05 and b<0.05,"The native SOUL pixel is missing: "..r..","..gg..","..b)
         assert(viewport.w>880,"Phone fit mode is still unnecessarily small")
         write("native-render.txt", "PASS\nroom="..self.game.roomState.name.."\nflowey_pixels="..colored.."\nviewport_width="..viewport.w.."\n")
     end

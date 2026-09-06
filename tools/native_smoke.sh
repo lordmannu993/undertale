@@ -7,7 +7,7 @@ command -v love >/dev/null || { echo 'Install LOVE, xvfb and xauth for native va
 set +e
 ALSOFT_DRIVERS=null LIBGL_ALWAYS_SOFTWARE=1 timeout 150s \
   xvfb-run -a -s '-screen 0 1600x900x24' \
-  love artifacts/undertale-love-experimental.love --smoke-test \
+  love "${1:-artifacts/undertale-love-experimental.love}" --smoke-test \
   >port-test-output/native.log 2>&1
 status=$?
 set -e

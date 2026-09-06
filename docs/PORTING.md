@@ -51,11 +51,13 @@ This omission must not shift the IDs of the 334 rooms that are supplied.
    cases, camera behavior, gradient text, advanced battles, and every route/end
    sequence need comparison against a reference run. Gradient text currently
    warns and uses its first corner color. Path execution is explicitly unsupported.
-5. **No native device testing or APK build was performed here.** The test suite
-   runs the real generated Lua in LuaJIT, with rendering/audio disabled. It does
-   not establish GPU correctness, audio timing, touch latency, Android lifecycle
-   behavior, or performance. The Android build script/workflow is a build path,
-   not evidence that an APK has already built successfully.
+5. **No Android device certification or APK build.** Python tests run the real
+   generated Lua headlessly. The v0.1.1 release pipeline additionally runs the
+   packaged game in native Linux LÖVE under Xvfb/software OpenGL, checks actual
+   enemy/border/SOUL pixels and captures screenshots using touch callbacks.
+   Audio uses a null output device. These checks still do not establish Android
+   GPU compatibility, audible fidelity, physical touch latency or lifecycle
+   behavior. The Android APK tooling remains unverified.
 
 Steam services intentionally report unavailable. LÖVE gamepad input replaces the
 legacy Windows joystick poller; the old in-game joystick configuration is not
@@ -156,3 +158,13 @@ The original GameMaker files have not been changed.
    every route/boss/save/ending. Fix behavior against reference recordings.
 5. Only then remove the experimental designation and prepare release signing,
    current Android SDK/NDK/page-size compatibility, icons and distribution rights.
+
+## The initial flower room
+
+The supplied `room_area1` has eight disabled background layers and 20 tile records;
+only the flowerbed-related records fall inside its initial camera view. The next
+room has no tile records. v0.1.1 does not invent walls or paint a replacement room.
+The larger viewport and corrected encounter address the reported presentation/
+battle bugs, but matching all scenery still requires comparison with a complete
+original export. Android's recent-apps thumbnail also shrinks/dims/rotates the
+landscape preview; use the running app to judge the display.

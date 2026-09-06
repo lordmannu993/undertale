@@ -12,9 +12,9 @@ this workspace. See [port status](docs/PORTING.md) and [validation](docs/VALIDAT
 
 ## Download the experimental `.love` file
 
-[**Download `undertale-love-experimental.love` (~124 MB)**](https://github.com/lordmannu993/undertale/releases/download/love-v0.1.0-experimental/undertale-love-experimental.love)
+[**Download `undertale-love-v0.1.1-experimental.love` (~124 MB)**](https://github.com/lordmannu993/undertale/releases/download/love-v0.1.1-experimental/undertale-love-v0.1.1-experimental.love)
 
-[Release notes, SHA-256 checksum, and conversion report](https://github.com/lordmannu993/undertale/releases/tag/love-v0.1.0-experimental)
+[Release notes, SHA-256 checksum, and conversion report](https://github.com/lordmannu993/undertale/releases/tag/love-v0.1.1-experimental)
 
 Download the **`.love` asset**, not GitHub's automatic “Source code” ZIP. It
 contains the generated Lua and supplied assets; you do not need Python or
@@ -25,6 +25,21 @@ APK and requires the LÖVE runtime.
 missing resources and native-testing limitations described above still apply.
 The large archive is hosted as a GitHub Release asset rather than committed to
 Git. To regenerate it yourself, follow the build instructions below.
+
+### Fixed in v0.1.1
+
+- Flowey now enters the tutorial room, rather than an empty test battle: the
+  converter preserves missing original room ID 159 instead of shifting later IDs.
+  Normal battles, game-over, and other later room references are corrected too.
+- The phone play area is larger: narrower side rails and full-area **Fit** scaling.
+  Optional **SCALE: INTEGER** remains available in PAUSE settings.
+- Regression coverage now includes the actual Flowey transition and a native Linux
+  LÖVE smoke test with touch callbacks and pixel checks, required before publishing.
+
+Close the old running game and open the new, versioned download; resuming the old
+Android recent-app card will keep running v0.1.0. Your save identity is unchanged.
+The first flower room still uses the sparse supplied layout: disabled backgrounds
+and flowerbed tiles. No replacement scenery or missing path data has been invented.
 
 ## Run with LÖVE
 
@@ -45,7 +60,8 @@ love . --input-test     # test multi-touch/keyboard/gamepad input without advanc
 
 The original opening, title, naming screen, initial movement, menu/cancel,
 first room transition, and save/load scripts have automated **headless LuaJIT**
-coverage. That is not GPU, audio-device, Android, or full-playthrough testing.
+coverage. The release pipeline also checks native Linux rendering. Neither constitutes
+Android hardware, audio-device, or full-playthrough validation.
 
 ## Build the Android-loadable archive
 

@@ -41,14 +41,18 @@ python3 -m pip install -r requirements-dev.txt
 python3 -m pytest -q
 ```
 
-**These are headless engine/input tests.** Sprite pixels, GPU drawing, codecs,
-physical speakers, touchscreen events and Android OS callbacks are not exercised
-by the headless tests. Collision pixel masks fall back to bounding geometry in
-that mode. Passing them must not be presented as full native or game-route QA.
+**The Python suite is headless.** Its collision masks fall back to bounding
+geometry. The release workflow separately requires a native Linux LÖVE run of the
+packaged archive, using real touch callbacks, native pixel masks and rendering.
+It checks Flowey, all four border edges and the supplied dark-red SOUL texture,
+and records flower-room, battle and integer-mode PNGs. This is software OpenGL
+under Xvfb with a null audio device, not Android hardware or full-game-route QA.
 
-## Unchecked: native LÖVE
+## Native LÖVE coverage and remaining work
 
-- [ ] Launch the packaged `.love` in LÖVE 11.4/11.5, not just an unpacked folder.
+- [x] Native Linux packaged-archive smoke test added as a required CI/release gate.
+      Successful run status and screenshot artifacts are visible in GitHub Actions.
+- [ ] Repeat on physical desktop and Android devices.
 - [ ] Compare intro/title/menu glyphs, sprite origins, colors and transparency
       with a reference recording.
 - [ ] Compare music volume, text voices, loops, pitch, seeking and fades.

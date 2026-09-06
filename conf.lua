@@ -5,7 +5,7 @@ function love.conf(t)
     t.gammacorrect = false
     t.accelerometerjoystick = false
     t.externalstorage = false
-    t.window.title = "UNDERTALE - experimental LOVE port"
+    t.window.title = "UNDERTALE - experimental LOVE " .. require("port.version").number
     t.window.width = 1120
     t.window.height = 700
     t.window.resizable = true

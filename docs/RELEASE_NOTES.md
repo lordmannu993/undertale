@@ -4,9 +4,25 @@ This prerelease makes the current `.love` package downloadable from GitHub. It
 contains the converted Lua and the assets supplied in this repository. **It is
 not a completed or native-device-verified game, and it is not an APK.**
 
+## v0.1.1 fixes
+
+- Preserve omitted original room slot **159**. Flowey goes to room **307**, normal
+  battles to **306**, and game-over to **310** instead of unrelated rooms.
+- Add the actual first-door/Flowey dialogue-to-battle route to regression tests;
+  assert that the enemy, dialogue and four correctly positioned borders exist.
+- Increase the phone game area using narrower side rails and full-area **Fit**
+  scaling. PAUSE → SCALE can opt into integer-pixel scaling.
+- Require a native Linux LÖVE test of the packaged archive, driven through touch
+  callbacks, with actual Flowey/border/SOUL pixel checks and screenshot capture.
+
+Close the old running LÖVE game before opening the new versioned file. The same
+save identity is retained. Android's rotated/dimmed recent-app thumbnail is not
+an in-game rendering setting. The sparse flower-room scenery is still the supplied
+export, not a fabricated replacement map.
+
 ## Download and try
 
-1. Download **`undertale-love-experimental.love`** from the assets below
+1. Download **`undertale-love-v0.1.1-experimental.love`** from the assets below
    (approximately 124 MB). Do not download GitHub's automatic “Source code” ZIP
    if you want to try the packaged game.
 2. Install the official **LÖVE 11.5 runtime** for your platform:
@@ -22,9 +38,10 @@ behavior still needs device validation.
 
 The automated tests check Lua 5.1/LuaJIT syntax, the converted opening/title,
 naming, initial movement, menu/cancel, first doorway, save/load, persistence,
-input handling, and reproducible packaging. **Headless tests do not establish
-native rendering, audio playback, touch latency, or full-game playability. No
-Android APK has been compiled or installed as part of this prerelease.**
+input handling, and reproducible packaging. **The separate native smoke test checks Linux rendering with software OpenGL and
+null audio; neither test suite establishes Android GPU compatibility, audible
+fidelity, physical touch latency, or full-game playability. No Android APK has
+been compiled or installed as part of this prerelease.**
 
 Missing movement paths and external resources, unresolved numeric asset IDs,
 and remaining GameMaker compatibility work prevent a complete game. Path playback

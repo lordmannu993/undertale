@@ -12,11 +12,12 @@ permissions:
   contents: read
 
 concurrency:
-  group: love-v0.1.0-experimental-publication
+  group: love-v0.1.1-experimental-publication
   cancel-in-progress: false
 
 env:
-  RELEASE_TAG: love-v0.1.0-experimental
+  RELEASE_TAG: love-v0.1.1-experimental
+  ASSET_BASE: undertale-love-v0.1.1-experimental
 
 jobs:
   publish:
@@ -65,26 +66,35 @@ jobs:
       - name: Build the experimental archive and release notes
         if: steps.release.outputs.publish == 'true'
         run: |
-          python tools/package.py --no-convert
+          python tools/package.py --no-convert --output "artifacts/$ASSET_BASE.love"
           python - <<'PY'
           import json, os, xml.etree.ElementTree as ET
           from pathlib import Path
-          report = json.loads(Path('artifacts/undertale-love-experimental.conversion-report.json').read_text())
+          base = os.environ['ASSET_BASE']
+          report = json.loads((Path('artifacts') / (base+'.conversion-report.json')).read_text())
           suites = list(ET.parse('port-test-output/release-tests.xml').getroot().iter('testsuite'))
           assert suites and not report['compile_errors']
           assert sum(int(s.get('failures', '0')) + int(s.get('errors', '0')) for s in suites) == 0
           count = sum(int(s.get('tests', '0')) - int(s.get('skipped', '0')) for s in suites)
-          checksum = Path('artifacts/undertale-love-experimental.love.sha256').read_text().strip()
+          checksum = (Path('artifacts') / (base+'.love.sha256')).read_text().strip()
           notes = Path('docs/RELEASE_NOTES.md').read_text()
           notes += '\n## Build record\n\n'
           notes += f'- Source commit: `{os.environ["GITHUB_SHA"]}` on `arena/01a07697-undertale` (PR #1).\n'
           notes += f'- **{count} automated tests passed** on GitHub Actions.\n'
           notes += f'- **{report["converted_code_units"]:,} source units** translated without parse failures.\n'
           notes += f'- **{len(report["missing_paths"])} missing movement paths**, **{len(report["unresolved_numeric_references"])} unresolved static numeric asset references**, and **{len(report["missing_external_files"])} missing literal external file paths** remain.\n'
+          notes += f'- **{len(report.get("missing_rooms", []))} original room is missing**; its ID is preserved rather than compacted.\n'
+          notes += '- Native Linux LOVE smoke: packaged archive, touch callbacks, Flowey/border/SOUL pixels, and three screenshots. Android device validation remains outstanding.\n'
           notes += '\n## SHA-256\n\n```text\n' + checksum + '\n```\n'
           Path('build').mkdir(exist_ok=True)
           Path('build/release-notes.md').write_text(notes)
           PY
+      - name: Install native LOVE for the rendering release gate
+        if: steps.release.outputs.publish == 'true'
+        run: sudo apt-get update && sudo apt-get install -y love xvfb xauth
+      - name: Validate native graphics before publishing
+        if: steps.release.outputs.publish == 'true'
+        run: bash tools/native_smoke.sh "artifacts/$ASSET_BASE.love"
       - name: Upload, verify, and publish the prerelease
         if: steps.release.outputs.publish == 'true'
         env:
@@ -93,20 +103,21 @@ jobs:
         run: |
           gh release edit "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" \
             --target "$GITHUB_SHA" --prerelease --latest=false \
-            --title 'LOVE v0.1.0 — Experimental (incomplete port)' \
+            --title 'LOVE v0.1.1 — Flowey and phone display fixes (experimental)' \
             --notes-file build/release-notes.md
           gh release upload "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --clobber \
-            'artifacts/undertale-love-experimental.love#Experimental LOVE archive (not a finished game)' \
-            'artifacts/undertale-love-experimental.love.sha256#SHA-256 checksum' \
-            'artifacts/undertale-love-experimental.conversion-report.json#Conversion report and missing resources'
+            "artifacts/$ASSET_BASE.love#LOVE v0.1.1 (experimental)" \
+            "artifacts/$ASSET_BASE.love.sha256#SHA-256 checksum" \
+            "artifacts/$ASSET_BASE.conversion-report.json#Conversion report and missing resources"
           gh api "repos/$GITHUB_REPOSITORY/releases/$RELEASE_ID" > build/release-assets.json
           python - <<'PY'
-          import hashlib, json
+          import hashlib, json, os
           from pathlib import Path
           release = json.loads(Path('build/release-assets.json').read_text())
           assert release['draft'] and release['prerelease']
           assets = {a['name']: a for a in release['assets']}
-          expected = ['undertale-love-experimental.love', 'undertale-love-experimental.love.sha256', 'undertale-love-experimental.conversion-report.json']
+          base = os.environ['ASSET_BASE']
+          expected = [base+'.love', base+'.love.sha256', base+'.conversion-report.json']
           assert set(assets) == set(expected), 'Unexpected or missing release assets'
           for name in expected:
               path, asset = Path('artifacts') / name, assets[name]
@@ -117,3 +128,10 @@ jobs:
           PY
           gh release edit "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" \
             --draft=false --prerelease --latest=false
+      - uses: actions/upload-artifact@v4
+        if: always() && steps.release.outputs.publish == 'true'
+        with:
+          name: native-love-${{ env.RELEASE_TAG }}
+          path: port-test-output/
+          retention-days: 7
+          if-no-files-found: ignore
