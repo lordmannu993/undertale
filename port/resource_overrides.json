@@ -1,0 +1,39 @@
+{
+  "notes": [
+    "Only original-ID overrides belong here. Named resources without evidence get synthetic IDs, never alphabetic original IDs.",
+    "Font order is reconstructed from the text setup call sites: main/damage/maintext/small/plain/plainbig/Comic Sans/Papyrus/Wingdings/cursive/maintext duplicate. The GMX glyph atlas is retained unchanged.",
+    "Do not guess missing paths. Supply their real point data before enabling path_start.",
+    "obj_doorparent 793 is the collision selector whose User 9 dispatch activates its door children in obj_mainchara Step. obj_interactable 1368 selects both readable and solid-readable descendants in the player interaction event.",
+    "Music aliases repair three malformed scr_getmusindex filenames: end/express_myogg, sfx_woofenstein.ogg, and sfx_disturbing.ogg.",
+    "Default dialogue samples SND_TXT1/2 occupy 94/95; menu cues use the contiguous menu0..6 range 219..225 (menu1..4 are explicitly identified in scr_getmusindex)."
+  ],
+  "ids": {
+    "fonts": {
+      "fnt_main": 0,
+      "fnt_dmg": 1,
+      "fnt_maintext": 2,
+      "fnt_small": 3,
+      "fnt_plain": 4,
+      "fnt_plainbig": 5,
+      "fnt_comicsans": 6,
+      "fnt_papyrus": 7,
+      "fnt_wingdings": 8,
+      "fnt_curs": 9,
+      "fnt_maintext_2": 10
+    },
+    "objects": {
+      "obj_doorparent": 793,
+      "obj_interactable": 1368
+    },
+    "sounds": {
+      "mus_express_myself": 438,
+      "mus_woofenstein": 380,
+      "mus_disturbing": 381,
+      "SND_TXT1": 94,
+      "SND_TXT2": 95,
+      "mus_menu0": 219,
+      "mus_menu5": 224,
+      "mus_menu6": 225
+    }
+  }
+}

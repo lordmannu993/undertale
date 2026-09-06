@@ -1,0 +1,148 @@
+# Port status and implementation
+
+## What is converted
+
+The build translates **20,285 source units** (137,558 lines of extracted GML),
+including empty event/creation units, with **zero parse failures**:
+
+| Resource | Count | Treatment |
+|---|---:|---|
+| Scripts | 173 | Generated Lua functions |
+| Objects | 1,703 | Metadata plus every event function |
+| Rooms | 334 | Creation code, instances, backgrounds, views and tiles |
+| Sprites | 2,472 / 7,505 frames | Original PNGs, origins, masks and animation metadata |
+| Sounds | 439 | Original audio, recovered sound IDs |
+| Backgrounds | 197 | Original PNGs and tile references |
+| Fonts | 11 | Original bitmap atlases and repaired glyph metadata |
+
+**“All source units translated” is not “the entire game is working.”** This is a
+compatibility-layer port, not a hand-rewrite of every object into idiomatic Lua.
+No GameMaker runner, compiler, Windows executable, or proprietary runtime is
+bundled. The `.love` archive is self-contained once built.
+
+## Known blockers — do not hide these
+
+1. **38 referenced movement paths are absent.** The GMX project's `paths` section
+   is empty. `path_start` fails with the missing path's name, rather than
+   fabricating movement or falsely completing a cutscene. Path parsing/playback
+   also needs implementing and validating against the recovered original point
+   data; dropping files into a folder alone is not sufficient yet.
+2. **Original numeric resource IDs were lost in the alphabetized export.** The
+   converter recovers annotations, `with` comments, room instance order and music
+   aliases. Unidentified *named* assets receive synthetic IDs outside the legacy
+   range; it never assigns an arbitrary alphabetic asset to a numeric reference.
+   The report currently lists **87 unresolved IDs in statically recognizable
+   reference positions**. This is not an exhaustive dynamic data-flow analysis.
+   Queries for an unknown object return no match with a warning; creation of an
+   unknown object stops. Unknown image/audio cues warn and cannot be reproduced.
+3. **External resources are absent**, including dynamically replaced boss images,
+   `credits.txt`, and the unused `data/unused/dfb` background. Detailed paths and
+   call sites are in `missing_external_files`. Missing external sprite loads stop
+   explicitly. Animated GIF replacement and dynamic color-key removal still need
+   work; static PNG replacement is supported in the limited single-frame case.
+4. **Full GameMaker fidelity is unverified.** In particular, complex collision
+   ordering, pixel-mask sampling under subpixel/rotated scales, persistence edge
+   cases, camera behavior, gradient text, advanced battles, and every route/end
+   sequence need comparison against a reference run. Gradient text currently
+   warns and uses its first corner color. Path execution is explicitly unsupported.
+5. **No native device testing or APK build was performed here.** The test suite
+   runs the real generated Lua in LuaJIT, with rendering/audio disabled. It does
+   not establish GPU correctness, audio timing, touch latency, Android lifecycle
+   behavior, or performance. The Android build script/workflow is a build path,
+   not evidence that an APK has already built successfully.
+
+Steam services intentionally report unavailable. LÖVE gamepad input replaces the
+legacy Windows joystick poller; the old in-game joystick configuration is not
+used. All original debug keys remain available, but touch controls do **not**
+enable `global.debug`.
+
+## Reproducible pipeline
+
+```text
+projectA.project.gmx + GMX/GML files
+              |
+      tools/convert.py
+      tools/gml.py (lexer, Pratt parser, Lua emitter)
+              |
+          generated/
+              |
+  port/runtime.lua + input/storage/graphics/audio/collision
+              |
+        tools/package.py
+              |
+  artifacts/undertale-love-experimental.love
+              |
+  tools/build_android.py (separate, pinned love-android dependency)
+              |
+  development APK, only when an Android toolchain actually builds it
+```
+
+Conversion rejects unknown syntax and drag-and-drop actions rather than dropping
+code. Every generated Lua chunk is checked by the tests in both **Lua 5.1** and
+**LuaJIT 2.1**. The large `SCR_TEXT` switch is partitioned by whole cases to avoid
+LuaJIT's short-jump limit while preserving return, break and fall-through.
+
+Generated files and build artifacts are ignored by Git. Edit the source,
+converter, or runtime, not generated files. Packaging uses an explicit file list:
+no `.git`, credentials, local saves, SDKs, Python packages, or GameMaker XML are
+included. ZIP timestamps and permissions are normalized and a SHA-256 is emitted.
+
+## Source repairs (export only)
+
+The original GameMaker files have not been changed.
+
+- Original room order is recovered from the non-overlapping, sequential
+  `inst_100000...` ranges. Alphabetic order is demonstrably incorrect.
+- Original asset IDs are recovered from numeric decompiler annotations and
+  adjacent `// object_name` / `with(id)` comments.
+- Music IDs are recovered from `scr_getmusindex` and explicit, documented
+  exceptions. `port/resource_overrides.json` records additional reconstructed
+  font, interaction-parent, default-dialogue and menu IDs. These inferences need
+  reference validation; annotations and overrides are distinguished in the report.
+- Glyph labels such as `320, 321, ... 3210` are the malformed concatenation of
+  `"32"` and an index. When the entire atlas matches that pattern, the export uses
+  **32 + index**, preserving the atlas pixels and glyph positions.
+- Exact malformed backslash comparisons in the three dialogue writer objects
+  become `chr(92)`. Only these known source tokens are repaired; five event units
+  contain the affected comparisons.
+- The absent `testlines.txt` *debug override* in `SCR_TEXT` case 0 is guarded with
+  `file_exists`; inline story/dialogue supplied by callers is retained.
+- `abc_123_a` metadata names an absent MP3, but the actual sound is an OGG. The
+  exporter records and uses the unique existing file with the same basename.
+- GMX boolean metadata (`-1` for true) is normalized separately from GML numeric
+  truth testing. The original project disables uninitialized-variable errors;
+  uninitialized GML fields therefore retain its zero-default behavior.
+
+## Runtime design
+
+- Explicit GML scopes keep instance fields, `global`, `self`, `other`, locals and
+  script arguments separate. `with` iterates a snapshot, including descendants.
+- Create/Destroy, Begin/Normal/End Step, alarms, keyboard and mouse events,
+  inherited events, room events and animation-end events are dispatched.
+- Fixed game ticks respect `room_speed`. **Draw executes once per game tick**,
+  not once per monitor refresh: much of this game updates menus/dialogue in Draw.
+- Rendering uses a cached, nearest-filtered canvas, sprite origins/transforms,
+  bitmap glyphs, tile depths, backgrounds and viewports. UI draws afterward in
+  device coordinates and cannot alter the game's virtual coordinates.
+- Collision queries use a bounding-box broad phase and transformed mask tests.
+  Exact parity, especially the collision-event response/order, remains unverified.
+- Audio resource IDs and playback handles are separate, with gain/pitch,
+  looping, pause, seek and fades. Music streams; short effects are cached/cloned.
+- Static image, mask, quad and sound-template caches are released on room changes
+  and low-memory notifications. Runtime-generated sprites are retained as needed.
+- INI/text saves live in LÖVE's application save directory, not the repository or
+  the original desktop game's save folder. Writes replace saves atomically;
+  absolute paths and traversal are rejected. Saves are never evaluated as Lua.
+
+## Finishing the port
+
+1. Recover the original path points/speeds/closed/smooth settings and referenced
+   external files from an export you are authorized to use.
+2. Recover the complete original asset index tables, resolving reported IDs rather
+   than guessing from alphabetical order. The manifest includes evidence per ID.
+3. Implement path playback and remaining flagged behavior, adding regression tests
+   with actual cutscene/battle fixtures.
+4. Run the native LÖVE and Android device checklist in `VALIDATION.md`, including
+   every route/boss/save/ending. Fix behavior against reference recordings.
+5. Only then remove the experimental designation and prepare release signing,
+   current Android SDK/NDK/page-size compatibility, icons and distribution rights.

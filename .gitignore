@@ -1,0 +1,18 @@
+# Reproducible port output and local build dependencies
+/generated/
+/build/
+/artifacts/
+/.tools/
+/.android/
+/.venv/
+__pycache__/
+.pytest_cache/
+*.pyc
+*.love
+*.apk
+*.aab
+*.keystore
+*.jks
+local.properties
+# Never package development/save files with the game
+/port-test-output/
