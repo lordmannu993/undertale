@@ -10,6 +10,22 @@ are missing. Those problems, plus remaining runtime fidelity work, prevent a
 full-game compatibility claim. No native Android APK has been built or tested in
 this workspace. See [port status](docs/PORTING.md) and [validation](docs/VALIDATION.md).
 
+## Download the experimental `.love` file
+
+[**Download `undertale-love-experimental.love` (~124 MB)**](https://github.com/lordmannu993/undertale/releases/download/love-v0.1.0-experimental/undertale-love-experimental.love)
+
+[Release notes, SHA-256 checksum, and conversion report](https://github.com/lordmannu993/undertale/releases/tag/love-v0.1.0-experimental)
+
+Download the **`.love` asset**, not GitHub's automatic “Source code” ZIP. It
+contains the generated Lua and supplied assets; you do not need Python or
+GameMaker to use it. Open it with **LÖVE 11.5** on desktop or Android. It is not an
+APK and requires the LÖVE runtime.
+
+**This is an experimental prerelease, not a fully functional game port.** The
+missing resources and native-testing limitations described above still apply.
+The large archive is hosted as a GitHub Release asset rather than committed to
+Git. To regenerate it yourself, follow the build instructions below.
+
 ## Run with LÖVE
 
 Install **LÖVE 11.4 or 11.5** and **Python 3.10+**. No GameMaker installation or
@@ -85,8 +101,8 @@ The converter processes **173 scripts, 1,703 objects, and 334 rooms**, including
 all event and instance-creation code. It preserves zero-based GML arrays,
 instance contexts, script arguments, numeric booleans, and original room order.
 Generated code lives in `generated/`; it is reproducible, intentionally not
-committed, and may be discarded after packaging to avoid duplicating the archive. The archive includes the generated code, so Python is not needed on
-the phone.
+committed, and may be discarded after packaging to avoid duplicating the archive.
+The archive includes the generated code, so Python is not needed on the phone.
 
 `generated/conversion-report.json` records translation coverage, resource-ID
 evidence, source repairs, every detected input key, and missing resources.
