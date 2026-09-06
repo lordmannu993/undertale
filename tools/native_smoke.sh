@@ -23,6 +23,6 @@ PY
   exit "$status"
 fi
 grep -q 'NATIVE SMOKE PASS' port-test-output/native.log
-for image in native-flowers native-flowey native-integer-scale; do
+for image in native-flowers native-corridor native-greeting native-flowey native-integer-scale; do
   test -s "port-test-output/$image.png"
 done

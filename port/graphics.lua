@@ -334,6 +334,10 @@ function Graphics.install(R)
             if g then
                 g.push();g.setScissor(view.px,view.py,view.pw,view.ph);g.translate(view.px,view.py);g.scale(view.pw/view.w,view.ph/view.h);g.translate(view.w/2,view.h/2);g.rotate(math.rad(view.angle or 0));g.translate(-view.x-view.w/2,-view.y-view.h/2)
             end
+            if self.roomState.backdrop then
+                log("reconstructed-background",self.roomState.backdrop)
+                if g then require("port.opening_backdrops").draw(g,self.roomState.backdrop) end
+            end
             backgrounds(false,view)
             for _,item in ipairs(list) do
                 if item.tile then

@@ -19,6 +19,7 @@ import xml.etree.ElementTree as ET
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from gml import CompileError, compile_gml, quote, walk
+from source_repairs import repair_script
 
 ROOT = Path(__file__).resolve().parents[1]
 CATEGORIES = {"sprites": ("sprite", ".sprite.gmx"), "objects": ("object", ".object.gmx"),
@@ -322,6 +323,8 @@ class Converter:
             total_lines += len(source.splitlines())
             nonempty += bool(source.strip())
             try:
+                if key.startswith("scripts/"):
+                    source = repair_script(key.split("/", 1)[1], source, self.report)
                 # Three decompiled dialogue writers contain a malformed quoted
                 # backslash. Restrict this repair to the exact known token and
                 # objects; chr(92) preserves the intended text-control marker.
@@ -375,6 +378,15 @@ class Converter:
                 data["id"] = int(data["name"].split("_")[1])
                 data.pop("code", None)
                 meta["instances"].append(data)
+            if name in ("room_area1", "room_area1_2"):
+                # These two room exports lack the ground/entrance backdrop.
+                # Reconstruct only the known sparse versions, never overpaint a
+                # future complete export or change room collision/game logic.
+                expected = (680, 260, 20) if name == "room_area1" else (320, 420, 0)
+                if (meta["width"], meta["height"], len(room.findall("tiles/tile"))) != expected or any(b["visible"] for b in meta["backgrounds"]):
+                    raise CompileError(f"{name}: room data changed; review reconstructed opening backdrop")
+                meta["port_backdrop"] = name
+                self.report.setdefault("reconstructed_backdrops", []).append({"room": name, "basis": "user reference screenshots, original room bounds/door positions, supplied palette; original flower tiles retained"})
             meta["tiles"] = []
             for t in room.findall("tiles/tile"):
                 data = fields(t)

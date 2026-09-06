@@ -346,7 +346,7 @@ function Runtime:loadRoom(index,first)
     self.instances=persistent;self.byId={}
     for _,i in ipairs(persistent) do self.byId[i.id]=i end
     local room=self:roomData(index)
-    self.roomState={name=room.name,tiles={},backgrounds={},tileOffsets={},hiddenLayers={}}
+    self.roomState={name=room.name,backdrop=room.port_backdrop,tiles={},backgrounds={},tileOffsets={},hiddenLayers={}}
     self.vars.room=index;self.vars.room_width=room.width;self.vars.room_height=room.height
     self.vars.room_speed=room.speed;self.vars.room_persistent=self.roomPersistence[index]~=nil and self.roomPersistence[index] or room.persistent
     self.vars.background_color=room.colour;self.vars.background_showcolor=room.showcolour

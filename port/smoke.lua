@@ -37,8 +37,13 @@ function Smoke.new(game,touch)
         tap(38);tap(90);tap(39);tap(90);wait(200)
         assert(game.roomState.name=="room_area1" and game.global.charname=="A","Naming -> first room failed")
         capture("native-flowers")
-        hold(40,10);hold(39,160);hold(38,20);hold(38,100)
+        hold(40,10);hold(39,160)
+        capture("native-corridor")
+        hold(38,20);hold(38,100)
         assert(game.roomState.name=="room_area1_2","First doorway failed")
+        local greeting=game:select(game.constants.OBJ_WRITER)[1]
+        assert(greeting and greeting.v.originalstring:find("Howdy",1,true),"Flowey's first greeting has the wrong text")
+        capture("native-greeting")
         for _=1,40 do
             tap(90);wait(30)
             if game.roomState.name~="room_area1_2" then break end
@@ -47,10 +52,13 @@ function Smoke.new(game,touch)
         wait(90)
         assert(#game:select(game.constants.obj_floweybattle1)==1,"Flowey controller is missing")
         assert(game.global.idealborder[0]==237 and game.global.idealborder[3]==385,"Battle borders are uninitialized")
+        local writer=game:select(game.constants.OBJ_WRITER)[1]
+        assert(writer and writer.v.originalstring:find("See that heart",1,true),"Wrong dialogue selected for Flowey")
+        assert(not writer.v.originalstring:find("Sit down",1,true),"Undyne's choice text leaked into Flowey")
         capture("native-flowey")
         touch.settings.pixels=true;touch:resize(touch.w,touch.h,touch.safe)
         capture("native-integer-scale")
-        print("NATIVE SMOKE PASS: touch navigation, flowers, Flowey, four rendered borders, soul, fit/integer presentation")
+        print("NATIVE SMOKE PASS: restored chamber/rings/corridor, touch navigation, correct SOUL dialogue, four rendered borders, fit/integer presentation")
         self.done=true;love.event.quit(0)
     end)
     return self
@@ -67,7 +75,27 @@ function Smoke:draw(viewport)
     local name=self.capture
     local g=love.graphics
     local data=self.game.canvas:newImageData()
-    if name=="native-flowey" then
+    local function worldPixel(x,y)
+        local v=self.game:views()[1]
+        return data:getPixel(math.floor(v.px+(x-v.x)*v.pw/v.w),math.floor(v.py+(y-v.y)*v.ph/v.h))
+    end
+    local function worldColor(x,y,expected)
+        local r,gg,b=worldPixel(x,y)
+        assert(math.abs(r-expected[1]/255)<0.03 and math.abs(gg-expected[2]/255)<0.03 and math.abs(b-expected[3]/255)<0.03,"Backdrop color mismatch at "..x..","..y)
+    end
+    if name=="native-flowers" then
+        local palette=require("port.opening_backdrops").palette
+        worldColor(150,190,palette.floor)
+        worldColor(65,150,palette.outer)
+        worldColor(85,150,palette.light)
+        worldColor(105,150,palette.grass)
+    elseif name=="native-corridor" then
+        worldColor(400,180,require("port.opening_backdrops").palette.floor)
+        local r,gg,b=worldPixel(586,122)
+        assert(r+gg+b>0.3,"The corridor doorway is missing")
+    elseif name=="native-greeting" then
+        worldColor(230,300,require("port.opening_backdrops").palette.floor)
+    elseif name=="native-flowey" then
         local function white(x,y)
             local r,gg,b=data:getPixel(x,y)
             assert(r>0.9 and gg>0.9 and b>0.9,"Missing native border pixel at "..x..","..y)
@@ -83,6 +111,19 @@ function Smoke:draw(viewport)
         -- The supplied base SOUL texture uses red=128/255; its flashing frame
         -- uses 255/255. Validate the actual palette, not assumed retail colors.
         assert(r>0.47 and gg<0.05 and b<0.05,"The native SOUL pixel is missing: "..r..","..gg..","..b)
+        local writer=self.game:select(self.game.constants.OBJ_WRITER)[1]
+        local bubble=self.game:select(self.game.constants.obj_blconwdflowey)[1]
+        local right=bubble.v.x+self.game:instanceGet(bubble,"sprite_width")
+        local bottom=bubble.v.y+self.game:instanceGet(bubble,"sprite_height")
+        local displayed={}
+        for _,entry in ipairs(self.game.drawLog) do
+            if entry[1]=="text" and entry[5]==writer.v.myfont and entry[4]<250 then
+                displayed[#displayed+1]=entry[2]
+                local glyph=self.game.assets.fonts[writer.v.myfont].glyphs[entry[2]:byte(1)]
+                assert(entry[3]+glyph.offset+glyph.w<=right and entry[4]+glyph.h<=bottom,"Dialogue overflows its bubble")
+            end
+        end
+        assert(table.concat(displayed):find("See that heart",1,true) and table.concat(displayed):find("SOUL",1,true),"Native dialogue content is wrong")
         assert(viewport.w>880,"Phone fit mode is still unnecessarily small")
         write("native-render.txt", "PASS\nroom="..self.game.roomState.name.."\nflowey_pixels="..colored.."\nviewport_width="..viewport.w.."\n")
     end
