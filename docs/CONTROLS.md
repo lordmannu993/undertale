@@ -68,9 +68,11 @@ others require a hold. Android Back is intentionally a safer pause action.
 
 ## Layout and settings
 
-Landscape reserves side controls outside the game image; portrait/4:3 reserves
-a bottom deck. The game retains its aspect ratio. Integer scaling is used when
-possible, with downscaling for smaller available areas. Safe-area insets are
+Landscape uses narrower, height-bounded side controls outside the game image;
+portrait/4:3 reserves
+a bottom deck. The game retains its aspect ratio. Aspect-preserving **Fit** scaling is the default and uses the whole available
+area with nearest-neighbour filtering. PAUSE → SCALE switches to optional
+integer-pixel scaling; small screens still downscale rather than crop. Safe-area insets are
 included when LÖVE/Android reports them.
 
 PAUSE offers size (80–125%), opacity (30–100%), left/right-handed layout, optional

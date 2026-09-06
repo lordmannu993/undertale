@@ -1,7 +1,7 @@
 -- Sandboxed, per-application saves. No desktop paths and no executable save data.
 return function(R)
     local B=R.builtins
-    local fs=love and love.filesystem
+    local fs=not R.options.memorySaves and love and love.filesystem
     local memory=R.options.storage or {}
     local handles,nextHandle={},1
     local ini=nil

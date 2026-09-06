@@ -311,7 +311,10 @@ function Runtime:compact()
 end
 
 function Runtime:gotoRoom(index)
-    if not self.manifest.rooms[index] then self:unsupported("room_goto","Missing room ID "..tostring(index)) end
+    if not self.manifest.rooms[index] then
+        local name=(self.manifest.missing_rooms or {})[index]
+        self:unsupported("room_goto","Missing original room "..tostring(index)..(name and " ("..name..")" or "")..". Its source data is not supplied; room IDs must not be compacted around this gap.")
+    end
     self.pendingRoom=index
 end
 function Runtime:roomData(index)

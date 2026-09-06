@@ -22,6 +22,12 @@ bundled. The `.love` archive is self-contained once built.
 
 ## Known blockers — do not hide these
 
+**An entire room is also absent:** original ID **159**, the Hotland
+walk-and-branch connector between the hot-dog stand and subsequent rooms.
+It is recorded in `missing_rooms`; attempting to enter it stops explicitly.
+This omission must not shift the IDs of the 334 rooms that are supplied.
+
+
 1. **38 referenced movement paths are absent.** The GMX project's `paths` section
    is empty. `path_start` fails with the missing path's name, rather than
    fabricating movement or falsely completing a cutscene. Path parsing/playback
@@ -91,8 +97,12 @@ included. ZIP timestamps and permissions are normalized and a SHA-256 is emitted
 
 The original GameMaker files have not been changed.
 
-- Original room order is recovered from the non-overlapping, sequential
-  `inst_100000...` ranges. Alphabetic order is demonstrably incorrect.
+- Editor instance IDs give relative room order, **not contiguous original IDs**.
+  Version 0.1.0 incorrectly compacted missing room slot **159**; all later numeric
+  room references were shifted. The exporter now preserves that hole and checks
+  independent elevator/battle/game-over anchors in `resource_overrides.json`.
+  Thus normal battle is 306, Flowey is 307, and game-over is 310. Adjacency does not
+  silently skip the missing Hotland room (`room_fire_walkandbranch`).
 - Original asset IDs are recovered from numeric decompiler annotations and
   adjacent `// object_name` / `with(id)` comments.
 - Music IDs are recovered from `scr_getmusindex` and explicit, documented

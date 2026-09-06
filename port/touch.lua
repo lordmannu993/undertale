@@ -4,7 +4,7 @@ local Touch = {}
 Touch.__index = Touch
 local function clamp(x,a,b) return math.max(a,math.min(b,x)) end
 local function inside(r,x,y) return x>=r.x and y>=r.y and x<r.x+r.w and y<r.y+r.h end
-local defaults = {scale=1, opacity=0.75, southpaw=false, haptics=false}
+local defaults = {scale=1, opacity=0.75, southpaw=false, haptics=false, pixels=false}
 local settingsPath = "touch-settings-v1.txt"
 local pages = {
     {name="Actions", keys={{"Enter",13},{"Shift",16},{"Ctrl",17},{"Space",32},{"Esc",27},
@@ -28,7 +28,7 @@ function Touch.new(input, mobile)
             for key,val in data:gmatch("([a-z]+)=([^\n]+)") do
                 if key=="scale" then self.settings.scale=clamp(tonumber(val) or 1,0.8,1.25)
                 elseif key=="opacity" then self.settings.opacity=clamp(tonumber(val) or 0.75,0.3,1)
-                elseif key=="southpaw" or key=="haptics" then self.settings[key]=val=="true" end
+                elseif key=="southpaw" or key=="haptics" or key=="pixels" then self.settings[key]=val=="true" end
             end
         end
     end
@@ -39,7 +39,7 @@ end
 function Touch:save()
     if not (love and love.filesystem) then return end
     local lines={}
-    for _,key in ipairs({"scale","opacity","southpaw","haptics"}) do lines[#lines+1]=key.."="..tostring(self.settings[key]) end
+    for _,key in ipairs({"scale","opacity","southpaw","haptics","pixels"}) do lines[#lines+1]=key.."="..tostring(self.settings[key]) end
     love.filesystem.write(settingsPath,table.concat(lines,"\n"))
 end
 
@@ -59,16 +59,18 @@ function Touch:resize(w,h,safe)
     if not self.visible then
         self.play={x=sx,y=sy,w=sw,h=sh}
     elseif sw/sh>=1.55 then
-        local rail=clamp(sw*0.205,126,sh*0.60)
+        -- Narrow, height-bounded rails leave substantially more space for the
+        -- game on wide phones without putting controls over its canvas.
+        local rail=clamp(math.min(sw*0.14,sh*0.26),96,176)
         self.play={x=sx+rail+8,y=sy+bar,w=sw-2*rail-16,h=sh-bar-8}
-        local r=clamp(math.min(rail*0.37,sh*0.24)*self.settings.scale,46,rail*0.46)
+        local r=clamp(rail*0.42*self.settings.scale,38,rail*0.47)
         self.pad={x=sx+rail/2,y=sy+sh*0.62,r=r}
-        local size=clamp(math.min(rail*0.38,sh*0.18)*self.settings.scale,44,rail*0.48)
+        local size=clamp(rail*0.56*self.settings.scale,44,math.min(rail*0.64,sh*0.20))
         local cx=sx+sw-rail/2
         self.controls={
-            {label="Z",caption="CONFIRM",key=90,x=cx-size*0.1,y=sy+sh*0.61,w=size,h=size},
-            {label="X",caption="CANCEL",key=88,x=cx-size*0.95,y=sy+sh*0.38,w=size,h=size},
-            {label="C",caption="MENU",key=67,x=cx-size*0.1,y=sy+sh*0.14,w=size,h=size},
+            {label="Z",caption="CONFIRM",key=90,x=cx-size/2+rail*0.06,y=sy+sh*0.61,w=size,h=size},
+            {label="X",caption="CANCEL",key=88,x=cx-size/2-rail*0.06,y=sy+sh*0.38,w=size,h=size},
+            {label="C",caption="MENU",key=67,x=cx-size/2+rail*0.06,y=sy+sh*0.14,w=size,h=size},
         }
     else
         -- Portrait and 4:3: game above a separate control deck, never stretched.
@@ -140,6 +142,7 @@ function Touch:layoutMenu()
     b("RESET CONTROLS","reset",0,3); b("EXTRA KEYS","keys",1,3)
     b("RESUME","pause",0,4); b("TOUCH ON / OFF","visible",1,4)
     b("CONTROL TEST","test",0,5)
+    b(self.settings.pixels and "SCALE: INTEGER" or "SCALE: FIT","pixels",1,5)
 end
 
 function Touch:setPaused(value)
@@ -181,6 +184,7 @@ function Touch:action(button)
     elseif a=="stronger" then self.settings.opacity=clamp(self.settings.opacity+0.1,0.3,1)
     elseif a=="southpaw" then self.settings.southpaw=not self.settings.southpaw
     elseif a=="haptics" then self.settings.haptics=not self.settings.haptics
+    elseif a=="pixels" then self.settings.pixels=not self.settings.pixels
     elseif a=="reset" then for k,v in pairs(defaults) do self.settings[k]=v end end
     self:save()
     self:resize(self.w,self.h,self.safe)

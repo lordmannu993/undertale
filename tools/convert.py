@@ -156,8 +156,21 @@ class Converter:
                 self.add_id(name, int(index), "decompiler annotation")
             for name, index in re.findall(r"//\s*(\w+)\s*\n\s*with\((\d+)\)", code):
                 self.add_id(name, int(index), "decompiler with annotation")
-        # All 334 rooms contain monotonic inst_100000... IDs. Their original
-        # order survives here even though the resource tree was sorted.
+        overrides_file = self.root / "port/resource_overrides.json"
+        overrides = json.loads(self.read(overrides_file)) if overrides_file.exists() else {}
+        # Instance IDs establish RELATIVE order, not contiguous resource IDs.
+        # The omitted Hotland room occupies original slot 159; compacting this
+        # hole routed Flowey into a test room and broke every later raw room ID.
+        gaps = overrides.get("room_id_gaps", [])
+        missing = {g["id"]: g for g in gaps}
+        if len(missing) != len(gaps) or any(type(i) is not int or i < 0 for i in missing):
+            raise CompileError("invalid or duplicate room ID gaps")
+        if any(g["name"] in self.resources["rooms"] for g in gaps):
+            raise CompileError("a declared missing room now exists; review its original ID before converting")
+        self.missing_rooms = {i: g["name"] for i, g in missing.items()}
+        self.report["missing_rooms"] = gaps
+        # Keep the non-overlapping editor order, constrained by the documented
+        # gaps and independent original-ID anchors in resource_overrides.json.
         ordered = []
         for name, (_, room) in self.resources["rooms"].items():
             numbers = []
@@ -170,12 +183,21 @@ class Converter:
                 raise CompileError(f"{name}: no instance IDs; supply an explicit original room order")
             ordered.append((min(numbers), max(numbers), name))
         ordered.sort()
+        self.room_order = []
+        slot, used_gaps = 0, set()
         for i, (lo, hi, name) in enumerate(ordered):
             if i and ordered[i - 1][1] >= lo:
                 raise CompileError("overlapping room instance ranges: cannot infer room order safely")
-            self.add_id(name, i, "monotonic room instance IDs")
-        self.room_order = [self.ids["rooms"][x[2]] for x in ordered]
-        self.report["repairs"].append("Recovered original room order from non-overlapping sequential instance IDs, not alphabetic GMX order.")
+            while slot in missing:
+                self.room_order.append(slot)  # next/previous must not silently skip missing rooms
+                used_gaps.add(slot)
+                slot += 1
+            self.add_id(name, slot, "relative instance order with documented original-ID gaps")
+            self.room_order.append(slot)
+            slot += 1
+        if used_gaps != set(missing):
+            raise CompileError("room ID gap is outside the reconstructed room sequence")
+        self.report["repairs"].append("Reconstructed room IDs from relative instance order, preserving missing slot 159 and checking independent room-call anchors; no contiguous-ID assumption.")
         # The stream adapter explicitly identifies most of the remaining music.
         music = self.resources["scripts"]["scr_getmusindex"][1]
         unresolved_music = []
@@ -190,8 +212,6 @@ class Converter:
             else:
                 unresolved_music.append({"file": filename, "id": int(index)})
         self.report["unresolved_music_aliases"] = unresolved_music
-        overrides_file = self.root / "port/resource_overrides.json"
-        overrides = json.loads(overrides_file.read_text()) if overrides_file.exists() else {}
         for category, entries in overrides.get("ids", {}).items():
             for name, index in entries.items():
                 if self.category.get(name) != category:
@@ -415,7 +435,7 @@ class Converter:
                 asset_modules.append((category, module))
         manifest = {"format": 1, "source_digest": self.digest.hexdigest(), "names": {},
                     "objects": {}, "scripts": {}, "rooms": {}, "room_order": self.room_order,
-                    "paths": self.paths, "keys": sorted(self.keys),
+                    "paths": self.paths, "missing_rooms": self.missing_rooms, "keys": sorted(self.keys),
                     "asset_modules": [{"kind": k, "module": "generated." + m.replace("/", ".")} for k, m in asset_modules]}
         for category, mapping in self.ids.items():
             for name, index in mapping.items():

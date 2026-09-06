@@ -1,7 +1,9 @@
 local Input=require("port.input")
 local Touch=require("port.touch")
 local Runtime=require("port.runtime")
+local Presentation=require("port.presentation")
 local input,touch,game
+local smoke,smokeMode=nil,false
 local accumulator=0
 local errorMessage=nil
 local tester=false
@@ -30,6 +32,11 @@ local function fail(err)
     love.graphics.reset()
     love.graphics.setDefaultFilter("nearest","nearest")
     love.filesystem.write("last-port-error.txt",errorMessage.."\n\nThis is an experimental conversion. See generated/conversion-report.json.\n")
+    if smokeMode then
+        local f=io.open("port-test-output/native-error.txt","w")
+        if f then f:write(errorMessage);f:close() end
+        love.event.quit(1)
+    end
 end
 local function boot()
     if game then game:flushSaves();game:releaseAudio();game:releaseGraphics() end
@@ -39,7 +46,7 @@ local function boot()
         return
     end
     local ok,err=pcall(function()
-        game=Runtime.new(require("generated.manifest"),input,{})
+        game=Runtime.new(require("generated.manifest"),input,{trace=smokeMode,memorySaves=smokeMode,seed=smokeMode and 42 or nil})
         game:start()
     end)
     if not ok then fail(err) end
@@ -51,6 +58,11 @@ local function setTester(value)
 end
 
 function love.load(args)
+    for _,a in ipairs(args or {}) do if a=="--smoke-test" then smokeMode=true end end
+    if smokeMode then
+        love.filesystem.setIdentity("undertale-love-port-selftest")
+        love.window.setMode(1440,720,{resizable=true,vsync=0})
+    end
     love.graphics.setDefaultFilter("nearest","nearest")
     love.graphics.setLineStyle("rough")
     mobile=love.system.getOS()=="Android" or love.system.getOS()=="iOS"
@@ -65,7 +77,12 @@ function love.load(args)
     touch.onTest=function() setTester(not tester) end
     resize()
     for _,a in ipairs(args or {}) do if a=="--touch" then touch.visible=true;resize() elseif a=="--input-test" then tester=true end end
+    if smokeMode then
+        touch.visible=true;touch.settings.scale=1;touch.settings.pixels=false
+        touch.settings.southpaw=false;touch.settings.haptics=false;resize()
+    end
     boot()
+    if smokeMode and not errorMessage then smoke=require("port.smoke").new(game,touch) end
     if tester then setTester(true) end
 end
 
@@ -87,6 +104,7 @@ function love.update(dt)
     while accumulator>=frameTime and steps<5 do
         accumulator=accumulator-frameTime;steps=steps+1
         local ok,err=pcall(function()
+            if smoke then smoke:beforeTick() end
             input:beginFrame()
             game:step()
             game:renderFrame()
@@ -100,11 +118,6 @@ function love.update(dt)
     end
 end
 
-local function fit(rect,w,h)
-    local scale=math.min(rect.w/w,rect.h/h)
-    if scale>=1 then scale=math.max(1,math.floor(scale)) end
-    return {x=math.floor(rect.x+(rect.w-w*scale)/2),y=math.floor(rect.y+(rect.h-h*scale)/2),w=w*scale,h=h*scale,scale=scale}
-end
 local function box(b,text)
     local g=love.graphics;g.setColor(0.12,0.19,0.22,1);g.rectangle("fill",b.x,b.y,b.w,b.h,8)
     g.setColor(0.75,0.95,0.89,1);g.printf(text,b.x,b.y+(b.h-g.getFont():getHeight())/2,b.w,"center")
@@ -115,7 +128,7 @@ function love.draw()
     g.push("all")
     local p=touch.play
     if game and game.canvas and not tester and not errorMessage then
-        viewport=fit(p,game.displayWidth,game.displayHeight)
+        viewport=Presentation.fit(p,game.displayWidth,game.displayHeight,touch.settings.pixels)
         g.setColor(1,1,1,1);g.setBlendMode("alpha","premultiplied")
         g.draw(game.canvas,viewport.x,viewport.y,0,viewport.scale,viewport.scale)
         g.setBlendMode("alpha")
@@ -143,6 +156,10 @@ function love.draw()
     if touch.w>650 then g.printf("EXPERIMENTAL LOVE PORT",160,10,touch.w-320,"center") end
     g.pop()
     touch:draw()
+    if smoke then
+        local ok,err=pcall(function() smoke:draw(viewport) end)
+        if not ok then fail(err) end
+    end
 end
 
 local function hit(b,x,y) return b and x>=b.x and x<=b.x+b.w and y>=b.y and y<=b.y+b.h end
@@ -208,10 +225,11 @@ function love.gamepadaxis(joystick,axis,value) if not touch.paused then input:ga
 function love.joystickremoved(joystick) input:releasePrefix("gamepad:"..tostring(joystick)..":") end
 function love.resize() if touch then resize();accumulator=0 end end
 function love.focus(value)
+    if smokeMode then return end -- Xvfb may have no window manager; not a lifecycle test
     focused=value
     if not value and touch then touch:setPaused(true) end
 end
-function love.visible(value) if not value then love.focus(false) else focused=true end end
+function love.visible(value) if smokeMode then return end; if not value then love.focus(false) else focused=true end end
 function love.lowmemory()
     if game then
         game:trimGraphicsCache();game:trimAudioCache()

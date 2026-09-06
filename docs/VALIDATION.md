@@ -7,12 +7,16 @@ Validation date: **2026-09-06**.
 - Converted all **20,285** source units with **zero parse failures**.
 - Compiled every generated Lua chunk, runtime module, `main.lua` and `conf.lua`
   with both **LuaJIT 2.1** and **Lua 5.1** (through Lupa).
-- **101 tests passed** in the automated pytest suite; it covers:
+- **121 tests passed** in the automated pytest suite; it covers:
   - GML expressions, strings/comments, numeric booleans, zero-based/2D arrays,
     post-increment, loops, break/continue, switch fall-through and large-switch
     partitioning, `with`/`other`, locals, inheritance and script arguments.
   - The actual converted opening story, title, naming grid, initial overworld
     movement, C menu, X cancel, first doorway, and original save/load scripts.
+  - The complete normal-input route into Flowey's tutorial: enemy, four nonzero
+    borders, and dialogue are present; the test/utility room is never entered.
+  - The missing room-159 gap, later original room IDs, and game-over routing.
+  - Fit/integer display modes, full-area scaling, and minimum main-button sizes.
   - Input ownership, two fingers plus a hardware key, auto-repeat suppression,
     between-tick taps, key remapping/direct checks, cancellation, gamepad drift,
     disconnect, mouse isolation, D-pad sliding, and cross-page held keys.
@@ -90,3 +94,19 @@ steps to reproduce, route/save state, LÖVE version, device model, Android versi
 screen size/insets, and whether a physical keyboard/gamepad was connected.
 Do not attach credentials. Never replace a missing path with a no-op to make a
 smoke test pass; report and recover the missing source data instead.
+
+## Native regression command
+
+With LÖVE, `xvfb` and `xauth` installed on Linux:
+
+```sh
+python3 tools/package.py
+bash tools/native_smoke.sh
+```
+
+The opt-in `--smoke-test` driver uses real touch callbacks, normal game ticks,
+and native rendering from the packaged archive. It requests screenshots of the
+flower room, Flowey tutorial and integer scaling, and checks border/enemy/SOUL
+pixels. It uses a separate LÖVE identity and in-memory game saves, and does not
+modify your playthrough. Xvfb focus changes are ignored in this test mode only;
+this is not an Android lifecycle test. Outputs go to `port-test-output/`.
