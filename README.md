@@ -12,9 +12,9 @@ this workspace. See [port status](docs/PORTING.md) and [validation](docs/VALIDAT
 
 ## Download the experimental `.love` file
 
-[**Download `undertale-love-v0.1.2-experimental.love` (~124 MB)**](https://github.com/lordmannu993/undertale/releases/download/love-v0.1.2-experimental/undertale-love-v0.1.2-experimental.love)
+[**Download `undertale-love-v0.1.3-experimental.love` (~124 MB)**](https://github.com/lordmannu993/undertale/releases/download/love-v0.1.3-experimental/undertale-love-v0.1.3-experimental.love)
 
-[Release notes, SHA-256 checksum, and conversion report](https://github.com/lordmannu993/undertale/releases/tag/love-v0.1.2-experimental)
+[Release notes, SHA-256 checksum, and conversion report](https://github.com/lordmannu993/undertale/releases/tag/love-v0.1.3-experimental)
 
 Download the **`.love` asset**, not GitHub's automatic “Source code” ZIP. It
 contains the generated Lua and supplied assets; you do not need Python or
@@ -26,7 +26,21 @@ missing resources and native-testing limitations described above still apply.
 The large archive is hosted as a GitHub Release asset rather than committed to
 Git. To regenerate it yourself, follow the build instructions below.
 
-### Fixed in v0.1.2
+### Fixed in v0.1.3
+
+- Fix the sprite-glitch softlock at the end of Flowey's tutorial fight. The
+  damaged export negated `obj_dialoguer`'s `obj_face` cleanup guards, so dialogue
+  face portraits leaked — Flowey's face followed the player out of the battle,
+  stacked on Toriel's, and the stray Toriel face then blocked `obj_floweytrigger`
+  forever. Both guards are restored as an audited, hash-guarded conversion repair;
+  the original GameMaker files are unchanged.
+- Restore Toriel's directional overworld sprite IDs so her walk animations resolve
+  to the correct original sprites.
+- Add regression coverage that plays the full tutorial battle through its ending
+  (faces cleaned up, trigger advances, control returned). **145 automated tests**
+  now pass.
+
+### Also fixed in v0.1.2
 
 - Restore the missing opening chamber floor, light rings, corridor and doorway
   using the supplied reference views, palette and room coordinates. These are
@@ -36,7 +50,7 @@ Git. To regenerate it yourself, follow the build instructions below.
   Papyrus-call tables are repaired too, with source-hash guards.
 - Correct original font IDs and malformed text-setup spacing arguments.
 - Check the actual dialogue words and bubble bounds, plus native floor/ring/door
-  pixels and five scene screenshots. **143 automated tests** now pass.
+  pixels and five scene screenshots.
 
 ### Also fixed in v0.1.1
 
@@ -48,12 +62,12 @@ Git. To regenerate it yourself, follow the build instructions below.
 - Regression coverage now includes the actual Flowey transition and a native Linux
   LÖVE smoke test with touch callbacks and pixel checks, required before publishing.
 
-Close the old running game and open the new, versioned download; resuming the old
-Android recent-app card will keep running v0.1.0. Your save identity is unchanged.
-The original flower tiles and gameplay collision layout are retained. v0.1.2 adds
-reference-guided backdrop artwork only to the two incomplete opening rooms;
-other rooms are not replaced by a generic background. Missing path data remains
-unresolved.
+Close the old running game and open the new, versioned download; resuming an old
+Android recent-app card will keep running the previous build. Your save identity is
+unchanged. The original flower tiles and gameplay collision layout are retained.
+The reference-guided backdrop artwork added in v0.1.2 applies only to the two
+incomplete opening rooms; other rooms are not replaced by a generic background.
+Missing path data remains unresolved.
 
 ## Run with LÖVE
 

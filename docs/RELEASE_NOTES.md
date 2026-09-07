@@ -4,29 +4,36 @@ This prerelease makes the current `.love` package downloadable from GitHub. It
 contains the converted Lua and the assets supplied in this repository. **It is
 not a completed or native-device-verified game, and it is not an APK.**
 
-## v0.1.2 fixes
+## v0.1.3 fixes
 
-- Restore reference-guided opening scenery: the chamber floor, light rings,
-  corridor and doorway. Original flower tiles and collision are unchanged.
-  This is an explicit reconstruction, not a claim of recovered original tiles.
-- Correct decompiler-reversed dialogue labels: Flowey now explains the SOUL,
-  rather than showing Undyne's chair question. Repair the verified item/phone/
-  encounter/Papyrus-call tables with exact source-hash guards as well.
-- Fix font IDs for the main/damage/HUD/Sans/Papyrus/Wingdings roles and malformed
-  decimal-comma arguments that shifted text speed/sound/line spacing.
-- Require exact dialogue-content and text-bounds assertions, plus native floor,
-  light-ring and doorway pixels and five scene screenshots.
-- Retain the v0.1.1 room-ID gap, proper Flowey/battle/game-over routing and larger
-  phone Fit viewport.
+- Fix the sprite-glitch softlock at the end of Flowey's tutorial fight. The
+  damaged GMX export negated `obj_dialoguer`'s `obj_face` cleanup guards (its
+  Destroy event and the no-face branch of its Step event), so dialogue face
+  portraits leaked: Flowey's face followed the player out of the battle, stacked
+  on top of Toriel's, and the leftover Toriel face then blocked
+  `obj_floweytrigger`'s `!instance_exists(obj_torface)` check forever. Both
+  guards are restored — verified against the shipped game's decompilation and
+  applied as an audited, per-event SHA-256-guarded conversion repair. The
+  original GameMaker files are unchanged.
+- Restore Toriel's directional overworld sprite IDs (`spr_toriel_dt`/`_r`/`_l`/
+  `_rt`/`_lt`), so her walk animations resolve to the correct original sprites.
+- Add regression coverage that plays the full tutorial battle through its ending:
+  it checks the faces are cleaned up, `obj_floweytrigger` advances, and player
+  control is returned. An audit test verifies the repair report and rejects a
+  different source export. **145 automated tests** now pass.
+- Retain every v0.1.2 fix: reference-guided opening scenery, decompiler-reversed
+  dialogue-label repairs, correct font IDs, the room-ID gap and proper Flowey/
+  battle/game-over routing, and the larger phone Fit viewport.
 
-Close the old running LÖVE game before opening the new versioned file. The same
-save identity is retained. Flowey's alternate greetings on repeat attempts are
-normal saved-history behaviour, not scrambled dialogue. Android's rotated/dimmed
+Close the old running LÖVE game before opening the new versioned file; resuming an
+old Android recent-app card will keep running the previous build. The same save
+identity is retained. Flowey's alternate greetings on repeat attempts are normal
+saved-history behaviour, not scrambled dialogue. Android's rotated/dimmed
 recent-app thumbnail is not an in-game rendering setting.
 
 ## Download and try
 
-1. Download **`undertale-love-v0.1.2-experimental.love`** from the assets below
+1. Download **`undertale-love-v0.1.3-experimental.love`** from the assets below
    (approximately 124 MB). Do not download GitHub's automatic “Source code” ZIP
    if you want to try the packaged game.
 2. Install the official **LÖVE 11.5 runtime** for your platform:

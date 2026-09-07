@@ -2,12 +2,12 @@
 
 ## Executed in this workspace
 
-Validation date: **2026-09-06**.
+Validation date: **2026-09-07**.
 
 - Converted all **20,285** source units with **zero parse failures**.
 - Compiled every generated Lua chunk, runtime module, `main.lua` and `conf.lua`
   with both **LuaJIT 2.1** and **Lua 5.1** (through Lupa).
-- **143 tests passed** in the automated pytest suite; it covers:
+- **145 tests passed** in the automated pytest suite; it covers:
   - GML expressions, strings/comments, numeric booleans, zero-based/2D arrays,
     post-increment, loops, break/continue, switch fall-through and large-switch
     partitioning, `with`/`other`, locals, inheritance and script arguments.
@@ -19,6 +19,10 @@ Validation date: **2026-09-06**.
     source-hash guards for the nine damaged switch tables.
   - The complete normal-input route into Flowey's tutorial: enemy, four nonzero
     borders, and dialogue are present; the test/utility room is never entered.
+  - The full tutorial battle played through its ending: dialogue face portraits
+    are cleaned up (no leaked Flowey/Toriel faces), `obj_floweytrigger` advances,
+    and player control returns — the v0.1.3 softlock fix, with an audit test that
+    checks the repair report and rejects a different source export.
   - The missing room-159 gap, later original room IDs, and game-over routing.
   - Fit/integer display modes, full-area scaling, and minimum main-button sizes.
   - Input ownership, two fingers plus a hardware key, auto-repeat suppression,
