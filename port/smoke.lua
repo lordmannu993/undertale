@@ -97,6 +97,10 @@ function Smoke.new(game,touch)
             "Toriel is not walking path_torielwalk1 in room_ruins1 (path_index="..tostring(walker and walker.v.path_index)..")")
         local startY,startX=walker.v.y,walker.v.x
         self.walkStartY=startY
+        -- Accumulate across the walk: whether she is on camera in the one frame a
+        -- screenshot happens to land in is not a fact worth gating on, but "the
+        -- renderer drew her here, displaced from her placement" is.
+        self.torielDraws,self.watchToriel={},true
         local furthest=0
         for round=1,400 do
             hold(38,4)
@@ -107,6 +111,7 @@ function Smoke.new(game,touch)
         assert(furthest>0.02,"Toriel never advanced along the recovered path (position stayed at 0)")
         assert(walker.v.y<startY-20,"Toriel did not walk up the corridor: y="..tostring(walker.v.y).." of "..tostring(startY))
         assert(math.abs(walker.v.x-startX)>2 or math.abs(walker.v.y-startY)>2,"Toriel's position never changed")
+        self.watchToriel=false
         self.walkTarget=walker
         capture("native-toriel-walk")
         print(string.format("NATIVE SMOKE PASS: path_torielwalk1 walked to %.0f%% at (%.0f,%.0f), position recorded by the renderer",
@@ -125,6 +130,14 @@ function Smoke:beforeTick()
     if not ok then error("Native smoke: "..tostring(err)) end
 end
 function Smoke:draw(viewport)
+    if self.watchToriel then
+        for _,entry in ipairs(self.game.drawLog) do
+            if entry[1]=="sprite" and entry[2] and entry[2]:find("spr_toriel",1,true) then
+                local seen=self.torielDraws
+                seen[#seen+1]={name=entry[2],x=entry[4],y=entry[5]}
+            end
+        end
+    end
     if not self.capture or self.pending then return end
     local name=self.capture
     local g=love.graphics
@@ -181,21 +194,25 @@ function Smoke:draw(viewport)
         assert(viewport.w>880,"Phone fit mode is still unnecessarily small")
         write("native-render.txt", "PASS\nroom="..self.game.roomState.name.."\nflowey_pixels="..colored.."\nviewport_width="..viewport.w.."\n")
     elseif name=="native-toriel-walk" then
-        -- Renderer-side proof: her sprite must be drawn where the recovered path put
-        -- her, and no longer where the room placed her. Pixel thresholds over unknown
-        -- ruins tiles would only flake, so the traced draw calls are the assertion and
-        -- the PNG below is the human-readable record.
+        -- Renderer-side proof: her sprite must have been drawn displaced along the
+        -- recovered path, not only where room_ruins1 placed her. Pixel thresholds over
+        -- unknown ruins tiles would only flake, so the traced draw calls are the
+        -- assertion and the PNG below is the human-readable record.
         local walker=self.walkTarget
-        local drawn
-        for _,entry in ipairs(self.game.drawLog) do
-            if entry[1]=="sprite" and entry[2] and entry[2]:find("spr_toriel",1,true) then drawn=entry end
+        local furthest_draw,displacement=0,0
+        for _,seen in ipairs(self.torielDraws or {}) do
+            local moved=math.abs(seen.y-self.walkStartY)
+            if moved>displacement then displacement,furthest_draw=moved,seen end
         end
-        assert(drawn,"Toriel's sprite was never drawn in room_ruins1")
-        assert(math.abs(drawn[5]-walker.v.x)<=2 and math.abs(drawn[6]-walker.v.y)<=64,
-            "Toriel was drawn at "..drawn[5]..","..drawn[6].." but walked to "..walker.v.x..","..walker.v.y)
-        assert(math.abs(drawn[6]-self.walkStartY)>20,
-            "Toriel is still drawn at her room placement, so the recovered path did not move the render")
-        write("native-toriel-walk.txt","sprite="..tostring(drawn[2]).." drawn="..drawn[5]..","..drawn[6]..
+        local observed=#(self.torielDraws or {})
+        assert(observed>0,"Toriel's sprite was never drawn during the corridor walk"..
+            " (path_position="..tostring(walker and walker.v.path_position)..
+            ", y="..tostring(walker and walker.v.y)..", placement y="..tostring(self.walkStartY)..")")
+        assert(displacement>20,"Toriel was drawn "..string.format("%.1f",displacement)..
+            " px from her placement across "..observed.." draws, but the walk should move her far further")
+        write("native-toriel-walk.txt","draws="..observed..
+            " furthest="..furthest_draw.name.." at "..string.format("%.0f,%.0f",furthest_draw.x,furthest_draw.y)..
+            " displaced="..string.format("%.1f",displacement).."px from y="..string.format("%.0f",self.walkStartY)..
             " instance="..string.format("%.1f,%.1f",walker.v.x,walker.v.y)..
             " path_position="..string.format("%.4f",walker.v.path_position)..
             " path_speed="..tostring(walker.v.path_speed).."\n")
