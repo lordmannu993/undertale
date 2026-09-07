@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 from tools.gml import CompileError
-from tools.source_repairs import repair_script
+from tools.source_repairs import repair_object_event, repair_script
 from test_regressions import enter_flowey
 
 
@@ -72,6 +72,21 @@ def test_source_repairs_are_audited_and_reject_different_input(converted):
     assert any('decimal-comma' in r for r in report['repairs'])
     with pytest.raises(CompileError,match='source changed'):
         repair_script('SCR_TEXT','switch(argument0) {case 0: exit;}',{'repairs':[]})
+
+
+def test_dialoguer_face_cleanup_repair_is_audited(converted):
+    # The damaged export negated obj_dialoguer's obj_face cleanup guard, leaking
+    # dialogue portraits (Flowey's face followed the player into and out of the
+    # tutorial fight and Toriel's face then softlocked obj_floweytrigger).
+    report=json.loads((converted/'conversion-report.json').read_text())
+    repaired=[r for r in report['repairs'] if 'obj_face cleanup' in r]
+    assert len(repaired) == 2
+    assert {'1:0','3:0'} == {r.partition(' event ')[2].split(': ',1)[0] for r in repaired}
+    destroy=(converted/'objects'/'obj_dialoguer.lua').read_text()
+    assert 'if R.truth(R:call("instance_exists", E, 774))' in destroy
+    assert 'if R.truth(R.num(not R.truth(R:call("instance_exists", E, 774))))' not in destroy
+    with pytest.raises(CompileError,match='source changed'):
+        repair_object_event('obj_dialoguer','1:0','instance_destroy();',{'repairs':[]})
 
 
 def test_opening_backdrops_are_scoped_and_keep_original_flower_tiles(lua,converted):

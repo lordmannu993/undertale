@@ -4,6 +4,13 @@ The decompiler paired descending switch labels with ascending branch bodies.
 Independent anchors: item 1=Candy, 3=Stick, phone 201=Hello, MSC 200=Flowey,
 MSC 666=SOUL, and old damage/Sans/Papyrus font callers. Keep branch bodies and
 fall-through untouched. Hash guards refuse to rewrite a different source export.
+
+The export also negated obj_dialoguer's obj_face cleanup guards in two events.
+The shipped game (checked against the verified data.win decompilation) destroys
+the dialogue face portraits when the dialoguer ends. With the guard negated the
+faces leak: Flowey's face survives into and out of the tutorial battle, stacks
+on top of Toriel's face afterwards, and the leftover Toriel face then blocks
+obj_floweytrigger's `!instance_exists(obj_torface)` check forever (softlock).
 """
 import hashlib
 import re
@@ -48,4 +55,34 @@ def repair_script(name, source, report):
         source, count = re.subn(r", 1,([245]),", r", 1.\1,", source)
         if count:
             report['repairs'].append(f"{name}: repaired {count} decimal-comma shake arguments; retained ten-argument text setup.")
+    return source
+
+
+# obj_dialoguer events whose obj_face cleanup guard the export negated.
+DIALOGUER_FACE_CLEANUP = {
+    # Destroy: shipped game runs `if (instance_exists(obj_face) == 1) with (obj_face) instance_destroy()`.
+    "1:0": "8b7b4f3b91494833adc79c4beb78c3001d42f01b2707f9fe5f884ea6cf020e11",
+    # Step, facechoice == 0 branch: shipped game runs the same guarded cleanup.
+    "3:0": "19b1c7e31952cce4f6f6de61515dc1e1d10b2d0b08b9bd6b5e2a86fa2d3526ad",
+}
+FACE_CLEANUP_BROKEN = re.compile(
+    r"if\(!instance_exists\(774/\* obj_face \*/\)\)"
+    r"(\s*\{\s*\n\s*// obj_face\n\s*with\(774\) instance_destroy\(\);\s*\n\s*\})"
+)
+
+
+def repair_object_event(name, event_key, source, report):
+    if name == "obj_dialoguer" and event_key in DIALOGUER_FACE_CLEANUP:
+        digest = DIALOGUER_FACE_CLEANUP[event_key]
+        normalized = source.replace("\r\n", "\n")
+        if hashlib.sha256(normalized.encode()).hexdigest() != digest:
+            raise CompileError(f"obj_dialoguer event {event_key}: source changed; review the face-cleanup repair instead of applying it blindly")
+        repaired, count = FACE_CLEANUP_BROKEN.subn(r"if(instance_exists(774/* obj_face */))\1", normalized)
+        if count != 1:
+            raise CompileError(f"obj_dialoguer event {event_key}: expected exactly one negated obj_face cleanup guard, found {count}")
+        report['repairs'].append(
+            f"obj_dialoguer event {event_key}: restored the negated obj_face cleanup guard so dialogue faces are destroyed "
+            f"when the dialoguer ends, matching the shipped game (source SHA-256 {digest})."
+        )
+        return repaired
     return source
