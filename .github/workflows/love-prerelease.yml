@@ -4,7 +4,7 @@ on:
   # Bootstrap publication from this unmerged branch without changing master.
   # Ordinary source pushes do not republish the immutable prerelease.
   push:
-    branches: [arena/01a07c38-undertale]
+    branches: [arena/01a07d10-undertale]
     paths: [.github/workflows/love-prerelease.yml]
   workflow_dispatch:
 
@@ -12,16 +12,16 @@ permissions:
   contents: read
 
 concurrency:
-  group: love-v0.1.3-experimental-publication
+  group: love-v0.1.4-experimental-publication
   cancel-in-progress: false
 
 env:
-  RELEASE_TAG: love-v0.1.3-experimental
-  ASSET_BASE: undertale-love-v0.1.3-experimental
+  RELEASE_TAG: love-v0.1.4-experimental
+  ASSET_BASE: undertale-love-v0.1.4-experimental
 
 jobs:
   publish:
-    if: github.ref == 'refs/heads/arena/01a07c38-undertale'
+    if: github.ref == 'refs/heads/arena/01a07d10-undertale'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
@@ -103,10 +103,10 @@ jobs:
         run: |
           gh release edit "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" \
             --target "$GITHUB_SHA" --prerelease --latest=false \
-            --title 'LOVE v0.1.3 — Flowey battle-end softlock fix (experimental)' \
+            --title 'LOVE v0.1.4 — registry and room recovery (experimental)' \
             --notes-file build/release-notes.md
           gh release upload "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --clobber \
-            "artifacts/$ASSET_BASE.love#LOVE v0.1.3 (experimental)" \
+            "artifacts/$ASSET_BASE.love#LOVE v0.1.4 (experimental)" \
             "artifacts/$ASSET_BASE.love.sha256#SHA-256 checksum" \
             "artifacts/$ASSET_BASE.conversion-report.json#Conversion report and missing resources"
           gh api "repos/$GITHUB_REPOSITORY/releases/$RELEASE_ID" > build/release-assets.json

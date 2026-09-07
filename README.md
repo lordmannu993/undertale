@@ -12,9 +12,9 @@ this workspace. See [port status](docs/PORTING.md) and [validation](docs/VALIDAT
 
 ## Download the experimental `.love` file
 
-[**Download `undertale-love-v0.1.3-experimental.love` (~124 MB)**](https://github.com/lordmannu993/undertale/releases/download/love-v0.1.3-experimental/undertale-love-v0.1.3-experimental.love)
+[**Download `undertale-love-v0.1.4-experimental.love` (~124 MB)**](https://github.com/lordmannu993/undertale/releases/download/love-v0.1.4-experimental/undertale-love-v0.1.4-experimental.love)
 
-[Release notes, SHA-256 checksum, and conversion report](https://github.com/lordmannu993/undertale/releases/tag/love-v0.1.3-experimental)
+[Release notes, SHA-256 checksum, and conversion report](https://github.com/lordmannu993/undertale/releases/tag/love-v0.1.4-experimental)
 
 Download the **`.love` asset**, not GitHub's automatic “Source code” ZIP. It
 contains the generated Lua and supplied assets; you do not need Python or
@@ -25,6 +25,12 @@ APK and requires the LÖVE runtime.
 missing resources and native-testing limitations described above still apply.
 The large archive is hosted as a GitHub Release asset rather than committed to
 Git. To regenerate it yourself, follow the build instructions below.
+
+### Fixed in v0.1.4
+
+- Recover and ship pinned exact-name resource registry evidence, reducing unresolved static references from 86 to 44.
+- Recover the missing Hotland room 159 source with provenance and include it in the archive; the GMS2-to-GMX adapter remains experimental and the runtime still stops explicitly at that slot.
+- Preserve reproducible conversion reports and source provenance in the downloadable archive.
 
 ### Fixed in v0.1.3
 
