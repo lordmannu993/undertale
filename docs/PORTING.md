@@ -110,6 +110,14 @@ The original GameMaker files have not been changed.
   rule or an unchecked rewrite of arbitrary switches.
 - Malformed decimal-comma shake values in `SCR_TEXTTYPE` and `_f` are repaired so
   the ten text-setup arguments do not shift into sound/spacing fields.
+- The export negated `obj_dialoguer`'s `obj_face` cleanup guards (its Destroy
+  event and the no-face branch of its Step event). The shipped game destroys the
+  dialogue face portraits when the dialoguer ends; with the guard negated they
+  leak, so Flowey's portrait followed the player out of the tutorial battle,
+  stacked on top of Toriel's, and the leftover Toriel face then blocked
+  `obj_floweytrigger`'s `!instance_exists(obj_torface)` check forever — the
+  sprite-glitch softlock at the end of Flowey's fight. Both guards are restored,
+  verified against the shipped game's decompilation and hash-guarded per event.
 
 - Editor instance IDs give relative room order, **not contiguous original IDs**.
   Version 0.1.0 incorrectly compacted missing room slot **159**; all later numeric
