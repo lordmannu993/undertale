@@ -218,6 +218,28 @@ class Converter:
                 if self.category.get(name) != category:
                     raise CompileError(f"invalid resource override {category}/{name}")
                 self.add_id(name, index, "documented resource override")
+        # Import only exact names from the pinned upstream registry audit.  Local
+        # overrides and decompiler annotations win: the two exports are known to
+        # have different ordering in places, so a conflict is evidence, not a
+        # reason to silently replace an established ID.
+        registry_file = self.root / "port/recovered_registry.json"
+        if registry_file.exists():
+            registry = json.loads(self.read(registry_file))
+            conflicts = []
+            for category, entries in registry.get("recovered", {}).items():
+                for name, evidence in entries.items():
+                    if name not in self.category or name in self.ids[category]:
+                        if name in self.ids[category] and self.ids[category][name] != evidence["id"]:
+                            conflicts.append((category, name, self.ids[category][name], evidence["id"]))
+                        continue
+                    other = next((n for n, i in self.ids[category].items() if i == evidence["id"]), None)
+                    if other is not None:
+                        conflicts.append((category, name, None, evidence["id"]))
+                        continue
+                    self.add_id(name, evidence["id"], "pinned upstream registry list")
+            self.report["registry_conflicts"] = [dict(category=c, name=n, local=local, upstream=upstream)
+                                                  for c, n, local, upstream in conflicts]
+            self.report["registry_source"] = {"upstream": registry.get("upstream"), "ref": registry.get("ref")}
         recovered_sound_ids = set(self.ids["sounds"].values())
         self.report["unresolved_music_aliases"] = [entry for entry in unresolved_music if entry["id"] not in recovered_sound_ids]
         self.report["synthetic_ids"] = {}

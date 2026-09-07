@@ -108,7 +108,9 @@ Not claimed:
 - [x] Piece 3 — route harness: `tests/test_paths.py::test_the_reported_scene_now_walks_instead_of_stopping`
       drives the real scripted battle, dialogue and triggers into `room_ruins1`, then
       asserts `path_position` advances and she leaves her placement behind. No teleporting.
-- [ ] Piece 4 — the remaining registry gaps: 86 unresolved static numeric asset
-      references and 68 missing literal external file paths (`data/unused/dfb.png` and
-      the `external/` sprite-replacement set), which the same dump can be mined with.
+- [x] Piece 4 — import the safe registry evidence with `tools/recover_registry.py`.
+      The pinned dump is recorded in `port/recovered_registry.json`; exact local-name
+      matches reduce the statically recognizable unresolved-ID count from 86 to 44.
+      Conflicting names are retained as conflicts rather than guessed. The 68 external
+      files and the remaining ambiguous IDs are still explicit limitations.
 - [ ] Piece 5 — the one missing room, then a release once pieces 2-4 are green.

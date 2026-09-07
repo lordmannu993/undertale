@@ -40,8 +40,11 @@ This omission must not shift the IDs of the 334 rooms that are supplied.
    converter recovers annotations, `with` comments, room instance order and music
    aliases. Unidentified *named* assets receive synthetic IDs outside the legacy
    range; it never assigns an arbitrary alphabetic asset to a numeric reference.
-   The report currently lists **86 unresolved IDs in statically recognizable
-   reference positions**. This is not an exhaustive dynamic data-flow analysis.
+   The report currently lists **44 unresolved IDs in statically recognizable
+   reference positions** after importing non-conflicting exact-name evidence from the
+   pinned `kittibyte/UndertaleDecomp` registry dump. The 2,087 conflicting or
+   non-applicable candidates are retained in `registry_conflicts`; they are not silently
+   assigned. This is not an exhaustive dynamic data-flow analysis.
    Queries for an unknown object return no match with a warning; creation of an
    unknown object stops. Unknown image/audio cues warn and cannot be reproduced.
 3. **External resources are absent**, including dynamically replaced boss images,
