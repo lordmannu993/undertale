@@ -95,10 +95,16 @@ Not claimed:
 
 - [x] Piece 1 — recover point data with provenance; implement playback; tests; docs.
 - [x] Piece 2 — native gate: `port/smoke.lua` now plays Flowey's tutorial fight, follows
-      Toriel into `room_ruins1`, and asserts her sprite is drawn where the recovered path
-      walked her (`native-toriel-walk` capture plus a traced draw-call check and a
-      `native-toriel-walk.txt` record). Runs in CI on every PR; the sandbox cannot
-      install LOVE. Budget raised to 9000 frames / 420s because the route is longer.
+      Toriel into `room_ruins1`, and asserts the renderer actually drew her displaced
+      along the recovered path: every `spr_toriel*` draw call observed during the walk is
+      accumulated and the furthest must be more than 20 px from her room placement, with
+      the sample count, sprite name, furthest drawn position and `path_position` recorded
+      in `native-toriel-walk.txt` alongside the `native-toriel-walk.png` capture.
+      `tools/native_smoke.sh` fails unless both exist. Budget raised to 9000 frames and
+      420 s because the route is genuinely longer.
+      First CI attempt gated on the single frame the screenshot landed in, where she is
+      not guaranteed to be inside the view; that is why the check is a per-walk
+      accumulation now, and it is green on run 34149357546.
 - [x] Piece 3 — route harness: `tests/test_paths.py::test_the_reported_scene_now_walks_instead_of_stopping`
       drives the real scripted battle, dialogue and triggers into `room_ruins1`, then
       asserts `path_position` advances and she leaves her placement behind. No teleporting.
