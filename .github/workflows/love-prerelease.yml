@@ -3,6 +3,7 @@ name: Experimental LOVE download
 on:
   # Bootstrap publication from this unmerged branch without changing master.
   # Ordinary source pushes do not republish the immutable prerelease.
+  # This workflow file is touched for the v0.1.4 bootstrap after its draft exists.
   push:
     branches: [arena/01a07d10-undertale]
     paths: [.github/workflows/love-prerelease.yml]
