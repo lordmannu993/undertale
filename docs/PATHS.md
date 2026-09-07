@@ -88,18 +88,20 @@ Not claimed:
   model is documented GameMaker behaviour plus the source code's own speed usage;
 - no Android device run, and the spline sampling for `kind 1` is the standard
   Catmull-Rom formula, not a byte-identical reproduction of GameMaker's sampler;
-- reaching `room_ruins1` still needs the scripted battle and dialogue to complete, and
-  the headless harness today only follows the route as far as Toriel starting to lead.
+- the route gate proves the walk renders on Linux software GL. It does not prove the
+  ruins door transition, and it does not exercise the other 36 recovered paths.
 
 ## Pieces
 
 - [x] Piece 1 — recover point data with provenance; implement playback; tests; docs.
-- [ ] Piece 2 — native gate: run `tools/native_smoke.sh` on the rebuilt archive and add
-      a screenshot assertion for Toriel actually moving up the corridor, so the stop is
-      proven gone on a real renderer, not only in Lupa.
-- [ ] Piece 3 — route harness: extend the headless flow from `room_area1_2` into
-      `room_ruins1` by following the scripted triggers, then assert Toriel reaches
-      `146,64` and the door transition fires.
+- [x] Piece 2 — native gate: `port/smoke.lua` now plays Flowey's tutorial fight, follows
+      Toriel into `room_ruins1`, and asserts her sprite is drawn where the recovered path
+      walked her (`native-toriel-walk` capture plus a traced draw-call check and a
+      `native-toriel-walk.txt` record). Runs in CI on every PR; the sandbox cannot
+      install LOVE. Budget raised to 9000 frames / 420s because the route is longer.
+- [x] Piece 3 — route harness: `tests/test_paths.py::test_the_reported_scene_now_walks_instead_of_stopping`
+      drives the real scripted battle, dialogue and triggers into `room_ruins1`, then
+      asserts `path_position` advances and she leaves her placement behind. No teleporting.
 - [ ] Piece 4 — the remaining registry gaps: 86 unresolved static numeric asset
       references and 68 missing literal external file paths (`data/unused/dfb.png` and
       the `external/` sprite-replacement set), which the same dump can be mined with.
