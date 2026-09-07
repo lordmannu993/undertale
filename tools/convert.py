@@ -19,7 +19,7 @@ import xml.etree.ElementTree as ET
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from gml import CompileError, compile_gml, quote, walk
-from source_repairs import repair_script
+from source_repairs import repair_object_event, repair_script
 
 ROOT = Path(__file__).resolve().parents[1]
 CATEGORIES = {"sprites": ("sprite", ".sprite.gmx"), "objects": ("object", ".object.gmx"),
@@ -325,6 +325,9 @@ class Converter:
             try:
                 if key.startswith("scripts/"):
                     source = repair_script(key.split("/", 1)[1], source, self.report)
+                elif key.startswith("objects/"):
+                    parts = key.split("/")
+                    source = repair_object_event(parts[1], parts[2], source, self.report)
                 # Three decompiled dialogue writers contain a malformed quoted
                 # backslash. Restrict this repair to the exact known token and
                 # objects; chr(92) preserves the intended text-control marker.

@@ -44,6 +44,42 @@ def test_actual_flowey_transition_has_enemy_borders_and_dialogue(lua):
     ''')
 
 
+def test_flowey_battle_end_cleans_dialogue_faces_and_resumes_control(lua):
+    enter_flowey(lua)
+    lua.execute('''
+        -- Play the tutorial battle like a player: steer the SOUL toward
+        -- Flowey's demonstration pellets and advance his dialogue with Z.
+        local sawFace = false
+        local deadline = R.frame + 6000
+        while R.roomState.name == "room_floweybattle" and R.frame < deadline do
+            if #R:select(R.constants.obj_face) > 0 then sawFace = true end
+            input:setSource("test", {38}); tick(2); input:setSource("test", {})
+            press(90)
+        end
+        assert(not sawFace, "dialogue face portrait leaked into the tutorial battle")
+        assert(R.roomState.name == "room_area1_2")
+        assert(R.global.plot == 1 and R.global.specialbattle == 1 and R.global.interact == 1)
+        assert(#R:select(R.constants.obj_face) == 0, "pre-battle Flowey face must not survive the battle")
+    ''')
+    lua.execute('''
+        -- Toriel appears, introduces herself, then starts leading on. Before
+        -- the repair, the leaked Toriel face kept obj_floweytrigger forever at
+        -- conversation 3.5 (waiting for it to vanish) and the game softlocked.
+        local deadline = R.frame + 3000
+        local trig
+        while R.frame < deadline do
+            tick(10); press(90)
+            trig = R:select(R.constants.obj_floweytrigger)[1]
+            if trig and trig.v.conversation >= 4 and R.global.interact == 0 then break end
+        end
+        assert(trig and trig.v.conversation >= 4, "obj_floweytrigger stuck after the Flowey battle")
+        assert(R.global.interact == 0, "player control is not restored after the battle")
+        assert(#R:select(R.constants.obj_face) == 0, "Toriel dialogue face was not cleaned up")
+        local tor = R:select(R.constants.obj_toroverworld1)[1]
+        assert(tor and tor.v.y < 260, "Toriel should start walking toward the ruins door")
+    ''')
+
+
 @pytest.mark.parametrize('name,expected', [
     ('room_fire_hotdog',158),('room_fire_sorry',160),('room_fire_apron',161),
     ('room_fire10',162),('room_fire_elevator_l2',168),('room_fire_elevator_l3',169),
