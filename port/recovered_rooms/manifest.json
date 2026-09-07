@@ -1,0 +1,10 @@
+{
+  "format": 1,
+  "room_id": 159,
+  "name": "room_fire_walkandbranch",
+  "upstream": "kittibyte/UndertaleDecomp",
+  "ref": "249ffa27ee7e7eee0d7ce84b736c294458b38685",
+  "file": "rooms/room_fire_walkandbranch/room_fire_walkandbranch.yy",
+  "sha256": "4044490ac90bfc78c02ca54393051c7f1a0b976825d3103392f5bc86750426e8",
+  "status": "source recovered; GMX adapter still required"
+}

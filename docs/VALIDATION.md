@@ -2,7 +2,7 @@
 
 ## Executed in this workspace
 
-Validation date: **2026-09-07** (v0.1.3).
+Validation date: **2026-09-07** (v0.1.4).
 
 - Converted all **20,285** source units with **zero parse failures**.
 - Compiled every generated Lua chunk, runtime module, `main.lua` and `conf.lua`

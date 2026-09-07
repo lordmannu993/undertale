@@ -4,6 +4,12 @@ This prerelease makes the current `.love` package downloadable from GitHub. It
 contains the converted Lua and the assets supplied in this repository. **It is
 not a completed or native-device-verified game, and it is not an APK.**
 
+## v0.1.4 fixes
+
+- Added pinned exact-name resource-registry evidence, reducing unresolved static references from 86 to 44 without guessing conflicting IDs.
+- Recovered the missing Hotland room 159 source from the pinned upstream dump and included its provenance in the archive. The runtime continues to stop explicitly until a tested GMS2-to-GMX adapter is available.
+- Updated the GitHub download to the v0.1.4 experimental LOVE archive.
+
 ## v0.1.3 fixes
 
 - **Fix the end-of-battle sprite glitch and permanent softlock after Flowey's

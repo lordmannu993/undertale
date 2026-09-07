@@ -34,6 +34,11 @@ def package(output: Path, regenerate=True):
     # from ships alongside it so anyone can audit the provenance offline.
     if (ROOT / "port/path_data.json").is_file():
         files.append(ROOT / "port/path_data.json")
+    if (ROOT / "port/recovered_registry.json").is_file():
+        files.append(ROOT / "port/recovered_registry.json")
+    recovered_rooms = ROOT / "port/recovered_rooms"
+    if recovered_rooms.is_dir():
+        files += sorted(recovered_rooms.iterdir())
     files += [generated / name for name in report["generated_files"]]
     for directory, extension in [("sprites/images", ".png"), ("background/images", ".png"), ("fonts", ".png")]:
         files += sorted((ROOT / directory).glob("*" + extension))
