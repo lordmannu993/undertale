@@ -4,6 +4,31 @@ This prerelease makes the current `.love` package downloadable from GitHub. It
 contains the converted Lua and the assets supplied in this repository. **It is
 not a completed or native-device-verified game, and it is not an APK.**
 
+## v0.1.3 fixes
+
+- **Fix the end-of-battle sprite glitch and permanent softlock after Flowey's
+  tutorial fight.** The damaged GameMaker export negated `obj_dialoguer`'s
+  `obj_face` cleanup guards in two events (its Destroy event and the no-face
+  branch of its Step event), so dialogue face portraits were never destroyed.
+  Flowey's face survived into and out of the tutorial battle and stacked on top
+  of Toriel's at nearly the same coordinates, and the leftover Toriel face then
+  blocked `obj_floweytrigger`'s `!instance_exists(obj_torface)` wait forever:
+  control never returned and Toriel never led you to the ruins door. Both guards
+  are restored to match the shipped game's decompilation, each behind its own
+  per-event source-hash guard, and recorded in the conversion report.
+- **Restore the verified Toriel directional sprite IDs** (`spr_toriel_dt` 1105,
+  `spr_toriel_r` 1107, `spr_toriel_l` 1108, `spr_toriel_rt` 1109,
+  `spr_toriel_lt` 1110) in `port/resource_overrides.json`, preserving the
+  existing ID anchors.
+- A new regression plays the entire tutorial fight like a player (steering the
+  SOUL into Flowey's pellets and advancing his dialogue) and then asserts that no
+  face leaks, the game returns to `room_area1_2`, Toriel appears and speaks, her
+  face is cleaned up, `obj_floweytrigger` advances past the stuck state, player
+  control returns, and Toriel starts walking toward the ruins door. A second test
+  audits the repair itself: both events are reported, the generated Lua carries the
+  restored guard, and a different source export is rejected by the hash guard.
+- **145 automated tests** now pass (was 143).
+
 ## v0.1.2 fixes
 
 - Restore reference-guided opening scenery: the chamber floor, light rings,
@@ -26,7 +51,7 @@ recent-app thumbnail is not an in-game rendering setting.
 
 ## Download and try
 
-1. Download **`undertale-love-v0.1.2-experimental.love`** from the assets below
+1. Download **`undertale-love-v0.1.3-experimental.love`** from the assets below
    (approximately 124 MB). Do not download GitHub's automatic “Source code” ZIP
    if you want to try the packaged game.
 2. Install the official **LÖVE 11.5 runtime** for your platform:
