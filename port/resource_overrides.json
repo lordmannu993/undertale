@@ -4,6 +4,8 @@
     "Font IDs anchored to actual callers: Gaster typer 34 uses Wingdings 0, normal large text uses main 1, dmgwriter_old uses damage 6, HUD uses Courier 7, Sans typer 17 and width adjustments use Comic Sans 8, Papyrus typer 18 and uppercase adjustments use Papyrus 9. Atlas geometry/pixels remain unchanged.",
     "Do not guess missing paths. Supply their real point data before enabling path_start.",
     "obj_doorparent 793 is the collision selector whose User 9 dispatch activates its door children in obj_mainchara Step. obj_interactable 1368 selects both readable and solid-readable descendants in the player interaction event.",
+    "Toriel directional/talking sprite IDs close the gaps the decompiler left in its own annotations: dt 1105, rt 1109, lt 1110, ut 1111, plus hand-hold down 1113 and up 1117. obj_toriel_friendc/toroverworld/torinteractable/torhandhold set usprite/utsprite to 1111 (spr_toriel_ut) and dsprite/usprite to 1113/1117 (hand-hold), all previously falling through to synthetic IDs and rendering Toriel's up/hand-hold poses as a blank sprite.",
+    "Asriel overworld directional/talking sprites fill the same classes of gap in the 2415-2428 block: dt 2418, ut 2420, rt 2422, l 2424, lt 2425 are referenced by obj_torinteractable7 and obj_asriel_overworldanim but were never annotated, so the Toriel/Asriel overworld reveal drew Asriel's side/up/talking poses blank.",
     "Music aliases repair three malformed scr_getmusindex filenames: end/express_myogg, sfx_woofenstein.ogg, and sfx_disturbing.ogg.",
     "Default dialogue samples SND_TXT1/2 occupy 94/95; menu cues use the contiguous menu0..6 range 219..225 (menu1..4 are explicitly identified in scr_getmusindex).",
     "Room instance IDs establish relative order, NOT contiguous original resource IDs. Preserve absent slot 159 and validate explicit call-site anchors. Never compact this hole or swap only the battle-room IDs."
@@ -27,7 +29,15 @@
       "spr_toriel_r": 1107,
       "spr_toriel_l": 1108,
       "spr_toriel_rt": 1109,
-      "spr_toriel_lt": 1110
+      "spr_toriel_lt": 1110,
+      "spr_toriel_ut": 1111,
+      "spr_toriel_handhold_d": 1113,
+      "spr_toriel_handhold_u": 1117,
+      "spr_asriel_dt": 2418,
+      "spr_asriel_ut": 2420,
+      "spr_asriel_rt": 2422,
+      "spr_asriel_l": 2424,
+      "spr_asriel_lt": 2425
     },
     "objects": {
       "obj_doorparent": 793,
