@@ -28,11 +28,14 @@ It is recorded in `missing_rooms`; attempting to enter it stops explicitly.
 This omission must not shift the IDs of the 334 rooms that are supplied.
 
 
-1. **38 referenced movement paths are absent.** The GMX project's `paths` section
-   is empty. `path_start` fails with the missing path's name, rather than
-   fabricating movement or falsely completing a cutscene. Path parsing/playback
-   also needs implementing and validating against the recovered original point
-   data; dropping files into a folder alone is not sufficient yet.
+1. **All 38 referenced movement paths were absent from this export; their point data is
+   now recovered, not reconstructed.** The GMX project's `paths` section is empty, so
+   `port/path_data.json` carries the coordinates pinned to one upstream GameMaker
+   project commit, and `port/runtime.lua` plays them back at GameMaker's
+   pixels-per-step speed. A path without a recovered record still stops with its name
+   instead of fabricating movement. Provenance, the coordinate-semantics evidence and
+   the open questions are in [PATHS.md](PATHS.md); device and route validation is not
+   finished.
 2. **Original numeric resource IDs were lost in the alphabetized export.** The
    converter recovers annotations, `with` comments, room instance order and music
    aliases. Unidentified *named* assets receive synthetic IDs outside the legacy

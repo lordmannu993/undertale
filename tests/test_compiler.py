@@ -17,7 +17,9 @@ def test_every_unit_converted_and_manifest_counts(converted):
     assert r["resources"]["rooms"] == 334
     assert r["resources"]["scripts"] == 173
     assert not r["missing_asset_files"]
-    assert len(r["missing_paths"]) == 38
+    assert len(r["missing_paths"]) == 0
+    assert len(r["recovered_paths"]) == 38
+    assert r["path_provenance"]["upstream"] and len(r["path_provenance"]["ref"]) == 40
     assert r["unresolved_numeric_references"]  # not disguised as complete compatibility
 
 

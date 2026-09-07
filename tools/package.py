@@ -30,11 +30,16 @@ def package(output: Path, regenerate=True):
     files = [ROOT / "main.lua", ROOT / "conf.lua"]
     files += sorted((ROOT / "port").glob("*.lua"))
     files += [ROOT / "port/resource_overrides.json"]
+    # Recovered path geometry is baked into the generated manifest; the file it came
+    # from ships alongside it so anyone can audit the provenance offline.
+    if (ROOT / "port/path_data.json").is_file():
+        files.append(ROOT / "port/path_data.json")
     files += [generated / name for name in report["generated_files"]]
     for directory, extension in [("sprites/images", ".png"), ("background/images", ".png"), ("fonts", ".png")]:
         files += sorted((ROOT / directory).glob("*" + extension))
     files += sorted(p for p in (ROOT / "sound/audio").iterdir() if p.suffix.lower() in (".wav", ".ogg", ".mp3"))
-    for name in ["README.md", "docs/PORTING.md", "docs/ANDROID.md", "docs/CONTROLS.md", "docs/VALIDATION.md"]:
+    for name in ["README.md", "docs/PORTING.md", "docs/ANDROID.md", "docs/CONTROLS.md", "docs/VALIDATION.md",
+                 "docs/PATHS.md"]:
         p = ROOT / name
         if p.exists():
             files.append(p)

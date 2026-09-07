@@ -136,6 +136,12 @@ See [all mappings and behavior](docs/CONTROLS.md). “Perfect” controls are no
 claimed: real-device comfort, latency, OS interruptions, and different Android
 screens still need testing.
 
+## For agents continuing this port
+
+Start at [AGENTS.md](AGENTS.md): current state, the open piece list, sandbox gotchas
+(no LOVE in the sandbox, so the native gate runs in CI) and the rules this repo is
+built on. The per-claim detail for recovered data is in [docs/PATHS.md](docs/PATHS.md).
+
 ## Conversion and tests
 
 ```sh

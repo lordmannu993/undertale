@@ -236,15 +236,55 @@ class Converter:
                 if not name.startswith("path_action_"):
                     pathnames[int(index)] = name
         self.paths = pathnames
-        self.report["missing_paths"] = [{"id": i, "name": n} for i, n in sorted(pathnames.items())]
-        if pathnames:
-            self.report["limitations"].append("The original GMX contains no path assets. path_start fails visibly instead of inventing cutscene/battle movement.")
+        self.path_points = self.load_path_data(pathnames)
+        self.report["recovered_paths"] = [{"id": i, "name": pathnames[i]} for i in sorted(self.path_points)]
+        self.report["missing_paths"] = [{"id": i, "name": n} for i, n in sorted(pathnames.items())
+                                        if i not in self.path_points]
+        if pathnames and self.report["missing_paths"]:
+            self.report["limitations"].append(
+                "Movement paths are absent from this GMX export; the ones without a recovered record in "
+                "port/path_data.json make path_start fail visibly instead of inventing cutscene/battle movement.")
+        elif self.path_points:
+            self.report["limitations"].append(
+                "Path point data was recovered from an external GameMaker project (see port/path_data.json "
+                "and docs/PATHS.md); playback is validated headlessly, not against the original engine.")
         self.report["limitations"].extend([
             "Not every original numeric asset ID is recoverable; synthetic IDs are used only for otherwise-unidentified named resources.",
             "Steam integration is intentionally disabled. Saves use LÖVE's Android/desktop application save directory.",
             "External sprite replacement files and the unused dfb background are not supplied in this checkout.",
             "Translation coverage is syntactic coverage, not a claim that every route/boss/cutscene is playable.",
         ])
+
+    def load_path_data(self, pathnames: dict) -> dict:
+        """Attach recovered movement-path point data, keyed by the original numeric ID.
+
+        ``port/path_data.json`` is written by ``tools/recover_paths.py`` and records the
+        upstream project, commit and file behind every path. Referenced names with no
+        record stay absent, so ``path_start`` keeps failing visibly instead of walking
+        an invented route.
+        """
+        file = self.root / "port" / "path_data.json"
+        if not file.is_file():
+            return {}
+        document = json.loads(self.read(file))
+        table = {}
+        for index, name in pathnames.items():
+            record = (document.get("paths") or {}).get(name) or {}
+            points = record.get("points") or []
+            if len(points) < 2 or not all(len(point) == 2 for point in points):
+                continue
+            table[index] = {
+                "points": [[float(x), float(y)] for x, y in points],
+                "closed": bool(record.get("closed")),
+                "kind": int(record.get("kind") or 0),
+                "precision": max(1, int(record.get("precision") or 4)),
+            }
+        self.report["path_provenance"] = {
+            "upstream": document.get("upstream"), "ref": document.get("ref"),
+            "generated_by": document.get("generated_by"), "generated_on": document.get("generated_on"),
+            "referenced": len(pathnames), "with_point_data": len(table),
+        }
+        return table
 
     def asset_id(self, category, name):
         return self.ids[category].get(name, -1)
@@ -451,7 +491,8 @@ class Converter:
                 asset_modules.append((category, module))
         manifest = {"format": 1, "source_digest": self.digest.hexdigest(), "names": {},
                     "objects": {}, "scripts": {}, "rooms": {}, "room_order": self.room_order,
-                    "paths": self.paths, "missing_rooms": self.missing_rooms, "keys": sorted(self.keys),
+                    "paths": self.paths, "path_points": self.path_points,
+                    "missing_rooms": self.missing_rooms, "keys": sorted(self.keys),
                     "asset_modules": [{"kind": k, "module": "generated." + m.replace("/", ".")} for k, m in asset_modules]}
         for category, mapping in self.ids.items():
             for name, index in mapping.items():

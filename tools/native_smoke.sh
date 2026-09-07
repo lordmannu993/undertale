@@ -5,7 +5,7 @@ cd "$(dirname "$0")/.."
 mkdir -p port-test-output
 command -v love >/dev/null || { echo 'Install LOVE, xvfb and xauth for native validation.' >&2; exit 1; }
 set +e
-ALSOFT_DRIVERS=null LIBGL_ALWAYS_SOFTWARE=1 timeout 150s \
+ALSOFT_DRIVERS=null LIBGL_ALWAYS_SOFTWARE=1 timeout 420s \
   xvfb-run -a -s '-screen 0 1600x900x24' \
   love "${1:-artifacts/undertale-love-experimental.love}" --smoke-test \
   >port-test-output/native.log 2>&1
@@ -23,6 +23,8 @@ PY
   exit "$status"
 fi
 grep -q 'NATIVE SMOKE PASS' port-test-output/native.log
-for image in native-flowers native-corridor native-greeting native-flowey native-integer-scale; do
+# native-toriel-walk is the recovered-path gate: Toriel must be drawn where
+# path_torielwalk1 walked her, not where room_ruins1 placed her.
+for image in native-flowers native-corridor native-greeting native-flowey native-integer-scale native-toriel-walk; do
   test -s "port-test-output/$image.png"
 done

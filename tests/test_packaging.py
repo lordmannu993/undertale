@@ -27,7 +27,12 @@ def test_archive_is_self_contained_reproducible_and_excludes_scratch(converted,t
             assert not any(n in names for n in ["file0","file9","undertale.ini","touch-settings-v1.txt"])
             assert archive.testzip() is None
             report=json.loads(archive.read("generated/conversion-report.json"))
-            assert not report["compile_errors"] and report["missing_paths"]
+            assert not report["compile_errors"]
+            # Known limits stay advertised: the report must still carry limitations and
+            # the recovered-path set it was built from.
+            assert report["limitations"] and report["path_provenance"]["upstream"]
+            assert report["path_provenance"]["with_point_data"]==len(report["recovered_paths"])
+            assert b"path_points" in archive.read("generated/manifest.lua")
             assert all(i.date_time==(1980,1,1,0,0,0) for i in archive.infolist())
     finally:
         scratch.unlink()

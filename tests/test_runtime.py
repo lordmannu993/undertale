@@ -119,8 +119,10 @@ def test_collision_queries_scaling_rotation_and_noone(lua):
 
 
 def test_missing_path_stops_explicitly_not_silent_noop(lua):
-    with pytest.raises(LuaError,match="repository does not contain"):
-        run_gml(lua,"path_start(0,3,0,0);")
+    # Every path this repository references now has recovered point data, so the
+    # guard is proven against an ID with no record: it must stop, never no-op.
+    with pytest.raises(LuaError,match="does not contain"):
+        run_gml(lua,"path_start(19998,3,0,0);")
 
 
 def test_missing_external_sprite_stops_explicitly(lua):

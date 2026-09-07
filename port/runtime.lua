@@ -39,6 +39,8 @@ function Runtime.new(manifest,input,options)
     for _,entry in ipairs(manifest.asset_modules or {}) do
         for id,asset in pairs(require(entry.module)) do self.assets[entry.kind][id]=deepCopy(asset) end
     end
+    -- Recovered movement-path geometry, keyed by the original numeric path ID.
+    for index,entry in pairs(manifest.path_points or {}) do self.pathData[index]=deepCopy(entry) end
     local constants={self=-1,other=-2,all=-3,noone=-4,pi=math.pi,os_windows=0,os_android=5,
         c_white=16777215,c_black=0,c_red=255,c_lime=65280,c_blue=16711680,c_yellow=65535,
         c_gray=8421504,c_silver=12632256,c_aqua=16776960,c_fuchsia=16711935,
@@ -516,15 +518,102 @@ function Runtime:finishFrame()
     self:compact();self:applyTransitions()
 end
 
+-- GameMaker path playback. A path is the polyline through its authored points
+-- (kind 0) or a Catmull-Rom spline sampled `precision` times per segment
+-- (kind 1). An instance walks it at `path_speed` pixels per step; `path_position`
+-- is the fraction of the total length covered, so the same number means the same
+-- place on the path for every speed.
+local function catmull(p0,p1,p2,p3,t)
+    local t2,t3=t*t,t*t*t
+    return 0.5*((2*p1)+(-p0+p2)*t+(2*p0-5*p1+4*p2-p3)*t2+(-p0+3*p1-3*p2+p3)*t3)
+end
+local function sampledPoints(data)
+    local points=data.points
+    if data.kind~=1 or #points<3 then return points end
+    local n,steps,span,out=#points,math.max(1,data.precision or 4),(data.closed and #points or #points-1),{}
+    -- A closed path wraps its control points; an open one repeats its endpoints so the
+    -- spline leaves the first and last authored point on a straight tangent.
+    local function at(i)
+        if data.closed then return points[((i-1)%n)+1] end
+        return points[math.max(1,math.min(n,i))]
+    end
+    for i=1,span do
+        local p0,p1,p2,p3=at(i-1),at(i),at(i+1),at(i+2)
+        for s=0,steps-1 do
+            local t=s/steps
+            out[#out+1]={catmull(p0[1],p1[1],p2[1],p3[1],t),catmull(p0[2],p1[2],p2[2],p3[2],t)}
+        end
+    end
+    out[#out+1]=points[data.closed and 1 or n]
+    return out
+end
+function Runtime:pathGeometry(index)
+    local data=index and index>=0 and self.pathData[index] or nil
+    if not data then return nil end
+    if data._length then return data end
+    local points=sampledPoints(data)
+    local count=#points
+    local cumulative={0}
+    local total=0
+    for i=1,(data.closed and count or math.max(0,count-1)) do
+        local a,b=points[i],points[i%count+1]
+        total=total+math.sqrt((b[1]-a[1])^2+(b[2]-a[2])^2)
+        cumulative[i+1]=total
+    end
+    data._points,data._cumulative,data._length=points,cumulative,total
+    return data
+end
+local function pointAt(geo,position)
+    local points,cumulative,total=geo._points,geo._cumulative,geo._length
+    local count=#points
+    if count==0 then return 0,0,0 end
+    if total<=0 then local p=points[1];return p[1],p[2],0 end
+    position=math.max(0,math.min(1,position))
+    local target,i=position*total,1
+    while i<count and cumulative[i+1]<target do i=i+1 end
+    local a,b=points[i],points[i%count+1]
+    local span=cumulative[i+1]-cumulative[i]
+    local t=span>0 and (target-cumulative[i])/span or 0
+    if t<0 then t=0 elseif t>1 then t=1 end
+    local dx,dy=b[1]-a[1],b[2]-a[2]
+    local angle=atan2(-dy,dx)*180/math.pi
+    if angle<0 then angle=angle+360 end
+    return a[1]+dx*t,a[2]+dy*t,angle
+end
+
 function Runtime:startPath(E,index,speed,action,absolute)
-    local data=self.pathData[index]
-    if not data then self:unsupported("path_start("..tostring(index)..")",
-        "The repository does not contain "..(self.manifest.paths[index] or "this path")..". Supply its original point data; see docs/PORTING.md.") end
+    local geo=self:pathGeometry(index)
+    if not geo then self:unsupported("path_start("..tostring(index)..")",
+        "The repository does not contain "..(self.manifest.paths[index] or "this path")..
+        " and no point data was recovered for it; see docs/PATHS.md.") end
     local v=E._self.v
-    v.path_index=index;v.path_speed=speed;v.path_endaction=action;v.path_position=0
+    v.path_index=index;v.path_speed=speed;v.path_endaction=action;v.path_position=0;v.path_positionprevious=0
     v._pathAbsolute=self.truth(absolute);v._pathStartX=v.x;v._pathStartY=v.y
+    -- GameMaker puts the instance on the path start when the path begins, not a step later.
+    local x,y=pointAt(geo,0)
+    if v._pathAbsolute then v.x=x;v.y=y else v.x=v._pathStartX+x;v.y=v._pathStartY+y end
 end
 function Runtime:advancePath(inst)
-    self:unsupported("path execution","Original movement paths are missing; path playback has not been certified.")
+    local v=inst.v
+    local geo=self:pathGeometry(v.path_index)
+    if not geo then v.path_index=-1;return end
+    local step=geo._length>0 and (v.path_speed/geo._length) or 0
+    local previous,action=v.path_position,v.path_endaction
+    local position=previous+step
+    if position>1 then
+        if action==0 then position=1;v.path_index=-1 -- stop: the path ends on its last point
+        elseif action==1 then position=position-1    -- restart: loop back to the beginning
+        elseif action==3 then position=1;v.path_speed=-math.abs(v.path_speed) end
+        -- action 2 (continue) holds the end position without ending the path.
+    elseif position<0 then
+        if action==3 then position=0;v.path_speed=math.abs(v.path_speed)
+        else position=0;v.path_index=-1 end
+    end
+    v.path_positionprevious=previous;v.path_position=position
+    local x,y,angle=pointAt(geo,position)
+    if v._pathAbsolute then v.x=x;v.y=y else v.x=v._pathStartX+x;v.y=v._pathStartY+y end
+    -- path_orientation < 0 follows the tangent; Undertale never sets path_scale, so
+    -- that instance variable is intentionally not applied here (docs/PATHS.md).
+    if v.path_orientation<0 then v.direction=angle end
 end
 return Runtime
