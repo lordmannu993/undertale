@@ -22,6 +22,13 @@
       "fnt_papyrus": 9,
       "fnt_maintext_2": 10
     },
+    "sprites": {
+      "spr_toriel_dt": 1105,
+      "spr_toriel_r": 1107,
+      "spr_toriel_l": 1108,
+      "spr_toriel_rt": 1109,
+      "spr_toriel_lt": 1110
+    },
     "objects": {
       "obj_doorparent": 793,
       "obj_interactable": 1368
