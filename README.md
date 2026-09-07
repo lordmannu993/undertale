@@ -12,9 +12,9 @@ this workspace. See [port status](docs/PORTING.md) and [validation](docs/VALIDAT
 
 ## Download the experimental `.love` file
 
-[**Download `undertale-love-v0.1.2-experimental.love` (~124 MB)**](https://github.com/lordmannu993/undertale/releases/download/love-v0.1.2-experimental/undertale-love-v0.1.2-experimental.love)
+[**Download `undertale-love-v0.1.3-experimental.love` (~124 MB)**](https://github.com/lordmannu993/undertale/releases/download/love-v0.1.3-experimental/undertale-love-v0.1.3-experimental.love)
 
-[Release notes, SHA-256 checksum, and conversion report](https://github.com/lordmannu993/undertale/releases/tag/love-v0.1.2-experimental)
+[Release notes, SHA-256 checksum, and conversion report](https://github.com/lordmannu993/undertale/releases/tag/love-v0.1.3-experimental)
 
 Download the **`.love` asset**, not GitHub's automatic “Source code” ZIP. It
 contains the generated Lua and supplied assets; you do not need Python or
@@ -26,7 +26,23 @@ missing resources and native-testing limitations described above still apply.
 The large archive is hosted as a GitHub Release asset rather than committed to
 Git. To regenerate it yourself, follow the build instructions below.
 
-### Fixed in v0.1.2
+### Fixed in v0.1.3
+
+- End-of-battle sprite glitch and permanent softlock after Flowey's tutorial
+  fight are gone. The damaged export negated `obj_dialoguer`'s `obj_face`
+  cleanup guards in two events, so dialogue face portraits were never destroyed:
+  Flowey's face followed the player out of the battle, stacked on Toriel's, and
+  the leftover Toriel face blocked `obj_floweytrigger`'s
+  `!instance_exists(obj_torface)` wait forever. Both guards are restored against
+  the shipped game's decompilation, each with its own source-hash guard.
+- Restore the verified Toriel directional sprite IDs (`spr_toriel_dt/r/l/rt/lt`
+  = 1105, 1107–1110) in the resource overrides, keeping the existing anchors.
+- New regression plays the whole tutorial fight like a player and checks that no
+  face leaks, play returns to `room_area1_2`, Toriel speaks and starts leading to
+  the ruins door, control is restored, and every face is cleaned up.
+- **145 automated tests** now pass.
+
+### Also fixed in v0.1.2
 
 - Restore the missing opening chamber floor, light rings, corridor and doorway
   using the supplied reference views, palette and room coordinates. These are
@@ -36,7 +52,7 @@ Git. To regenerate it yourself, follow the build instructions below.
   Papyrus-call tables are repaired too, with source-hash guards.
 - Correct original font IDs and malformed text-setup spacing arguments.
 - Check the actual dialogue words and bubble bounds, plus native floor/ring/door
-  pixels and five scene screenshots. **143 automated tests** now pass.
+  pixels and five scene screenshots; **143 automated tests** passed at that release.
 
 ### Also fixed in v0.1.1
 

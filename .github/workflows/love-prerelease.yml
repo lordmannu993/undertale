@@ -4,7 +4,7 @@ on:
   # Bootstrap publication from this unmerged branch without changing master.
   # Ordinary source pushes do not republish the immutable prerelease.
   push:
-    branches: [arena/01a07697-undertale]
+    branches: [arena/01a07c38-undertale]
     paths: [.github/workflows/love-prerelease.yml]
   workflow_dispatch:
 
@@ -12,16 +12,16 @@ permissions:
   contents: read
 
 concurrency:
-  group: love-v0.1.2-experimental-publication
+  group: love-v0.1.3-experimental-publication
   cancel-in-progress: false
 
 env:
-  RELEASE_TAG: love-v0.1.2-experimental
-  ASSET_BASE: undertale-love-v0.1.2-experimental
+  RELEASE_TAG: love-v0.1.3-experimental
+  ASSET_BASE: undertale-love-v0.1.3-experimental
 
 jobs:
   publish:
-    if: github.ref == 'refs/heads/arena/01a07697-undertale'
+    if: github.ref == 'refs/heads/arena/01a07c38-undertale'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
@@ -79,7 +79,7 @@ jobs:
           checksum = (Path('artifacts') / (base+'.love.sha256')).read_text().strip()
           notes = Path('docs/RELEASE_NOTES.md').read_text()
           notes += '\n## Build record\n\n'
-          notes += f'- Source commit: `{os.environ["GITHUB_SHA"]}` on `arena/01a07697-undertale` (PR #1).\n'
+          notes += f'- Source commit: `{os.environ["GITHUB_SHA"]}` on `{os.environ["GITHUB_REF_NAME"]}` (v0.1.2 plus PRs #2 and #3).\n'
           notes += f'- **{count} automated tests passed** on GitHub Actions.\n'
           notes += f'- **{report["converted_code_units"]:,} source units** translated without parse failures.\n'
           notes += f'- **{len(report["missing_paths"])} missing movement paths**, **{len(report["unresolved_numeric_references"])} unresolved static numeric asset references**, and **{len(report["missing_external_files"])} missing literal external file paths** remain.\n'
@@ -103,10 +103,10 @@ jobs:
         run: |
           gh release edit "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" \
             --target "$GITHUB_SHA" --prerelease --latest=false \
-            --title 'LOVE v0.1.2 — Opening scenery and dialogue fixes (experimental)' \
+            --title 'LOVE v0.1.3 — Flowey battle-end softlock fix (experimental)' \
             --notes-file build/release-notes.md
           gh release upload "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --clobber \
-            "artifacts/$ASSET_BASE.love#LOVE v0.1.2 (experimental)" \
+            "artifacts/$ASSET_BASE.love#LOVE v0.1.3 (experimental)" \
             "artifacts/$ASSET_BASE.love.sha256#SHA-256 checksum" \
             "artifacts/$ASSET_BASE.conversion-report.json#Conversion report and missing resources"
           gh api "repos/$GITHUB_REPOSITORY/releases/$RELEASE_ID" > build/release-assets.json
