@@ -113,4 +113,9 @@ Not claimed:
       matches reduce the statically recognizable unresolved-ID count from 86 to 44.
       Conflicting names are retained as conflicts rather than guessed. The 68 external
       files and the remaining ambiguous IDs are still explicit limitations.
-- [ ] Piece 5 — the one missing room, then a release once pieces 2-4 are green.
+- [x] Piece 5a — recover the missing room source from the same pinned dump.
+      `tools/recover_missing_room.py` verifies the checked-in SHA-256 and the source is
+      packaged as `port/recovered_rooms/room_fire_walkandbranch.yy` with provenance.
+      The source is GMS2 `.yy`, while this port consumes GMX; the explicit adapter remains
+      open, so the runtime still stops at slot 159 rather than pretending the formats are
+      interchangeable. A release is not claimed until that adapter is tested.

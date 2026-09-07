@@ -170,6 +170,14 @@ class Converter:
             raise CompileError("a declared missing room now exists; review its original ID before converting")
         self.missing_rooms = {i: g["name"] for i, g in missing.items()}
         self.report["missing_rooms"] = gaps
+        recovered_room = self.root / "port/recovered_rooms/manifest.json"
+        if recovered_room.exists():
+            source = json.loads(self.read(recovered_room))
+            self.report["recovered_room_sources"] = [source]
+            self.report["limitations"].append(
+                "Room source for the original slot 159 is recovered and shipped with provenance, "
+                "but its GMS2 room format still needs an explicit GMX adapter before it can replace "
+                "the visible compatibility stop.")
         # Keep the non-overlapping editor order, constrained by the documented
         # gaps and independent original-ID anchors in resource_overrides.json.
         ordered = []
