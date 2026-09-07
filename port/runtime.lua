@@ -518,13 +518,21 @@ end
 
 function Runtime:startPath(E,index,speed,action,absolute)
     local data=self.pathData[index]
-    if not data then self:unsupported("path_start("..tostring(index)..")",
-        "The repository does not contain "..(self.manifest.paths[index] or "this path")..". Supply its original point data; see docs/PORTING.md.") end
     local v=E._self.v
+    if not data then
+        -- The GMX export's paths section is empty, so every referenced path is
+        -- absent. Failing the whole scene (the earlier behaviour) made the very
+        -- first Froggit battle a hard compatibility stop. Degrade instead: warn
+        -- once and leave the instance on an empty path, so it holds its start
+        -- position and the cutscene/battle continues. Real path playback and
+        -- recovered point data remain unimplemented (see docs/PORTING.md).
+        self:warn("path:"..tostring(index),"Missing movement path "..(self.manifest.paths[index] or "path "..tostring(index)).."; starting it as an empty hold-in-place path. Supply its original point data to enable real playback.")
+    end
     v.path_index=index;v.path_speed=speed;v.path_endaction=action;v.path_position=0
     v._pathAbsolute=self.truth(absolute);v._pathStartX=v.x;v._pathStartY=v.y
 end
 function Runtime:advancePath(inst)
-    self:unsupported("path execution","Original movement paths are missing; path playback has not been certified.")
+    local data=self.pathData[inst.v.path_index]
+    if not data then return end -- empty/missing path: keep the instance stationary
 end
 return Runtime

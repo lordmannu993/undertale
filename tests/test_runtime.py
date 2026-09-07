@@ -118,9 +118,19 @@ def test_collision_queries_scaling_rotation_and_noone(lua):
     ''')
 
 
-def test_missing_path_stops_explicitly_not_silent_noop(lua):
-    with pytest.raises(LuaError,match="repository does not contain"):
-        run_gml(lua,"path_start(0,3,0,0);")
+def test_missing_path_warns_and_holds_position_not_softlock(lua):
+    # The project has no path assets, so path_start used to hard-stop the scene
+    # and soft-locked the first Froggit battle. It now degrades: it warns once
+    # and leaves the instance on an empty path so it holds its start position.
+    lua.execute("x0=a.v.x; y0=a.v.y")
+    run_gml(lua, "path_start(0,3,0,0);")
+    assert lua.eval("a.v.path_index") == 0
+    assert lua.eval("a.v.x") == lua.eval("x0")
+    assert lua.eval("a.v.y") == lua.eval("y0")
+    # advancing the path must not move it and must not raise (previous softlock)
+    lua.execute("R:advancePath(a);R:advancePath(a)")
+    assert lua.eval("a.v.x") == lua.eval("x0")
+    assert lua.eval("a.v.y") == lua.eval("y0")
 
 
 def test_missing_external_sprite_stops_explicitly(lua):
