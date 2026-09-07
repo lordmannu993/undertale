@@ -1,0 +1,76 @@
+{
+  "notes": [
+    "Only original-ID overrides belong here. Named resources without evidence get synthetic IDs, never alphabetic original IDs.",
+    "Font IDs anchored to actual callers: Gaster typer 34 uses Wingdings 0, normal large text uses main 1, dmgwriter_old uses damage 6, HUD uses Courier 7, Sans typer 17 and width adjustments use Comic Sans 8, Papyrus typer 18 and uppercase adjustments use Papyrus 9. Atlas geometry/pixels remain unchanged.",
+    "Do not guess missing paths. Supply their real point data before enabling path_start.",
+    "obj_doorparent 793 is the collision selector whose User 9 dispatch activates its door children in obj_mainchara Step. obj_interactable 1368 selects both readable and solid-readable descendants in the player interaction event.",
+    "Music aliases repair three malformed scr_getmusindex filenames: end/express_myogg, sfx_woofenstein.ogg, and sfx_disturbing.ogg.",
+    "Default dialogue samples SND_TXT1/2 occupy 94/95; menu cues use the contiguous menu0..6 range 219..225 (menu1..4 are explicitly identified in scr_getmusindex).",
+    "Room instance IDs establish relative order, NOT contiguous original resource IDs. Preserve absent slot 159 and validate explicit call-site anchors. Never compact this hole or swap only the battle-room IDs."
+  ],
+  "ids": {
+    "fonts": {
+      "fnt_wingdings": 0,
+      "fnt_main": 1,
+      "fnt_maintext": 2,
+      "fnt_small": 3,
+      "fnt_plain": 4,
+      "fnt_plainbig": 5,
+      "fnt_dmg": 6,
+      "fnt_curs": 7,
+      "fnt_comicsans": 8,
+      "fnt_papyrus": 9,
+      "fnt_maintext_2": 10
+    },
+    "sprites": {
+      "spr_toriel_dt": 1105,
+      "spr_toriel_r": 1107,
+      "spr_toriel_l": 1108,
+      "spr_toriel_rt": 1109,
+      "spr_toriel_lt": 1110
+    },
+    "objects": {
+      "obj_doorparent": 793,
+      "obj_interactable": 1368
+    },
+    "sounds": {
+      "mus_express_myself": 438,
+      "mus_woofenstein": 380,
+      "mus_disturbing": 381,
+      "SND_TXT1": 94,
+      "SND_TXT2": 95,
+      "mus_menu0": 219,
+      "mus_menu5": 224,
+      "mus_menu6": 225
+    },
+    "rooms": {
+      "room_area1_2": 5,
+      "room_fire_elevator_r1": 156,
+      "room_fire_elevator_r2": 157,
+      "room_fire_hotdog": 158,
+      "room_fire_sorry": 160,
+      "room_fire_apron": 161,
+      "room_fire10": 162,
+      "room_fire_elevator_l2": 168,
+      "room_fire_elevator_l3": 169,
+      "room_battle": 306,
+      "room_floweybattle": 307,
+      "room_fastbattle": 308,
+      "room_storybattle": 309,
+      "room_gameover": 310,
+      "room_papdate": 317,
+      "room_adate": 318
+    }
+  },
+  "room_id_gaps": [
+    {
+      "id": 159,
+      "name": "room_fire_walkandbranch",
+      "evidence": [
+        "room_fire_hotdog=158 is identified by obj_sans_room / obj_npc_room; obj_door_t connects room 159 to room 162 (room_fire10). The intervening walk-and-branch room is absent from the project.",
+        "obj_elev_floorsign identifies elevator R1=156, R2=157, L2=168, L3=169; later IDs retain a single missing slot.",
+        "Independent late anchors: obj_battler -> room 306 (normal battle), obj_battlerflowey from area 5 -> room 307 (Flowey tutorial), scr_gameoverb -> room 310."
+      ]
+    }
+  ]
+}
