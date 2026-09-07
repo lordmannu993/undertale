@@ -13,6 +13,7 @@ from pathlib import Path
 import pytest
 
 from conftest import run_gml
+from test_regressions import enter_flowey
 
 ROOT = Path(__file__).resolve().parents[1]
 DATA = json.loads((ROOT / "port/path_data.json").read_text())
@@ -136,3 +137,65 @@ def test_smooth_paths_are_splined_not_straight(lua):
 def test_a_path_without_recovered_data_still_stops(lua):
     with pytest.raises(Exception, match="does not contain"):
         run_gml(lua, "path_start(19999,3,0,1);")
+
+
+ROUTE_DRIVE = """
+    local deadline = R.frame + 6000
+    while R.roomState.name == "room_floweybattle" and R.frame < deadline do
+        input:setSource("test", {38}); tick(2); input:setSource("test", {})
+        press(90)
+    end
+    assert(R.roomState.name == "room_area1_2", "tutorial battle did not return to the corridor")
+    deadline = R.frame + 3000
+    local trigger
+    while R.frame < deadline do
+        tick(10); press(90)
+        trigger = R:select(R.constants.obj_floweytrigger)[1]
+        if trigger and trigger.v.conversation >= 4 and R.global.interact == 0 then break end
+    end
+    assert(trigger and trigger.v.conversation >= 4, "obj_floweytrigger stuck after the Flowey battle")
+
+    local function walker()
+        for _, id in ipairs({R.constants.obj_toroverworld2, R.constants.obj_toroverworld1}) do
+            local instance = R:select(id)[1]
+            if instance and instance.v.path_index >= 0 then return instance end
+        end
+        return R:select(R.constants.obj_toroverworld2)[1] or R:select(R.constants.obj_toroverworld1)[1]
+    end
+    for round = 1, 700 do
+        if R.roomState.name ~= "room_area1_2" then break end
+        input:setSource("test", {38}); tick(6); input:setSource("test", {})
+        if round % 20 == 0 then press(90) end
+    end
+    assert(R.roomState.name == "room_ruins1",
+        "following Toriel never reached room_ruins1: " .. R.roomState.name)
+
+    local tor
+    for round = 1, 60 do
+        input:setSource("test", {38}); tick(4); input:setSource("test", {})
+        tor = walker()
+        if tor and tor.v.path_index >= 0 then break end
+    end
+    assert(tor and tor.v.path_index == R.manifest.names.path_torielwalk1,
+        "Toriel is not walking path_torielwalk1 in room_ruins1")
+    local started_y, furthest = tor.v.y, 0
+    for round = 1, 400 do
+        input:setSource("test", {38}); tick(4); input:setSource("test", {})
+        if round % 20 == 0 then press(90) end
+        if tor.v.path_position > furthest then furthest = tor.v.path_position end
+        if tor.v.path_position >= 1 or tor.v.path_index < 0 then break end
+    end
+    assert(furthest > 0.02, "Toriel never advanced along the recovered path")
+    assert(tor.v.y < started_y - 20, "Toriel did not walk up the corridor")
+"""
+
+
+def test_the_reported_scene_now_walks_instead_of_stopping(lua):
+    """Reproduces the reported phone screen: the ruins-entry corridor walk plays out.
+
+    Before the recovered path data this raised the compatibility stop inside
+    ``path_start``; the assertion is the route itself, driven through the real
+    scripted battle, dialogue and triggers rather than a teleported room.
+    """
+    enter_flowey(lua)
+    lua.execute(ROUTE_DRIVE)

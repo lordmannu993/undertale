@@ -59,6 +59,58 @@ function Smoke.new(game,touch)
         touch.settings.pixels=true;touch:resize(touch.w,touch.h,touch.safe)
         capture("native-integer-scale")
         print("NATIVE SMOKE PASS: restored chamber/rings/corridor, touch navigation, correct SOUL dialogue, four rendered borders, fit/integer presentation")
+        -- Play Flowey's tutorial fight out the way the headless regression does, then
+        -- follow Toriel into the ruins. Before the recovered path data this is exactly
+        -- where a phone stopped with "Compatibility stop: path_start(...)".
+        local deadline=self.frames+2400
+        while game.roomState.name=="room_floweybattle" and self.frames<deadline do
+            hold(38,2);tap(90)
+        end
+        assert(game.roomState.name=="room_area1_2","Tutorial battle did not return to the corridor: "..game.roomState.name)
+        deadline=self.frames+1200
+        local trigger
+        while self.frames<deadline do
+            wait(10);tap(90)
+            trigger=game:select(game.constants.obj_floweytrigger)[1]
+            if trigger and trigger.v.conversation>=4 and game.global.interact==0 then break end
+        end
+        assert(trigger and trigger.v.conversation>=4,"obj_floweytrigger never advanced past the battle")
+        local function walking()
+            for _,id in ipairs({game.constants.obj_toroverworld2,game.constants.obj_toroverworld1}) do
+                local instance=game:select(id)[1]
+                if instance and instance.v.path_index>=0 then return instance end
+            end
+        end
+        local walker
+        for round=1,700 do
+            if game.roomState.name~="room_area1_2" then break end
+            hold(38,6)
+            if round%20==0 then tap(90) end
+        end
+        assert(game.roomState.name=="room_ruins1","Following Toriel never reached the ruins entry: "..game.roomState.name)
+        for round=1,60 do
+            hold(38,4)
+            walker=walking()
+            if walker and walker.v.path_index>=0 then break end
+        end
+        assert(walker and walker.v.path_index==game.manifest.names.path_torielwalk1,
+            "Toriel is not walking path_torielwalk1 in room_ruins1 (path_index="..tostring(walker and walker.v.path_index)..")")
+        local startY,startX=walker.v.y,walker.v.x
+        self.walkStartY=startY
+        local furthest=0
+        for round=1,400 do
+            hold(38,4)
+            if round%20==0 then tap(90) end
+            if walker.v.path_position>furthest then furthest=walker.v.path_position end
+            if walker.v.path_position>=1 or walker.v.path_index<0 then break end
+        end
+        assert(furthest>0.02,"Toriel never advanced along the recovered path (position stayed at 0)")
+        assert(walker.v.y<startY-20,"Toriel did not walk up the corridor: y="..tostring(walker.v.y).." of "..tostring(startY))
+        assert(math.abs(walker.v.x-startX)>2 or math.abs(walker.v.y-startY)>2,"Toriel's position never changed")
+        self.walkTarget=walker
+        capture("native-toriel-walk")
+        print(string.format("NATIVE SMOKE PASS: path_torielwalk1 walked to %.0f%% at (%.0f,%.0f), position recorded by the renderer",
+            walker.v.path_position*100,walker.v.x,walker.v.y))
         self.done=true;love.event.quit(0)
     end)
     return self
@@ -66,7 +118,9 @@ end
 function Smoke:beforeTick()
     if self.done then return end
     self.frames=self.frames+1
-    assert(self.frames<3000,"Native smoke exceeded its tick budget")
+    -- Budget covers the whole scripted opening including Flowey's tutorial fight
+    -- and Toriel's walked corridor; a hang must still fail fast, not run forever.
+    assert(self.frames<9000,"Native smoke exceeded its tick budget")
     local ok,err=coroutine.resume(self.thread)
     if not ok then error("Native smoke: "..tostring(err)) end
 end
@@ -126,6 +180,25 @@ function Smoke:draw(viewport)
         assert(table.concat(displayed):find("See that heart",1,true) and table.concat(displayed):find("SOUL",1,true),"Native dialogue content is wrong")
         assert(viewport.w>880,"Phone fit mode is still unnecessarily small")
         write("native-render.txt", "PASS\nroom="..self.game.roomState.name.."\nflowey_pixels="..colored.."\nviewport_width="..viewport.w.."\n")
+    elseif name=="native-toriel-walk" then
+        -- Renderer-side proof: her sprite must be drawn where the recovered path put
+        -- her, and no longer where the room placed her. Pixel thresholds over unknown
+        -- ruins tiles would only flake, so the traced draw calls are the assertion and
+        -- the PNG below is the human-readable record.
+        local walker=self.walkTarget
+        local drawn
+        for _,entry in ipairs(self.game.drawLog) do
+            if entry[1]=="sprite" and entry[2] and entry[2]:find("spr_toriel",1,true) then drawn=entry end
+        end
+        assert(drawn,"Toriel's sprite was never drawn in room_ruins1")
+        assert(math.abs(drawn[5]-walker.v.x)<=2 and math.abs(drawn[6]-walker.v.y)<=64,
+            "Toriel was drawn at "..drawn[5]..","..drawn[6].." but walked to "..walker.v.x..","..walker.v.y)
+        assert(math.abs(drawn[6]-self.walkStartY)>20,
+            "Toriel is still drawn at her room placement, so the recovered path did not move the render")
+        write("native-toriel-walk.txt","sprite="..tostring(drawn[2]).." drawn="..drawn[5]..","..drawn[6]..
+            " instance="..string.format("%.1f,%.1f",walker.v.x,walker.v.y)..
+            " path_position="..string.format("%.4f",walker.v.path_position)..
+            " path_speed="..tostring(walker.v.path_speed).."\n")
     end
     data:release()
     self.pending=true
