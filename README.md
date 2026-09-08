@@ -11,8 +11,8 @@ original numeric asset IDs (86 in statically recognizable reference positions;
 the pinned upstream registry dump is audit-only since v0.1.6, so no ID is
 imported from it) and external resources remain unresolved or missing. Those
 problems, plus remaining runtime fidelity work, prevent a full-game
-compatibility claim. No
-native Android APK has been built or tested in this workspace. See [port status](docs/PORTING.md) and [validation](docs/VALIDATION.md).
+compatibility claim. No native Android APK has been built or tested in this
+workspace. See [port status](docs/PORTING.md) and [validation](docs/VALIDATION.md).
 
 ## Download the experimental `.love` file
 
