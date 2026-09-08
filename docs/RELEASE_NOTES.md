@@ -4,6 +4,44 @@ This prerelease makes the current `.love` package downloadable from GitHub. It
 contains the converted Lua and the assets supplied in this repository. **It is
 not a completed or native-device-verified game, and it is not an APK.**
 
+## v0.1.7 fixes
+
+- **Fix the Ruins spike-bridge softlock** ("Toriel and the player go missing").
+  `obj_torhandhold1` started the recovered `path_torielwalk5_2` with GameMaker's
+  *relative* path flag, but the recovered points are room-absolute coordinates
+  that zig-zag across the spike maze. Read as offsets from the walk-in position
+  near (768,110) the hand-in-hand crossing landed at (1540,210)..(1904,170) —
+  outside the `1200x240` room — so the crossing, its follow-up dialogue and the
+  hand-back of control all happened off-camera with the player invisible. All
+  three `path_start` calls in that object now pass the absolute flag, exactly as
+  sibling `obj_toroverworld6` already did for `path_torielwalk5` in the same room.
+  The scene now ends in view at (1136,60), restores `phasing` and the player's
+  visibility, creates `obj_toroverworld4`, and the farewell dialogue completes.
+  This is a **listed deviation** from the pinned upstream decompile (which passes
+  `0`); the room geometry makes relative coordinates impossible there, and the
+  evidence is recorded in `docs/PATHS.md` under "Playback semantics".
+- **Fix overlapping dialogue when skipping text.** `scr_textskip` (X/Shift) only
+  fast-forwarded the character position, so a writer that had reached a halt state
+  never ran its own confirm-key page advance or destroy event and stayed alive
+  under the next bubble's writer. The script now branches on the writer's halt
+  state the way the writer's own user event does: complete the page, advance it,
+  or hand control back and destroy the stalled writer.
+- **Add a touch COLLISION toggle for testing.** PAUSE gains a seventh row,
+  `COLLISION: ON/OFF`, mapped onto the game's own `phasing` debug global (the
+  keyboard toggle on `obj_mainchara`): OFF walks through walls. It is a testing
+  aid, not a setting — it is never written to the persisted touch settings, it
+  defaults to ON, and it is re-applied after an in-game restart.
+- Three new regressions pin these fixes (the suite grows from 160 to **163
+  automated tests**), and each was verified to fail on the unfixed code with the
+  bug's own signature before passing after it.
+- Updated the GitHub download to the v0.1.7 experimental LOVE archive, and this
+  page's "Download and try" section, which still named the v0.1.5 asset.
+- Corrected a stale limitation count: `README.md` and `docs/PORTING.md` claimed
+  **44** unresolved numeric asset IDs, but the conversion report that ships inside
+  the archive has listed **86** ever since v0.1.6 made the pinned upstream
+  registry dump audit-only (no IDs imported). `docs/CONTROLS.md` now documents the
+  new PAUSE COLLISION row.
+
 ## v0.1.6 fixes
 
 - Toriel now faces the tangent while following paths, including reverse travel; stopped paths preserve the scripted facing.
@@ -87,7 +125,7 @@ recent-app thumbnail is not an in-game rendering setting.
 
 ## Download and try
 
-1. Download **`undertale-love-v0.1.5-experimental.love`** from the assets below
+1. Download **`undertale-love-v0.1.7-experimental.love`** from the assets below
    (approximately 124 MB). Do not download GitHub's automatic “Source code” ZIP
    if you want to try the packaged game.
 2. Install the official **LÖVE 11.5 runtime** for your platform:
@@ -96,8 +134,9 @@ recent-app thumbnail is not an in-game rendering setting.
    not required for the downloaded archive.
 
 Touch controls include the D-pad, Z/X/C, extra key pages, pause/settings,
-handedness, size/opacity adjustment, and a control tester. Actual touchscreen
-behavior still needs device validation.
+handedness, size/opacity adjustment, a control tester, and (from v0.1.7) a
+runtime-only COLLISION toggle for walking through walls while testing. Actual
+touchscreen behavior still needs device validation.
 
 ## Validation and limitations
 

@@ -42,10 +42,10 @@ explicitly **not a finished game** and every release note says so.
 
 | item | state |
 | --- | --- |
-| `master` | all six PRs merged (through `7ca9608`): v0.1.3 softlock/sprite fixes, path-recovery pieces 1-3, registry and room-159 evidence, v0.1.4 publication; v0.1.6 fixes prepared |
-| Published release | `love-v0.1.4-experimental` (prerelease, 3 assets, checksum in notes). `love-v0.1.5-experimental` is published; v0.1.6 is prepared for publication. Every published release is immutable: do not re-publish over it |
-| Open PR | this session's PR: Toriel/Asriel sprite-ID restoration cherry-picked from the unmerged `arena/01a07d27-undertale` (commit `ab75598`), v0.1.5 publication, and stale-claim fixes in README/PORTING/release pages. That branch's other commit (`51dca8f`, missing paths degrade to hold-in-place) was **deliberately not ported**: all 38 paths are recovered on master, and silently degrading a missing path would violate hard rule 1 (a missing resource stops with its name) |
-| Old releases | `love-v0.1.0/1/2/3-experimental` are **kept on purpose** (owner declined deletion) and renamed with a "Superseded (…)" prefix as each is replaced. Version branches `v0.1.0`..`v0.1.3` point at each tagged build |
+| `master` | PRs 1-11 merged (through `e5705d2`): the LÖVE port, touch controls and Android tooling, the v0.1.1-v0.1.3 softlock/sprite/scenery fixes, path-recovery pieces 1-5, registry and room-159 evidence, the v0.1.4-v0.1.6 publications, and PR #11's Ruins spike-bridge softlock, X-skip text-overlap and touch COLLISION-toggle fixes |
+| Published release | `love-v0.1.7-experimental` (prerelease, 3 assets, checksum in notes) is published by the pinned workflow from this session's branch and carries PR #11's fixes. `love-v0.1.5/6-experimental` stay up, renamed with a "Superseded —" prefix. Every published release is immutable: do not re-publish over it |
+| Open PR | this session's PR: publish PR #11's three merged fixes as a downloadable `love-v0.1.7-experimental` build — `port/version.lua` bump, `docs/RELEASE_NOTES.md`, README download links and the "Fixed in v0.1.7" section, `docs/CONTROLS.md` for the new PAUSE row, and the workflow retarget. The **draft prerelease is created before** the workflow-touching push, because the job refuses to run without it |
+| Old releases | `love-v0.1.0`..`love-v0.1.6-experimental` are **kept on purpose** (owner declined deletion) and renamed with a "Superseded (…)" prefix as each is replaced. Version branches `v0.1.0`..`v0.1.3` point at each tagged build |
 | Release plumbing | `.github/workflows/love-prerelease.yml` publishes on push to one pinned branch and **refuses unless a draft release with that tag already exists** |
 
 ### To publish a version (only when a piece list says a release is due)

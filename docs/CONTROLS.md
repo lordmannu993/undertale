@@ -80,6 +80,12 @@ vibration, reset and a control test screen. Settings are saved as validated plai
 text in `touch-settings-v1.txt` in the app's save directory. No executable Lua is
 loaded from settings/saves. Vibration is off by default.
 
+A seventh PAUSE row, **COLLISION: ON/OFF**, exposes the game's own `phasing`
+debug toggle (the keyboard equivalent lives on `obj_mainchara`): OFF walks
+through walls. It is a testing aid rather than a setting, so it defaults to ON,
+is never written to `touch-settings-v1.txt`, and is re-applied after an in-game
+restart.
+
 Extra-key panels temporarily cover the game picture; they are not intended to
 replace the large D-pad/Z/X/C controls during normal battles. Very small windows
 necessarily have smaller extra targets. Real-device reach, hit-target comfort,
