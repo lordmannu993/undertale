@@ -20,7 +20,8 @@ Touch.pages = pages
 
 function Touch.new(input, mobile)
     local self=setmetatable({input=input, mobile=mobile, visible=mobile, settings={}, pointers={},
-        extra=false, page=1, paused=false, controls={}, toolbar={}, extraButtons={}, lastHaptic=-1},Touch)
+        extra=false, page=1, paused=false, controls={}, toolbar={}, extraButtons={}, lastHaptic=-1,
+        collision=true},Touch)
     for k,v in pairs(defaults) do self.settings[k]=v end
     if love and love.filesystem then
         local data=love.filesystem.read(settingsPath)
@@ -130,7 +131,9 @@ function Touch:layoutMenu()
     local height=math.min(sh-20,390)
     self.menu={x=sx+(sw-width)/2,y=sy+(sh-height)/2,w=width,h=height}
     local m=self.menu
-    local row=math.min(44,(height-76)/6)
+    -- Seven rows now; the collision toggle is a testing aid, not a setting,
+    -- so it is not persisted with the rest (it resets to ON every launch).
+    local row=math.min(44,(height-76)/7)
     self.menuButtons={}
     local function b(label,action,column,line)
         local bw=(width-36)/2
@@ -143,6 +146,7 @@ function Touch:layoutMenu()
     b("RESUME","pause",0,4); b("TOUCH ON / OFF","visible",1,4)
     b("CONTROL TEST","test",0,5)
     b(self.settings.pixels and "SCALE: INTEGER" or "SCALE: FIT","pixels",1,5)
+    b(self.collision and "COLLISION: ON" or "COLLISION: OFF","collision",0,6)
 end
 
 function Touch:setPaused(value)
@@ -185,6 +189,9 @@ function Touch:action(button)
     elseif a=="southpaw" then self.settings.southpaw=not self.settings.southpaw
     elseif a=="haptics" then self.settings.haptics=not self.settings.haptics
     elseif a=="pixels" then self.settings.pixels=not self.settings.pixels
+    elseif a=="collision" then
+        self.collision=not self.collision
+        if self.onCollision then self.onCollision(self.collision) end
     elseif a=="reset" then for k,v in pairs(defaults) do self.settings[k]=v end end
     self:save()
     self:resize(self.w,self.h,self.safe)

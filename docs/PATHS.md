@@ -56,6 +56,20 @@ Implemented in `Runtime:startPath` / `Runtime:advancePath` / `Runtime:pathGeomet
   `path_torielwalk1` starts at `140,320`. Read as absolute the path begins 2 px from
   where she stands; read as relative it would put her at `282,640`, outside a
   `320x480` room. `tests/test_paths.py` pins that comparison so the choice cannot rot.
+- **One deliberate deviation from the upstream source: `obj_torhandhold1`'s three
+  `path_start` calls pass the absolute flag, where the pinned decompile passes `0`.**
+  The upstream `obj_torhandhold1` starts `path_torielwalk5_2` (and Toriel's
+  `path_walkright` exit) with the *relative* flag; taken as offsets from the walk-in
+  position near (768,110) the recovered points — which zig-zag across the spike maze
+  in room-absolute coordinates ending at (1136,60) — would put the crossing at
+  (1540,210)..(1904,170), outside the `1200x240` room, and the scene limps on
+  off-camera with the player invisible (the reported "Toriel and player go missing"
+  at the spike bridge). This checkout therefore passes `1/* absolute */` on all three
+  calls, matching what sibling `obj_toroverworld6` already passes for
+  `path_torielwalk5` in the same room. The evidence and the resulting scene flow
+  (`path_position == 1` → restore visibility/`phasing`, create `obj_toroverworld4`,
+  farewell dialogue to `plot = 8`) are pinned by
+  `tests/test_paths.py::test_toriel_handhold_completes_scene_instead_of_walking_off_room`.
 - **Start snaps onto the path.** GameMaker places the instance at the path position
   when the path begins, so `path_start` does the same instead of waiting a step.
 - **End actions follow the constants this runtime declares** (`path_action_stop = 0`,

@@ -139,6 +139,87 @@ def test_a_path_without_recovered_data_still_stops(lua):
         run_gml(lua, "path_start(19999,3,0,1);")
 
 
+HANDHOLD_SCENE = """
+    R:start()
+    -- The lead-in (Toriel's greeting, her follow-walk and the scripted encounter
+    -- at x=520) is other objects' business; this test pins the handhold scene the
+    -- reported softlock happens in. obj_toroverworld6 leaves obj_torinteractable5
+    -- standing at the end of path_torielwalk5, so the scene is entered exactly
+    -- from there.
+    R:gotoRoom(R.constants.room_ruins5)
+    tick(3)
+    R.global.plot = 7
+    local lead = R.pathData[R.manifest.names.path_torielwalk5]
+    local ia = R:create(R.constants.obj_torinteractable5,
+        lead.points[#lead.points][1], lead.points[#lead.points][2])
+    local mc = R:select(R.constants.obj_mainchara)[1]
+    mc.v.x, mc.v.y = ia.v.x - 15, ia.v.y + 31     -- at her feet, facing right
+    tick(1)
+    input:setSource("test", {39}); tick(2); input:setSource("test", {}); tick(1)
+    assert(R.global.facing == 1 and R.global.interact == 0)
+    press(90)                                      -- talk to her (msc 217)
+    for round = 1, 120 do
+        if #R:select(R.constants.obj_dialoguer) == 0 then break end
+        press(90)
+    end
+    tick(6)
+    local hh = R:select(R.constants.obj_torhandhold1)[1]
+    assert(hh, "talking to Toriel never spawned obj_torhandhold1")
+    assert(mc.v.visible == 0 and R.global.interact == 6 and R.global.phasing == 1)
+    -- The crossing must run inside the room the whole way.
+    local start = R.pathData[R.manifest.names.path_torielwalk5_2].points[1]
+    assert(hh.v.y == start[2] and math.abs(hh.v.x - start[1]) <= 20,
+        string.format("handhold entered the maze at (%.0f,%.0f), not the path start", hh.v.x, hh.v.y))
+    local peak_x, peak_y = hh.v.x, hh.v.y
+    for round = 1, 700 do
+        tick(1)
+        if not hh.alive then break end
+        if hh.v.x > peak_x then peak_x = hh.v.x end
+        if hh.v.y > peak_y then peak_y = hh.v.y end
+        if hh.v.conversation == 2 then break end
+    end
+    assert(hh.alive and hh.v.conversation == 2 and hh.v.path_position == 1,
+        "the hand-in-hand crossing never reached the far side of the spikes")
+    assert(hh.v.x == 1136 and hh.v.y == 60,
+        string.format("crossing ended at (%.0f,%.0f) instead of (1136,60)", hh.v.x, hh.v.y))
+    assert(peak_x < R.vars.room_width and peak_y < R.vars.room_height,
+        string.format("Toriel and the player left the room: peak (%.0f,%.0f)", peak_x, peak_y))
+    assert(R.global.phasing == 0, "phasing was not restored after the crossing")
+    assert(mc.v.visible == 1, "the player was not made visible again")
+    assert(mc.v.x == 1136 and mc.v.y == 60, "the player did not exit the maze with Toriel")
+    assert(R:select(R.constants.obj_spiketile2)[1].v.solid == 1, "spikes stayed passable")
+    local tor = R:select(R.constants.obj_toroverworld4)[1]
+    assert(tor and tor.v.x == hh.v.x + 12 and tor.v.y == hh.v.y,
+        "obj_toroverworld4 was not placed at the handhold's position")
+    -- alarm[0] fires the farewell dialogue (msc 218); Z through it like a player.
+    tick(6)
+    for round = 1, 200 do
+        if #R:select(R.constants.obj_dialoguer) == 0 then break end
+        press(90)
+    end
+    tick(4)
+    assert(R.global.plot == 8, "the scene did not finish with global.plot = 8")
+    assert(R.global.interact == 0, "player control was not returned")
+    assert(not hh.alive, "obj_torhandhold1 survived its own scene")
+"""
+
+
+def test_toriel_handhold_completes_scene_instead_of_walking_off_room(lua):
+    """The Ruins water-spike handhold crossing plays out inside room_ruins5.
+
+    ``obj_torhandhold1`` started ``path_torielwalk5_2`` with GameMaker's
+    *relative* flag, but the recovered points are room-absolute coordinates that
+    zig-zag through the spike maze. Read as offsets from the walk-in position
+    (768,110) the path dumped Toriel and the invisible player around (1540,210)
+    to (1904,170) — outside the 1200x240 room — so the whole crossing, its
+    follow-up dialogue and the hand-back of control happened off-camera: on a
+    phone that reads as Toriel and the player vanishing at the spike bridge.
+    The fix starts the maze path absolutely, exactly like sibling
+    ``obj_toroverworld6`` already did for ``path_torielwalk5`` in the same room.
+    """
+    lua.execute(HANDHOLD_SCENE)
+
+
 ROUTE_DRIVE = """
     local deadline = R.frame + 6000
     while R.roomState.name == "room_floweybattle" and R.frame < deadline do
