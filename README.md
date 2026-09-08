@@ -14,9 +14,9 @@ native Android APK has been built or tested in this workspace. See [port status]
 
 ## Download the experimental `.love` file
 
-[**Download `undertale-love-v0.1.5-experimental.love` (~124 MB)**](https://github.com/lordmannu993/undertale/releases/download/love-v0.1.5-experimental/undertale-love-v0.1.5-experimental.love)
+[**Download `undertale-love-v0.1.6-experimental.love` (~124 MB)**](https://github.com/lordmannu993/undertale/releases/download/love-v0.1.6-experimental/undertale-love-v0.1.6-experimental.love)
 
-[Release notes, SHA-256 checksum, and conversion report](https://github.com/lordmannu993/undertale/releases/tag/love-v0.1.5-experimental)
+[Release notes, SHA-256 checksum, and conversion report](https://github.com/lordmannu993/undertale/releases/tag/love-v0.1.6-experimental)
 
 Download the **`.love` asset**, not GitHub's automatic “Source code” ZIP. It
 contains the generated Lua and supplied assets; you do not need Python or
