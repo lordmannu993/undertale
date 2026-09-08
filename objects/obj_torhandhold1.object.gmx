@@ -41,11 +41,11 @@ facing= 0;
 direction= 0;
 obj_mainchara.visible= 0;
 obj_mainchara.y= y + 28;
-path_start(14/* path_torielwalk5_2 */, 1, 0, 0/* path_action_stop */);
+path_start(14/* path_torielwalk5_2 */, 1, 0, 1/* absolute */);
 global.phasing= 1;
 obj_spiketile2.solid= 0;
 // obj_mainchara
-with(1570) path_start(14/* path_torielwalk5_2 */, 1, 0, 0/* path_action_stop */);
+with(1570) path_start(14/* path_torielwalk5_2 */, 1, 0, 1/* absolute */);
 global.interact= 6;
 conversation= 0;
 phone= 0;
@@ -111,7 +111,7 @@ conversation= 3;
     conversation= 2;
 }
 if(conversation == 3 &amp;&amp; !instance_exists(779/* obj_dialoguer */)) {
-    with(tor) path_start(41/* path_walkright */, 3, 0, 0/* path_action_stop */);
+    with(tor) path_start(41/* path_walkright */, 3, 0, 1/* absolute */);
     global.interact= 0;
     instance_destroy();
     global.plot= 8;

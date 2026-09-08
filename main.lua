@@ -51,6 +51,9 @@ local function boot()
         game:start()
     end)
     if not ok then fail(err) end
+    -- The touch collision toggle is runtime-only, so a restart must re-apply it:
+    -- the walk-through-walls debug state lives in the game's global.phasing.
+    if game and touch.collision == false then game.global.phasing = 1 end
 end
 local function setTester(value)
     tester=value;input:cancelAll();recent={};accumulator=0
@@ -76,6 +79,11 @@ function love.load(args)
         end
     end
     touch.onTest=function() setTester(not tester) end
+    touch.onCollision=function(enabled)
+        -- Maps the pause-menu toggle onto the game's own phasing debug global:
+        -- collision ON keeps global.phasing = 0, OFF walks through walls (1).
+        if game then game.global.phasing = enabled and 0 or 1 end
+    end
     resize()
     for _,a in ipairs(args or {}) do if a=="--touch" then touch.visible=true;resize() elseif a=="--input-test" then tester=true end end
     if smokeMode then

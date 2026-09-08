@@ -137,3 +137,110 @@ def test_fit_downscales_without_cropping_even_in_integer_mode(lua):
             assert(r.x>=10 and r.y>=20 and r.x+r.w<=310 and r.y+r.h<=240)
         end
     ''')
+
+
+def test_text_skip_with_cancel_cleans_stalled_writers(lua):
+    """X/Shift skipping no longer leaves a halted writer under the next bubble.
+
+    Battle controllers (obj_sansb, obj_papdate, ...) call ``scr_textskip`` every
+    step, but the old script only fast-forwarded ``stringpos``. A writer that had
+    advanced to a halt state (``halt`` 1, 2 or 4) never runs its own Z-driven
+    page-advance/destroy user event during a skip, so it stayed alive under the
+    next bubble's writer and both texts drew at once. The fixed script branches
+    on the halt state exactly like the writer's own user event does.
+    """
+    lua.execute('''
+        R:start()
+        R:gotoRoom(R.constants.room_ruins5)   -- quiet room: no dialogue of its own
+        tick(3)
+        assert(#R:select(782) == 0, "ambient writers would obscure the count")
+        -- A battle controller polls scr_textskip while X is held, inside the tick.
+        local function xskip()
+            input:setSource("test", {88})
+            input:beginFrame()
+            R:call("scr_textskip", E)
+            R:step(); R:renderFrame(); R:finishFrame()
+            input:endFrame()
+            input:setSource("test", {})
+            tick(1)
+        end
+        R.global.typer = 4
+        R.global.msc = 1   -- three pages: two ending "/" and a last one ending "/%"
+        local stalled = R:create(R.constants.OBJ_WRITER, 40, 150)
+        tick(1)
+        -- Two skips per page: one completes the page, one advances to the next.
+        xskip(); xskip()
+        assert(stalled.alive and stalled.v.stringno == 1 and stalled.v.halt == 0,
+            "the halt == 1 branch did not advance to the next page")
+        xskip(); xskip()
+        xskip()
+        assert(stalled.alive and stalled.v.halt == 2 and stalled.v.stringno == 2,
+            "the dialogue did not stall at its /% ending")
+        -- The controller moves on (the battle ended) and a new bubble appears.
+        local fresh = R:create(R.constants.OBJ_WRITER, 60, 250)
+        tick(1)
+        assert(#R:select(782) == 2, "expected the stalled writer plus the new one")
+        -- The next X press must clean the stalled writer and complete the new page.
+        input:setSource("test", {88})
+        input:beginFrame()
+        R:call("scr_textskip", E)
+        local writers = R:select(782)
+        assert(#writers == 1 and writers[1] == fresh,
+            "the skip must leave exactly the new writer, not a stack of stalled ones")
+        assert(writers[1].v.halt == 0, "the surviving writer should be mid-page, not halted")
+        assert(R.global.myfight == 0 and R.global.mnfight == 1,
+            "the halt == 2/4 cleanup must hand control back like the writer's own user event")
+        assert(not stalled.alive, "the stalled writer was not destroyed")
+        R:step(); R:renderFrame(); R:finishFrame()
+        input:endFrame()
+        input:setSource("test", {})
+    ''')
+
+
+def test_touch_pause_menu_collision_toggle_flips_testing_phasing(lua):
+    """The pause menu's COLLISION button drives the game's phasing debug global.
+
+    It is the touch equivalent of the keyboard debug toggle on obj_mainchara
+    (global.phasing 0 = solid collisions, 1 = walk through walls), which is how
+    the game itself gates every solid-collision pushback. It is runtime-only:
+    it must not be written to the persisted touch settings.
+    """
+    lua.execute('''
+        R:start(); tick(2)
+        assert(R.global.phasing == 0)
+        local Touch=require("port.touch")
+        local touch=Touch.new(input,false)
+        touch:resize(960,540)
+        assert(touch.collision == true, "collision must default to ON")
+        -- Wire it exactly like main.lua's love.load does.
+        touch.onCollision=function(enabled)
+            if R then R.global.phasing = enabled and 0 or 1 end
+        end
+        local function collisionButton()
+            for _,b in ipairs(touch.menuButtons) do if b.action=="collision" then return b end end
+        end
+        local function fits()
+            local m=touch.menu
+            for _,b in ipairs(touch.menuButtons) do
+                assert(b.x>=m.x and b.y>=m.y and b.x+b.w<=m.x+m.w+0.01 and b.y+b.h<=m.y+m.h+0.01,
+                    "menu button escapes the panel: "..b.label)
+            end
+        end
+        fits()
+        local button=collisionButton()
+        assert(button and button.label=="COLLISION: ON", "the seventh pause-menu row is missing")
+        touch:setPaused(true)
+        touch:pressed("finger", button.x+button.w/2, button.y+button.h/2)
+        assert(touch.collision == false and R.global.phasing == 1,
+            "tapping COLLISION must turn walk-through-walls on")
+        assert(collisionButton().label == "COLLISION: OFF", "the button label did not refresh")
+        assert(touch.settings.collision == nil, "the toggle must not persist to touch settings")
+        touch:pressed("finger", button.x+button.w/2, button.y+button.h/2)
+        assert(touch.collision == true and R.global.phasing == 0,
+            "tapping COLLISION again must restore solid collisions")
+        assert(collisionButton().label == "COLLISION: ON")
+        -- The seventh row must still fit on a small phone panel.
+        touch:resize(480,320)
+        fits()
+        assert(collisionButton().label == "COLLISION: ON")
+    ''')
