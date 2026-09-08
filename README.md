@@ -14,9 +14,9 @@ native Android APK has been built or tested in this workspace. See [port status]
 
 ## Download the experimental `.love` file
 
-[**Download `undertale-love-v0.1.5-experimental.love` (~124 MB)**](https://github.com/lordmannu993/undertale/releases/download/love-v0.1.5-experimental/undertale-love-v0.1.5-experimental.love)
+[**Download `undertale-love-v0.1.6-experimental.love` (~124 MB)**](https://github.com/lordmannu993/undertale/releases/download/love-v0.1.6-experimental/undertale-love-v0.1.6-experimental.love)
 
-[Release notes, SHA-256 checksum, and conversion report](https://github.com/lordmannu993/undertale/releases/tag/love-v0.1.5-experimental)
+[Release notes, SHA-256 checksum, and conversion report](https://github.com/lordmannu993/undertale/releases/tag/love-v0.1.6-experimental)
 
 Download the **`.love` asset**, not GitHub's automatic “Source code” ZIP. It
 contains the generated Lua and supplied assets; you do not need Python or
@@ -27,6 +27,17 @@ APK and requires the LÖVE runtime.
 missing resources and native-testing limitations described above still apply.
 The large archive is hosted as a GitHub Release asset rather than committed to
 Git. To regenerate it yourself, follow the build instructions below.
+
+### Fixed in v0.1.6
+
+- Toriel now faces the path tangent while following movement paths, including
+  reverse travel; stopped paths preserve the scripted facing.
+- Void the incompatible upstream registry import and restore all 13 verified
+  Toriel dialogue-face sprite IDs, so dialogue portraits no longer show
+  placeholder or unrelated sprites.
+- Alarm timers now fire when they cross zero, so the first Froggit encounter
+  starts normally.
+- **160 automated tests** passed for this release.
 
 ### Fixed in v0.1.5
 
