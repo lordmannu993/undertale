@@ -48,7 +48,7 @@ Git. To regenerate it yourself, follow the build instructions below.
 - The packaged build is gated on a native Linux LÖVE run that asserts Toriel is
   actually drawn displaced along the recovered path, plus a route test that
   drives the real scripted fight and dialogue into `room_ruins1`.
-- Recover and ship pinned exact-name resource registry evidence, reducing unresolved static references from 86 to 44.
+- Recover and ship pinned exact-name resource registry evidence, the registry is audit-only; unresolved static references remain 86.
 - Recover the missing Hotland room 159 source with provenance and include it in the archive; the GMS2-to-GMX adapter remains experimental and the runtime still stops explicitly at that slot.
 - Preserve reproducible conversion reports and source provenance in the downloadable archive.
 
