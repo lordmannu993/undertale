@@ -4,17 +4,19 @@ This checkout now includes a **GML-to-Lua converter, a LÖVE compatibility runti
 and multi-touch controls**. The original GameMaker files are preserved.
 
 **This is not a finished, full-game Android port.** Every source unit translates,
-but the decompiled checkout is incomplete: 38 referenced movement paths are
-absent, some original numeric asset IDs are unresolved, and external resources
-are missing. Those problems, plus remaining runtime fidelity work, prevent a
-full-game compatibility claim. No native Android APK has been built or tested in
-this workspace. See [port status](docs/PORTING.md) and [validation](docs/VALIDATION.md).
+but the decompiled checkout is incomplete: the 38 referenced movement paths had
+no point data in the export — their coordinates are now recovered from a pinned
+upstream dump ([docs/PATHS.md](docs/PATHS.md)) and played back — while some
+original numeric asset IDs (44 in statically recognizable reference positions)
+and external resources remain unresolved or missing. Those problems, plus
+remaining runtime fidelity work, prevent a full-game compatibility claim. No
+native Android APK has been built or tested in this workspace. See [port status](docs/PORTING.md) and [validation](docs/VALIDATION.md).
 
 ## Download the experimental `.love` file
 
-[**Download `undertale-love-v0.1.4-experimental.love` (~124 MB)**](https://github.com/lordmannu993/undertale/releases/download/love-v0.1.4-experimental/undertale-love-v0.1.4-experimental.love)
+[**Download `undertale-love-v0.1.5-experimental.love` (~124 MB)**](https://github.com/lordmannu993/undertale/releases/download/love-v0.1.5-experimental/undertale-love-v0.1.5-experimental.love)
 
-[Release notes, SHA-256 checksum, and conversion report](https://github.com/lordmannu993/undertale/releases/tag/love-v0.1.4-experimental)
+[Release notes, SHA-256 checksum, and conversion report](https://github.com/lordmannu993/undertale/releases/tag/love-v0.1.5-experimental)
 
 Download the **`.love` asset**, not GitHub's automatic “Source code” ZIP. It
 contains the generated Lua and supplied assets; you do not need Python or
@@ -26,8 +28,26 @@ missing resources and native-testing limitations described above still apply.
 The large archive is hosted as a GitHub Release asset rather than committed to
 Git. To regenerate it yourself, follow the build instructions below.
 
+### Fixed in v0.1.5
+
+- Restore the missing Toriel/Asriel directional and talking sprite IDs
+  (`spr_toriel_ut` 1111, `spr_toriel_handhold_d` 1113, `spr_toriel_handhold_u`
+  1117, `spr_asriel_dt` 2418, `spr_asriel_ut` 2420, `spr_asriel_rt` 2422,
+  `spr_asriel_l` 2424, `spr_asriel_lt` 2425): Toriel's up/hand-hold poses and
+  Asriel's overworld reveal no longer draw blank.
+- Regression coverage now asserts every directional/talking sprite ID the
+  Toriel/Asriel overworld objects assign resolves to a real, non-empty sprite,
+  and that the restored IDs are not synthetic.
+
 ### Fixed in v0.1.4
 
+- Recover point data for all 38 referenced movement paths from one pinned
+  upstream GameMaker project dump (per-path provenance in
+  [docs/PATHS.md](docs/PATHS.md)) and play them back at GameMaker's
+  pixels-per-step speed: Toriel's walk to the ruins no longer stops the scene.
+- The packaged build is gated on a native Linux LÖVE run that asserts Toriel is
+  actually drawn displaced along the recovered path, plus a route test that
+  drives the real scripted fight and dialogue into `room_ruins1`.
 - Recover and ship pinned exact-name resource registry evidence, reducing unresolved static references from 86 to 44.
 - Recover the missing Hotland room 159 source with provenance and include it in the archive; the GMS2-to-GMX adapter remains experimental and the runtime still stops explicitly at that slot.
 - Preserve reproducible conversion reports and source provenance in the downloadable archive.
@@ -74,8 +94,9 @@ Close the old running game and open the new, versioned download; resuming the ol
 Android recent-app card will keep running v0.1.0. Your save identity is unchanged.
 The original flower tiles and gameplay collision layout are retained. v0.1.2 adds
 reference-guided backdrop artwork only to the two incomplete opening rooms;
-other rooms are not replaced by a generic background. Missing path data remains
-unresolved.
+other rooms are not replaced by a generic background. Movement path point data
+is recovered and played back from v0.1.4 (docs/PATHS.md); frame-level fidelity
+against the original engine is not yet certified.
 
 ## Run with LÖVE
 

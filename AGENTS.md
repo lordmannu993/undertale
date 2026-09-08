@@ -42,10 +42,10 @@ explicitly **not a finished game** and every release note says so.
 
 | item | state |
 | --- | --- |
-| `master` | `ae5d80f` — v0.1.3 docs, workflow and `port/version.lua` merged via PR #4 |
-| Published release | `love-v0.1.3-experimental` (prerelease, 3 assets, checksum in notes). Immutable: do not re-publish over it |
-| Open PR | **#5** — pieces 1-3: recovered path data, runtime playback, native gate + route test |
-| Old releases | `love-v0.1.0/1/2-experimental` are **kept on purpose** (owner declined deletion). Version branches `v0.1.0`..`v0.1.3` point at each tagged build |
+| `master` | all six PRs merged (through `7ca9608`): v0.1.3 softlock/sprite fixes, path-recovery pieces 1-3, registry and room-159 evidence, v0.1.4 publication |
+| Published release | `love-v0.1.4-experimental` (prerelease, 3 assets, checksum in notes). `love-v0.1.5-experimental` is published from this session's branch. Every published release is immutable: do not re-publish over it |
+| Open PR | this session's PR: Toriel/Asriel sprite-ID restoration cherry-picked from the unmerged `arena/01a07d27-undertale` (commit `ab75598`), v0.1.5 publication, and stale-claim fixes in README/PORTING/release pages. That branch's other commit (`51dca8f`, missing paths degrade to hold-in-place) was **deliberately not ported**: all 38 paths are recovered on master, and silently degrading a missing path would violate hard rule 1 (a missing resource stops with its name) |
+| Old releases | `love-v0.1.0/1/2/3-experimental` are **kept on purpose** (owner declined deletion) and renamed with a "Superseded (…)" prefix as each is replaced. Version branches `v0.1.0`..`v0.1.3` point at each tagged build |
 | Release plumbing | `.github/workflows/love-prerelease.yml` publishes on push to one pinned branch and **refuses unless a draft release with that tag already exists** |
 
 ### To publish a version (only when a piece list says a release is due)

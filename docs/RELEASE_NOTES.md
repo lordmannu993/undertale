@@ -4,10 +4,34 @@ This prerelease makes the current `.love` package downloadable from GitHub. It
 contains the converted Lua and the assets supplied in this repository. **It is
 not a completed or native-device-verified game, and it is not an APK.**
 
+## v0.1.5 fixes
+
+- **Restore the missing Toriel/Asriel directional and talking sprite IDs.** The
+  decompiler only annotated a handful of the directional sprite IDs, so Toriel's
+  up-talking pose (`utsprite`/`usprite` = 1111) and the hand-hold down/up poses
+  (1113/1117) fell through to synthetic IDs or were absent entirely, and the
+  Toriel/Asriel overworld reveal (`obj_torinteractable7`,
+  `obj_asriel_overworldanim`) drew Asriel's side/up/talking poses blank. Restored
+  in `port/resource_overrides.json`: `spr_toriel_ut` 1111,
+  `spr_toriel_handhold_d` 1113, `spr_toriel_handhold_u` 1117, `spr_asriel_dt`
+  2418, `spr_asriel_ut` 2420, `spr_asriel_rt` 2422, `spr_asriel_l` 2424,
+  `spr_asriel_lt` 2425.
+- A new regression (`tests/test_toriel_sprites.py`) asserts every
+  directional/talking sprite ID a Toriel or Asriel overworld object assigns
+  resolves to a real, non-empty sprite, and that the restored IDs are not
+  synthetic.
+- Corrected the v0.1.4 release page, whose "Download and try" section named the
+  v0.1.3 asset and whose limitations text still described movement paths as
+  missing although that archive contains all 38 recovered paths and their
+  playback.
+- Updated the GitHub download to the v0.1.5 experimental LOVE archive.
+
 ## v0.1.4 fixes
 
 - Added pinned exact-name resource-registry evidence, reducing unresolved static references from 86 to 44 without guessing conflicting IDs.
 - Recovered the missing Hotland room 159 source from the pinned upstream dump and included its provenance in the archive. The runtime continues to stop explicitly until a tested GMS2-to-GMX adapter is available.
+- Recovered point data for all 38 referenced movement paths from one pinned upstream GameMaker project dump and played them back at GameMaker's pixels-per-step speed. Per-path provenance and the coordinate-semantics evidence are in docs/PATHS.md.
+- The release was gated on a native Linux LÖVE run asserting Toriel is actually drawn displaced along her recovered path, plus a route test that drives the real scripted fight and dialogue into room_ruins1.
 - Updated the GitHub download to the v0.1.4 experimental LOVE archive.
 
 ## v0.1.3 fixes
@@ -57,7 +81,7 @@ recent-app thumbnail is not an in-game rendering setting.
 
 ## Download and try
 
-1. Download **`undertale-love-v0.1.3-experimental.love`** from the assets below
+1. Download **`undertale-love-v0.1.5-experimental.love`** from the assets below
    (approximately 124 MB). Do not download GitHub's automatic “Source code” ZIP
    if you want to try the packaged game.
 2. Install the official **LÖVE 11.5 runtime** for your platform:
@@ -78,11 +102,14 @@ null audio; neither test suite establishes Android GPU compatibility, audible
 fidelity, physical touch latency, or full-game playability. No Android APK has
 been compiled or installed as part of this prerelease.**
 
-Missing movement paths and external resources, unresolved numeric asset IDs,
-and remaining GameMaker compatibility work prevent a complete game. Path playback
-also needs implementation and validation against recovered data. Some scenes
-will stop with a diagnostic; missing resources have not been fabricated or
-silently replaced. Some of the missing external files are optional/debug assets.
+All 38 referenced movement paths were recovered with pinned provenance
+(docs/PATHS.md) and are played back by the runtime, but frame-level parity with
+the original engine's stepping is not yet certified. Missing external
+resources, the remaining unresolved numeric asset IDs, the missing Hotland
+room's GMS2-to-GMX adapter, and remaining GameMaker compatibility work
+prevent a complete game. Some scenes will stop with a diagnostic; missing
+resources have not been fabricated or silently replaced. Some of the missing
+external files are optional/debug assets.
 
 See the bundled `docs/PORTING.md`, `docs/ANDROID.md`, and `docs/VALIDATION.md`, plus
 the attached conversion report. This release must not be presented as a finished

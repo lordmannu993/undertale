@@ -56,7 +56,9 @@ This omission must not shift the IDs of the 334 rooms that are supplied.
    ordering, pixel-mask sampling under subpixel/rotated scales, persistence edge
    cases, camera behavior, gradient text, advanced battles, and every route/end
    sequence need comparison against a reference run. Gradient text currently
-   warns and uses its first corner color. Path execution is explicitly unsupported.
+   warns and uses its first corner color. Path playback is implemented for the
+   38 recovered paths (docs/PATHS.md); frame-level parity with the original
+   engine's stepping is not yet certified.
 5. **No Android device certification or APK build.** Python tests run the real
    generated Lua headlessly. The v0.1.1 release pipeline additionally runs the
    packaged game in native Linux LÖVE under Xvfb/software OpenGL, checks actual
@@ -176,12 +178,14 @@ The original GameMaker files have not been changed.
 
 ## Finishing the port
 
-1. Recover the original path points/speeds/closed/smooth settings and referenced
-   external files from an export you are authorized to use.
+1. Recover the remaining referenced external files from an export you are
+   authorized to use. Path points are already recovered with pinned provenance
+   (docs/PATHS.md); speed/closed/smooth parity still needs reference validation.
 2. Recover the complete original asset index tables, resolving reported IDs rather
    than guessing from alphabetical order. The manifest includes evidence per ID.
-3. Implement path playback and remaining flagged behavior, adding regression tests
-   with actual cutscene/battle fixtures.
+3. Certify path playback against reference runs on every route/boss, and add
+   regression fixtures for the remaining flagged behavior (collision ordering,
+   persistence, camera, gradient text, advanced battles).
 4. Run the native LÖVE and Android device checklist in `VALIDATION.md`, including
    every route/boss/save/ending. Fix behavior against reference recordings.
 5. Only then remove the experimental designation and prepare release signing,
