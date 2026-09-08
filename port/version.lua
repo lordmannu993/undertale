@@ -1,1 +1,1 @@
-return {number="0.1.6", experimental=true}
+return {number="0.1.7", experimental=true}

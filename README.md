@@ -7,16 +7,18 @@ and multi-touch controls**. The original GameMaker files are preserved.
 but the decompiled checkout is incomplete: the 38 referenced movement paths had
 no point data in the export — their coordinates are now recovered from a pinned
 upstream dump ([docs/PATHS.md](docs/PATHS.md)) and played back — while some
-original numeric asset IDs (44 in statically recognizable reference positions)
-and external resources remain unresolved or missing. Those problems, plus
-remaining runtime fidelity work, prevent a full-game compatibility claim. No
+original numeric asset IDs (86 in statically recognizable reference positions;
+the pinned upstream registry dump is audit-only since v0.1.6, so no ID is
+imported from it) and external resources remain unresolved or missing. Those
+problems, plus remaining runtime fidelity work, prevent a full-game
+compatibility claim. No
 native Android APK has been built or tested in this workspace. See [port status](docs/PORTING.md) and [validation](docs/VALIDATION.md).
 
 ## Download the experimental `.love` file
 
-[**Download `undertale-love-v0.1.6-experimental.love` (~124 MB)**](https://github.com/lordmannu993/undertale/releases/download/love-v0.1.6-experimental/undertale-love-v0.1.6-experimental.love)
+[**Download `undertale-love-v0.1.7-experimental.love` (~124 MB)**](https://github.com/lordmannu993/undertale/releases/download/love-v0.1.7-experimental/undertale-love-v0.1.7-experimental.love)
 
-[Release notes, SHA-256 checksum, and conversion report](https://github.com/lordmannu993/undertale/releases/tag/love-v0.1.6-experimental)
+[Release notes, SHA-256 checksum, and conversion report](https://github.com/lordmannu993/undertale/releases/tag/love-v0.1.7-experimental)
 
 Download the **`.love` asset**, not GitHub's automatic “Source code” ZIP. It
 contains the generated Lua and supplied assets; you do not need Python or
@@ -27,6 +29,29 @@ APK and requires the LÖVE runtime.
 missing resources and native-testing limitations described above still apply.
 The large archive is hosted as a GitHub Release asset rather than committed to
 Git. To regenerate it yourself, follow the build instructions below.
+
+### Fixed in v0.1.7
+
+- Toriel's hand-in-hand crossing of the Ruins spike maze no longer walks her and
+  the player off-camera (`obj_torhandhold1` started the recovered
+  `path_torielwalk5_2` with GameMaker's *relative* flag while the recovered points
+  are room-absolute, so the crossing, its dialogue and the hand-back of control
+  happened outside the 1200x240 room). The scene now ends in view, control
+  returns, and the farewell dialogue completes. The deliberate deviation from the
+  pinned decompile is listed with its evidence in [docs/PATHS.md](docs/PATHS.md).
+- Holding **X**/Shift to skip text no longer leaves a stalled text writer alive
+  under the next bubble: `scr_textskip` now runs the same halt-state handling as
+  the writer's own confirm key, including handing control back and destroying the
+  stale writer. Overlapping dialogue is gone.
+- **PAUSE** gains a seventh row, **COLLISION: ON/OFF**, exposing the game's own
+  phasing debug toggle to touch: OFF walks through walls. It is a testing aid —
+  runtime-only, never saved to the touch settings, and it defaults to ON.
+- **163 automated tests** passed for this release (was 160), including three new
+  regressions that were each verified to fail on the unfixed code.
+- Corrected a stale limitation count: this README and `docs/PORTING.md` claimed
+  **44** unresolved numeric asset IDs, while the conversion report inside the
+  archive has listed **86** since v0.1.6 made the pinned upstream registry dump
+  audit-only. `docs/CONTROLS.md` now documents the new PAUSE COLLISION row.
 
 ### Fixed in v0.1.6
 
@@ -102,7 +127,8 @@ Git. To regenerate it yourself, follow the build instructions below.
   LÖVE smoke test with touch callbacks and pixel checks, required before publishing.
 
 Close the old running game and open the new, versioned download; resuming the old
-Android recent-app card will keep running v0.1.0. Your save identity is unchanged.
+Android recent-app card will keep running the older build (v0.1.6 or earlier).
+Your save identity is unchanged.
 The original flower tiles and gameplay collision layout are retained. v0.1.2 adds
 reference-guided backdrop artwork only to the two incomplete opening rooms;
 other rooms are not replaced by a generic background. Movement path point data
@@ -163,7 +189,8 @@ It has not been executed as part of this change.
 - **KEYS** opens Enter, Shift, Ctrl, Space, Escape, Backspace, navigation keys,
   A–Z, 0–9, F1–F12, numpad keys, and the two mouse buttons used in a test room.
 - **PAUSE** provides size/opacity adjustment, left-handed layout, optional
-  vibration, reset, and a control tester.
+  vibration, reset, a control tester, and (from v0.1.7) a runtime-only
+  **COLLISION** toggle for testing.
 - Android **Back** pauses. Desktop **F2** opens the same pause screen.
 - Simultaneous fingers, gamepads, and physical keys have independent ownership;
   lifting one source does not cancel another. Short taps survive between ticks.
