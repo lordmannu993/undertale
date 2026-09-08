@@ -37,7 +37,20 @@
       "spr_asriel_ut": 2420,
       "spr_asriel_rt": 2422,
       "spr_asriel_l": 2424,
-      "spr_asriel_lt": 2425
+      "spr_asriel_lt": 2425,
+      "spr_face_torielhappytalk": 1986,
+      "spr_face_torieltalkside": 2004,
+      "spr_face_torieltalk": 1990,
+      "spr_face_torielwhat": 1999,
+      "spr_face_torielwhatside": 2000,
+      "spr_face_torielrevenge": 1997,
+      "spr_face_torielrevengetalk": 1998,
+      "spr_face_torielcold": 1991,
+      "spr_face_torielcoldblink": 1992,
+      "spr_face_torielmad": 1993,
+      "spr_face_torielmadblink": 1995,
+      "spr_face_torielembarrassed": 1996,
+      "spr_face_toriel_goawayasgore": 1987
     },
     "objects": {
       "obj_doorparent": 793,

@@ -431,7 +431,7 @@ function Runtime:step()
                 local value=i.v.alarm[alarm]
                 if value>=0 then
                     value=value-1;i.v.alarm[alarm]=value
-                    if value==0 then self:event(i,2,alarm) end
+                    if value<=0 then self:event(i,2,alarm) end
                 end
             end
         end
@@ -612,8 +612,12 @@ function Runtime:advancePath(inst)
     v.path_positionprevious=previous;v.path_position=position
     local x,y,angle=pointAt(geo,position)
     if v._pathAbsolute then v.x=x;v.y=y else v.x=v._pathStartX+x;v.y=v._pathStartY+y end
-    -- path_orientation < 0 follows the tangent; Undertale never sets path_scale, so
-    -- that instance variable is intentionally not applied here (docs/PATHS.md).
-    if v.path_orientation<0 then v.direction=angle end
+    -- GameMaker updates facing only when the path actually moves. Orientation 0
+    -- follows travel, 1 faces away, and 2+ preserves the object's own direction.
+    if (v.x~= (v._pathAbsolute and pointAt(geo,previous) or v._pathStartX+pointAt(geo,previous))) or
+       (v.y~= (v._pathAbsolute and select(2,pointAt(geo,previous)) or v._pathStartY+select(2,pointAt(geo,previous)))) then
+        if v.path_orientation==0 then v.direction=(angle + (v.path_speed<0 and 180 or 0))%360
+        elseif v.path_orientation==1 then v.direction=(angle + (v.path_speed<0 and 0 or 180))%360 end
+    end
 end
 return Runtime

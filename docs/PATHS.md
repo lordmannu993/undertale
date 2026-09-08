@@ -124,7 +124,7 @@ Not claimed:
       asserts `path_position` advances and she leaves her placement behind. No teleporting.
 - [x] Piece 4 — import the safe registry evidence with `tools/recover_registry.py`.
       The pinned dump is recorded in `port/recovered_registry.json`; exact local-name
-      matches reduce the statically recognizable unresolved-ID count from 86 to 44.
+      matches do not reduce the unresolved-ID count; the registry is audit-only.
       Conflicting names are retained as conflicts rather than guessed. The 68 external
       files and the remaining ambiguous IDs are still explicit limitations.
 - [x] Piece 5a — recover the missing room source from the same pinned dump.

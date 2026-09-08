@@ -4,6 +4,12 @@ This prerelease makes the current `.love` package downloadable from GitHub. It
 contains the converted Lua and the assets supplied in this repository. **It is
 not a completed or native-device-verified game, and it is not an APK.**
 
+## v0.1.6 fixes
+
+- Toriel now faces the tangent while following paths, including reverse travel; stopped paths preserve the scripted facing.
+- Voided the incompatible upstream registry import and restored all 13 verified Toriel dialogue-face sprite IDs, preventing disco-ball and unrelated portraits.
+- Alarm timers now fire when they cross zero, so the first Froggit encounter starts normally.
+
 ## v0.1.5 fixes
 
 - **Restore the missing Toriel/Asriel directional and talking sprite IDs.** The
@@ -28,7 +34,7 @@ not a completed or native-device-verified game, and it is not an APK.**
 
 ## v0.1.4 fixes
 
-- Added pinned exact-name resource-registry evidence, reducing unresolved static references from 86 to 44 without guessing conflicting IDs.
+- Added pinned exact-name resource-registry evidence, The upstream registry is audit-only; its conflicting candidates are retained, and the honest unresolved count remains 86.
 - Recovered the missing Hotland room 159 source from the pinned upstream dump and included its provenance in the archive. The runtime continues to stop explicitly until a tested GMS2-to-GMX adapter is available.
 - Recovered point data for all 38 referenced movement paths from one pinned upstream GameMaker project dump and played them back at GameMaker's pixels-per-step speed. Per-path provenance and the coordinate-semantics evidence are in docs/PATHS.md.
 - The release was gated on a native Linux LÖVE run asserting Toriel is actually drawn displaced along her recovered path, plus a route test that drives the real scripted fight and dialogue into room_ruins1.
