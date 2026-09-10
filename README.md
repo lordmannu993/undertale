@@ -9,16 +9,18 @@ no point data in the export — their coordinates are now recovered from a pinne
 upstream dump ([docs/PATHS.md](docs/PATHS.md)) and played back — while some
 original numeric asset IDs (86 in statically recognizable reference positions;
 the pinned upstream registry dump is audit-only since v0.1.6, so no ID is
-imported from it) and external resources remain unresolved or missing. Those
+imported from it; the variable-mediated monster battle-part spawns are
+recovered since v0.1.8 with per-site provenance) and external resources remain
+unresolved or missing. Those
 problems, plus remaining runtime fidelity work, prevent a full-game
 compatibility claim. No native Android APK has been built or tested in this
 workspace. See [port status](docs/PORTING.md) and [validation](docs/VALIDATION.md).
 
 ## Download the experimental `.love` file
 
-[**Download `undertale-love-v0.1.7-experimental.love` (~124 MB)**](https://github.com/lordmannu993/undertale/releases/download/love-v0.1.7-experimental/undertale-love-v0.1.7-experimental.love)
+[**Download `undertale-love-v0.1.8-experimental.love` (~124 MB)**](https://github.com/lordmannu993/undertale/releases/download/love-v0.1.8-experimental/undertale-love-v0.1.8-experimental.love)
 
-[Release notes, SHA-256 checksum, and conversion report](https://github.com/lordmannu993/undertale/releases/tag/love-v0.1.7-experimental)
+[Release notes, SHA-256 checksum, and conversion report](https://github.com/lordmannu993/undertale/releases/tag/love-v0.1.8-experimental)
 
 Download the **`.love` asset**, not GitHub's automatic “Source code” ZIP. It
 contains the generated Lua and supplied assets; you do not need Python or
@@ -29,6 +31,26 @@ APK and requires the LÖVE runtime.
 missing resources and native-testing limitations described above still apply.
 The large archive is hosted as a GitHub Release asset rather than committed to
 Git. To regenerate it yourself, follow the build instructions below.
+
+### Fixed in v0.1.8
+
+- **Starting battles outside the Ruins no longer crashes with "Port
+  compatibility stop: instance_create Missing object ID 255."** Part-based
+  monsters spawn their artwork through variables holding bare original object
+  IDs (`part2= 255;` then `instance_create(x, y, part2)`); without decompiler
+  annotations those IDs stayed synthetic and every such battle stopped the
+  instant it began — including *every* enemy encounter in Snowdin (Snowdrake,
+  Doggo, Dogamy & Dogaressa, Greater Dog, Gyftrot, Glyde, Papyrus) and the
+  part-based Waterfall, Hotland and True Lab battles.
+- The 22 missing part-object IDs are recovered by `tools/recover_parts.py`:
+  each ID is this checkout's own numeric literal, paired with the object name
+  the pinned upstream decompilation uses for the same statement, with the 38
+  already-annotated part sites re-validated as anchors and per-site provenance
+  committed in `port/recovered_parts.json`. All 59 part spawn sites now resolve.
+- **179 automated tests** passed for this release (was 163), including 16 new
+  regressions: provenance/no-invention checks, a static guard over every part
+  spawn site, and end-to-end battle tests for every Snowdin battlegroup. Each
+  was verified to fail on the unfixed code with the reported crash signature.
 
 ### Fixed in v0.1.7
 

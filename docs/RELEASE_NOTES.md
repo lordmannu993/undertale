@@ -4,6 +4,46 @@ This prerelease makes the current `.love` package downloadable from GitHub. It
 contains the converted Lua and the assets supplied in this repository. **It is
 not a completed or native-device-verified game, and it is not an APK.**
 
+## v0.1.8 fixes
+
+- **Fix the crash on starting most battles outside the Ruins** (reported as:
+  *unable to initiate battle with any enemy in Snowdin — "Port compatibility
+  stop: instance_create Missing object ID 255" against `obj_snowdrake` in
+  `room_battle`*). Every part-based monster spawns its artwork through a local
+  variable holding a bare original object ID (`part2= 255; mypart2=
+  instance_create(x, y, part2)`), and those literals carry no decompiler
+  annotation — so the body-part objects stayed on synthetic IDs and
+  `instance_create` stopped the moment the battle controller created the
+  monster. The first Snowdin encounter (battlegroup 30, Snowdrake) stopped on
+  255; Doggo, Dogamy & Dogaressa, Greater Dog, Gyftrot, Glyde, Papyrus, Shyren,
+  Undyne the Undying, Mettaton EX/NEO, So Sorry and the True Lab amalgamates all
+  hit the same wall on their own part IDs.
+- **Recover the 22 missing part-object IDs with pinned, auditable provenance.**
+  `tools/recover_parts.py` pairs each of this checkout's own numeric literals
+  with the object name that the pinned upstream decompilation
+  (`kittibyte/UndertaleDecomp` @ `249ffa27`, the same immutable commit already
+  backing the registry and movement-path recoveries) uses for the *same
+  statement* — accepting a pair only when both events assign the same `partN`
+  variables in the same order, and taking **no number from the dump**: IDs come
+  from this repository's own literals, only the names are paired. The sweep also
+  re-validates the 38 part sites that already have decompiler annotations as
+  anchors, refuses on any disagreement, and records per-site provenance in
+  `port/recovered_parts.json` (fetched by script, committed, and imported by the
+  converter). A `--check` mode re-verifies the file offline.
+- All 59 monster part-spawn sites in the game now resolve, so part-based
+  battles start and draw their monsters. This does **not** certify full battle
+  fidelity: turn logic, ACT/FIGHT behaviour and attack patterns beyond the
+  scripted regression coverage remain unverified.
+- 16 new automated tests pin the fix (the suite grows from 163 to **179**): the
+  provenance and no-invention checks, a static guard that every `partN` literal
+  passed to `instance_create` resolves to a registered object, the reported
+  crash case (ID 255 = `obj_drakebody`) explicitly, and end-to-end battle tests
+  for every Snowdin battlegroup (Doggo, Lesser Dog, Dogamy & Dogaressa, Greater
+  Dog, Papyrus, Gyftrot, Snowdrake, Ice Cap, Jerry, Glad Dummy, Glyde) plus a
+  Waterfall Shyren spot check. Each was verified to fail on the unfixed build
+  with the reported crash signature before passing after it.
+- Updated the GitHub download to the v0.1.8 experimental LOVE archive.
+
 ## v0.1.7 fixes
 
 - **Fix the Ruins spike-bridge softlock** ("Toriel and the player go missing").
