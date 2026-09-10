@@ -226,6 +226,30 @@ class Converter:
                 if self.category.get(name) != category:
                     raise CompileError(f"invalid resource override {category}/{name}")
                 self.add_id(name, index, "documented resource override")
+        # Monster body parts are spawned through variables holding bare original
+        # IDs (part2= 255; instance_create(x, y, part2)), so no annotation pass
+        # can see them. tools/recover_parts.py pairs each literal with the object
+        # name the pinned upstream decompilation uses for the same statement and
+        # re-verifies every already-annotated site as an anchor.
+        parts_file = self.root / "port/recovered_parts.json"
+        if parts_file.exists():
+            parts = json.loads(self.read(parts_file))
+            imported, anchor_conflicts = {}, []
+            for name, record in parts.get("pairs", {}).items():
+                if self.category.get(name) != "objects":
+                    raise CompileError(f"recovered part {name} is not an object")
+                self.add_id(name, int(record["id"]), "recovered monster-part pairing (port/recovered_parts.json)")
+                imported[name] = record["id"]
+            for name, record in parts.get("anchors", {}).items():
+                if self.ids["objects"].get(name) not in (None, record["id"]):
+                    anchor_conflicts.append(dict(name=name, local=self.ids["objects"][name], pairing=record["id"]))
+            if anchor_conflicts:
+                raise CompileError(f"recovered part anchors disagree with other ID evidence: {anchor_conflicts}")
+            self.report["recovered_parts"] = {
+                "source": {"upstream": parts.get("upstream"), "ref": parts.get("ref")},
+                "imported": imported,
+                "anchors_revalidated": {name: record["id"] for name, record in parts.get("anchors", {}).items()},
+            }
         # The pinned dump uses its own ID space, so it is audit/conflict-only.
         # Never import its numeric IDs into the runtime registry.
         registry_file = self.root / "port/recovered_registry.json"
