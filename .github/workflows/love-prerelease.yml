@@ -3,9 +3,9 @@ name: Experimental LOVE download
 on:
   # Bootstrap publication from this unmerged branch without changing master.
   # Ordinary source pushes do not republish the immutable prerelease.
-  # This workflow file is touched for the v0.1.8 bootstrap after its draft exists.
+  # This workflow file is touched for the v0.1.9 bootstrap after its draft exists.
   push:
-    branches: [arena/01a086f6-undertale]
+    branches: [arena/01a08bfc-undertale]
     paths: [.github/workflows/love-prerelease.yml]
   workflow_dispatch:
 
@@ -13,16 +13,16 @@ permissions:
   contents: read
 
 concurrency:
-  group: love-v0.1.8-experimental-publication
+  group: love-v0.1.9-experimental-publication
   cancel-in-progress: false
 
 env:
-  RELEASE_TAG: love-v0.1.8-experimental
-  ASSET_BASE: undertale-love-v0.1.8-experimental
+  RELEASE_TAG: love-v0.1.9-experimental
+  ASSET_BASE: undertale-love-v0.1.9-experimental
 
 jobs:
   publish:
-    if: github.ref == 'refs/heads/arena/01a086f6-undertale'
+    if: github.ref == 'refs/heads/arena/01a08bfc-undertale'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
@@ -80,7 +80,7 @@ jobs:
           checksum = (Path('artifacts') / (base+'.love.sha256')).read_text().strip()
           notes = Path('docs/RELEASE_NOTES.md').read_text()
           notes += '\n## Build record\n\n'
-          notes += f'- Source commit: `{os.environ["GITHUB_SHA"]}` on `{os.environ["GITHUB_REF_NAME"]}` (v0.1.8, recovered monster body-part IDs fixing the Snowdin battle crash).\n'
+          notes += f'- Source commit: `{os.environ["GITHUB_SHA"]}` on `{os.environ["GITHUB_REF_NAME"]}` (v0.1.9, one-shot alarm reset fixing the Snowdin tile-puzzle softlock and every doubled text/enemy/dialogue).\n'
           notes += f'- **{count} automated tests passed** on GitHub Actions.\n'
           notes += f'- **{report["converted_code_units"]:,} source units** translated without parse failures.\n'
           notes += f'- **{len(report["missing_paths"])} missing movement paths**, **{len(report["unresolved_numeric_references"])} unresolved static numeric asset references**, and **{len(report["missing_external_files"])} missing literal external file paths** remain.\n'
@@ -104,10 +104,10 @@ jobs:
         run: |
           gh release edit "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" \
             --target "$GITHUB_SHA" --prerelease --latest=false \
-            --title 'LOVE v0.1.8 — Snowdin battle crash fix (experimental)' \
+            --title 'LOVE v0.1.9 — Snowdin tile-puzzle softlock + doubled text/enemies fix (experimental)' \
             --notes-file build/release-notes.md
           gh release upload "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --clobber \
-            "artifacts/$ASSET_BASE.love#LOVE v0.1.8 (experimental)" \
+            "artifacts/$ASSET_BASE.love#LOVE v0.1.9 (experimental)" \
             "artifacts/$ASSET_BASE.love.sha256#SHA-256 checksum" \
             "artifacts/$ASSET_BASE.conversion-report.json#Conversion report and missing resources"
           gh api "repos/$GITHUB_REPOSITORY/releases/$RELEASE_ID" > build/release-assets.json
