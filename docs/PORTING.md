@@ -50,6 +50,16 @@ This omission must not shift the IDs of the 334 rooms that are supplied.
    dump's 1,535 disagreeing rows are retained in `registry_conflicts` as
    evidence; they are not silently assigned. This is not an exhaustive dynamic
    data-flow analysis.
+   One class the static audit cannot see — monster events that spawn battle
+   artwork through variables holding bare original IDs (`part2= 255; mypart2=
+   instance_create(x, y, part2)`) — is now recovered instead of left synthetic:
+   every such battle used to stop with `instance_create Missing original object
+   ID`, which is what broke all part-based Snowdin encounters. `tools/recover_parts.py`
+   pairs each of this checkout's literals with the object name the pinned
+   upstream decompilation uses for the same statement, after checking both events
+   assign the same part variables in the same order; per-site provenance and the
+   38 already-annotated sites it re-validates as anchors are in
+   `port/recovered_parts.json` (see `tests/test_monster_parts.py`).
    Queries for an unknown object return no match with a warning; creation of an
    unknown object stops. Unknown image/audio cues warn and cannot be reproduced.
 3. **External resources are absent**, including dynamically replaced boss images,
@@ -140,6 +150,16 @@ The original GameMaker files have not been changed.
   silently skip the missing Hotland room (`room_fire_walkandbranch`).
 - Original asset IDs are recovered from numeric decompiler annotations and
   adjacent `// object_name` / `with(id)` comments.
+- Monster body-part spawns are recovered from variable-mediated references:
+  the decompiled events hold bare literals in `partN` variables that no
+  annotation covers, so `tools/recover_parts.py` pairs each literal with the
+  object name the pinned upstream decompilation uses for the same statement
+  (structural agreement required, no number taken from the dump) and the
+  converter imports the result from `port/recovered_parts.json`. All 59 part
+  spawn sites now resolve; the 22 previously-unresolved IDs cover every
+  part-based battle from Snowdin through the True Lab (Doggo, Dogamy &
+  Dogaressa, Greater Dog, Gyftrot, Glyde, Papyrus, Snowdrake, Shyren, Undyne,
+  Mettaton EX/NEO, So Sorry, the amalgamates and their True Lab mimics).
 - Music IDs are recovered from `scr_getmusindex` and explicit, documented
   exceptions. `port/resource_overrides.json` records additional reconstructed
   font, interaction-parent, default-dialogue and menu IDs. Font anchors now include

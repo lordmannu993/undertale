@@ -1,0 +1,886 @@
+{
+ "schema": 1,
+ "generated_by": "tools/recover_parts.py",
+ "upstream": "kittibyte/UndertaleDecomp",
+ "ref": "249ffa27ee7e7eee0d7ce84b736c294458b38685",
+ "generated_on": "2026-09-09",
+ "note": "Original object IDs for monster body-part spawn variables that the decompiler left as bare literals (partN= <id> before instance_create). Each ID is this checkout's own numeric literal; only the object name is paired from the pinned upstream decompilation of the same game state, after both events were checked to assign the same part variables in the same statement order. Anchors re-verify IDs the converter already recovers from its own annotations. No number was taken from the pinned dump; its numbered lists remain audit-only in tools/recover_registry.py.",
+ "pairs": {
+  "obj_battlebomb_body": {
+   "id": 400,
+   "sites": [
+    {
+     "object": "obj_battlebomb",
+     "event": "0:0",
+     "variable": "part1",
+     "file": "objects/obj_battlebomb.object.gmx",
+     "upstream_file": "objects/obj_battlebomb/Create_0.gml"
+    }
+   ]
+  },
+  "obj_drakebody": {
+   "id": 255,
+   "sites": [
+    {
+     "object": "obj_chilldrake",
+     "event": "0:0",
+     "variable": "part2",
+     "file": "objects/obj_chilldrake.object.gmx",
+     "upstream_file": "objects/obj_chilldrake/Create_0.gml"
+    },
+    {
+     "object": "obj_monster_extrabody",
+     "event": "2:0",
+     "variable": "part2",
+     "file": "objects/obj_monster_extrabody.object.gmx",
+     "upstream_file": "objects/obj_monster_extrabody/Alarm_0.gml"
+    },
+    {
+     "object": "obj_snowdrake",
+     "event": "0:0",
+     "variable": "part2",
+     "file": "objects/obj_snowdrake.object.gmx",
+     "upstream_file": "objects/obj_snowdrake/Create_0.gml"
+    }
+   ]
+  },
+  "obj_glyde_body": {
+   "id": 227,
+   "sites": [
+    {
+     "object": "obj_glydeb",
+     "event": "0:0",
+     "variable": "part1",
+     "file": "objects/obj_glydeb.object.gmx",
+     "upstream_file": "objects/obj_glydeb/Create_0.gml"
+    }
+   ]
+  },
+  "obj_greatdogbody": {
+   "id": 239,
+   "sites": [
+    {
+     "object": "obj_greatdog",
+     "event": "0:0",
+     "variable": "part1",
+     "file": "objects/obj_greatdog.object.gmx",
+     "upstream_file": "objects/obj_greatdog/Create_0.gml"
+    }
+   ]
+  },
+  "obj_gyftrotbody": {
+   "id": 237,
+   "sites": [
+    {
+     "object": "obj_gyftrot",
+     "event": "0:0",
+     "variable": "part2",
+     "file": "objects/obj_gyftrot.object.gmx",
+     "upstream_file": "objects/obj_gyftrot/Create_0.gml"
+    },
+    {
+     "object": "obj_monster_extrabody",
+     "event": "2:0",
+     "variable": "part2",
+     "file": "objects/obj_monster_extrabody.object.gmx",
+     "upstream_file": "objects/obj_monster_extrabody/Alarm_0.gml"
+    }
+   ]
+  },
+  "obj_gyftrotgift": {
+   "id": 233,
+   "sites": [
+    {
+     "object": "obj_gyftrot",
+     "event": "0:0",
+     "variable": "part3",
+     "file": "objects/obj_gyftrot.object.gmx",
+     "upstream_file": "objects/obj_gyftrot/Create_0.gml"
+    },
+    {
+     "object": "obj_monster_extrabody",
+     "event": "2:0",
+     "variable": "part3",
+     "file": "objects/obj_monster_extrabody.object.gmx",
+     "upstream_file": "objects/obj_monster_extrabody/Alarm_0.gml"
+    }
+   ]
+  },
+  "obj_mandogax": {
+   "id": 243,
+   "sites": [
+    {
+     "object": "obj_mandog",
+     "event": "0:0",
+     "variable": "part2",
+     "file": "objects/obj_mandog.object.gmx",
+     "upstream_file": "objects/obj_mandog/Create_0.gml"
+    },
+    {
+     "object": "obj_monster_extrabody",
+     "event": "2:0",
+     "variable": "part2",
+     "file": "objects/obj_monster_extrabody.object.gmx",
+     "upstream_file": "objects/obj_monster_extrabody/Alarm_0.gml"
+    }
+   ]
+  },
+  "obj_mettatonb_body2": {
+   "id": 302,
+   "sites": [
+    {
+     "object": "obj_mettatonb_second",
+     "event": "0:0",
+     "variable": "part1",
+     "file": "objects/obj_mettatonb_second.object.gmx",
+     "upstream_file": "objects/obj_mettatonb_second/Create_0.gml"
+    },
+    {
+     "object": "obj_mettatonb_third",
+     "event": "0:0",
+     "variable": "part1",
+     "file": "objects/obj_mettatonb_third.object.gmx",
+     "upstream_file": "objects/obj_mettatonb_third/Create_0.gml"
+    }
+   ]
+  },
+  "obj_migospel_body": {
+   "id": 596,
+   "sites": [
+    {
+     "object": "obj_migospel",
+     "event": "0:0",
+     "variable": "part1",
+     "file": "objects/obj_migospel.object.gmx",
+     "upstream_file": "objects/obj_migospel/Create_0.gml"
+    }
+   ]
+  },
+  "obj_mneo_body": {
+   "id": 451,
+   "sites": [
+    {
+     "object": "obj_mettaton_neo",
+     "event": "0:0",
+     "variable": "part1",
+     "file": "objects/obj_mettaton_neo.object.gmx",
+     "upstream_file": "objects/obj_mettaton_neo/Create_0.gml"
+    }
+   ]
+  },
+  "obj_moldessa_body": {
+   "id": 599,
+   "sites": [
+    {
+     "object": "obj_moldessa",
+     "event": "0:0",
+     "variable": "part1",
+     "file": "objects/obj_moldessa.object.gmx",
+     "upstream_file": "objects/obj_moldessa/Create_0.gml"
+    }
+   ]
+  },
+  "obj_movedogearms": {
+   "id": 250,
+   "sites": [
+    {
+     "object": "obj_monster_extrabody",
+     "event": "2:0",
+     "variable": "part3",
+     "file": "objects/obj_monster_extrabody.object.gmx",
+     "upstream_file": "objects/obj_monster_extrabody/Alarm_0.gml"
+    },
+    {
+     "object": "obj_movedoge",
+     "event": "0:0",
+     "variable": "part3",
+     "file": "objects/obj_movedoge.object.gmx",
+     "upstream_file": "objects/obj_movedoge/Create_0.gml"
+    }
+   ]
+  },
+  "obj_movedogebody": {
+   "id": 249,
+   "sites": [
+    {
+     "object": "obj_monster_extrabody",
+     "event": "2:0",
+     "variable": "part4",
+     "file": "objects/obj_monster_extrabody.object.gmx",
+     "upstream_file": "objects/obj_monster_extrabody/Alarm_0.gml"
+    },
+    {
+     "object": "obj_movedoge",
+     "event": "0:0",
+     "variable": "part4",
+     "file": "objects/obj_movedoge.object.gmx",
+     "upstream_file": "objects/obj_movedoge/Create_0.gml"
+    }
+   ]
+  },
+  "obj_movedogetail": {
+   "id": 251,
+   "sites": [
+    {
+     "object": "obj_monster_extrabody",
+     "event": "2:0",
+     "variable": "part2",
+     "file": "objects/obj_monster_extrabody.object.gmx",
+     "upstream_file": "objects/obj_monster_extrabody/Alarm_0.gml"
+    },
+    {
+     "object": "obj_movedoge",
+     "event": "0:0",
+     "variable": "part2",
+     "file": "objects/obj_movedoge.object.gmx",
+     "upstream_file": "objects/obj_movedoge/Create_0.gml"
+    }
+   ]
+  },
+  "obj_papyrusbody": {
+   "id": 231,
+   "sites": [
+    {
+     "object": "obj_papyrusboss",
+     "event": "0:0",
+     "variable": "part1",
+     "file": "objects/obj_papyrusboss.object.gmx",
+     "upstream_file": "objects/obj_papyrusboss/Create_0.gml"
+    }
+   ]
+  },
+  "obj_parsnik_body": {
+   "id": 598,
+   "sites": [
+    {
+     "object": "obj_parsnik",
+     "event": "0:0",
+     "variable": "part1",
+     "file": "objects/obj_parsnik.object.gmx",
+     "upstream_file": "objects/obj_parsnik/Create_0.gml"
+    }
+   ]
+  },
+  "obj_shyrenbody": {
+   "id": 260,
+   "sites": [
+    {
+     "object": "obj_monster_extrabody",
+     "event": "2:0",
+     "variable": "part1",
+     "file": "objects/obj_monster_extrabody.object.gmx",
+     "upstream_file": "objects/obj_monster_extrabody/Alarm_0.gml"
+    },
+    {
+     "object": "obj_shyren",
+     "event": "0:0",
+     "variable": "part1",
+     "file": "objects/obj_shyren.object.gmx",
+     "upstream_file": "objects/obj_shyren/Create_0.gml"
+    }
+   ]
+  },
+  "obj_snowdrakemom_body": {
+   "id": 551,
+   "sites": [
+    {
+     "object": "obj_snowdrakemom",
+     "event": "0:0",
+     "variable": "part1",
+     "file": "objects/obj_snowdrakemom.object.gmx",
+     "upstream_file": "objects/obj_snowdrakemom/Create_0.gml"
+    }
+   ]
+  },
+  "obj_sorrybody": {
+   "id": 457,
+   "sites": [
+    {
+     "object": "obj_sosorry",
+     "event": "0:0",
+     "variable": "part1",
+     "file": "objects/obj_sosorry.object.gmx",
+     "upstream_file": "objects/obj_sosorry/Create_0.gml"
+    }
+   ]
+  },
+  "obj_undynebody2": {
+   "id": 274,
+   "sites": [
+    {
+     "object": "obj_ripoff_undyne",
+     "event": "0:0",
+     "variable": "part1",
+     "file": "objects/obj_ripoff_undyne.object.gmx",
+     "upstream_file": "objects/obj_ripoff_undyne/Create_0.gml"
+    },
+    {
+     "object": "obj_undynebattle2",
+     "event": "0:0",
+     "variable": "part1",
+     "file": "objects/obj_undynebattle2.object.gmx",
+     "upstream_file": "objects/obj_undynebattle2/Create_0.gml"
+    }
+   ]
+  },
+  "obj_undynex_body": {
+   "id": 281,
+   "sites": [
+    {
+     "object": "obj_undyne_ex",
+     "event": "0:0",
+     "variable": "part1",
+     "file": "objects/obj_undyne_ex.object.gmx",
+     "upstream_file": "objects/obj_undyne_ex/Create_0.gml"
+    }
+   ]
+  },
+  "obj_womandogax": {
+   "id": 244,
+   "sites": [
+    {
+     "object": "obj_monster_extrabody",
+     "event": "2:0",
+     "variable": "part2",
+     "file": "objects/obj_monster_extrabody.object.gmx",
+     "upstream_file": "objects/obj_monster_extrabody/Alarm_0.gml"
+    },
+    {
+     "object": "obj_womandog",
+     "event": "0:0",
+     "variable": "part2",
+     "file": "objects/obj_womandog.object.gmx",
+     "upstream_file": "objects/obj_womandog/Create_0.gml"
+    }
+   ]
+  }
+ },
+ "anchors": {
+  "obj_aaronbody": {
+   "id": 290,
+   "sites": [
+    {
+     "object": "obj_aaron",
+     "event": "0:0",
+     "variable": "part1",
+     "file": "objects/obj_aaron.object.gmx",
+     "upstream_file": "objects/obj_aaron/Create_0.gml"
+    }
+   ]
+  },
+  "obj_adate_body": {
+   "id": 176,
+   "sites": [
+    {
+     "object": "obj_ripoff_alphys",
+     "event": "0:0",
+     "variable": "part1",
+     "file": "objects/obj_ripoff_alphys.object.gmx",
+     "upstream_file": "objects/obj_ripoff_alphys/Create_0.gml"
+    }
+   ]
+  },
+  "obj_afinal_body": {
+   "id": 568,
+   "sites": [
+    {
+     "object": "obj_asrielfinal",
+     "event": "0:0",
+     "variable": "part1",
+     "file": "objects/obj_asrielfinal.object.gmx",
+     "upstream_file": "objects/obj_asrielfinal/Create_0.gml"
+    }
+   ]
+  },
+  "obj_asgoreb_body": {
+   "id": 488,
+   "sites": [
+    {
+     "object": "obj_asgoreb",
+     "event": "0:0",
+     "variable": "part1",
+     "file": "objects/obj_asgoreb.object.gmx",
+     "upstream_file": "objects/obj_asgoreb/Create_0.gml"
+    }
+   ]
+  },
+  "obj_asgorespear": {
+   "id": 489,
+   "sites": [
+    {
+     "object": "obj_asgoreb",
+     "event": "0:0",
+     "variable": "part2",
+     "file": "objects/obj_asgoreb.object.gmx",
+     "upstream_file": "objects/obj_asgoreb/Create_0.gml"
+    }
+   ]
+  },
+  "obj_astigmatism_body": {
+   "id": 388,
+   "sites": [
+    {
+     "object": "obj_astigmatism",
+     "event": "0:0",
+     "variable": "part1",
+     "file": "objects/obj_astigmatism.object.gmx",
+     "upstream_file": "objects/obj_astigmatism/Create_0.gml"
+    }
+   ]
+  },
+  "obj_barabody": {
+   "id": 318,
+   "sites": [
+    {
+     "object": "obj_bara01",
+     "event": "0:0",
+     "variable": "part1",
+     "file": "objects/obj_bara01.object.gmx",
+     "upstream_file": "objects/obj_bara01/Create_0.gml"
+    },
+    {
+     "object": "obj_bara02",
+     "event": "0:0",
+     "variable": "part1",
+     "file": "objects/obj_bara02.object.gmx",
+     "upstream_file": "objects/obj_bara02/Create_0.gml"
+    },
+    {
+     "object": "obj_bara03",
+     "event": "0:0",
+     "variable": "part1",
+     "file": "objects/obj_bara03.object.gmx",
+     "upstream_file": "objects/obj_bara03/Create_0.gml"
+    },
+    {
+     "object": "obj_bara04",
+     "event": "0:0",
+     "variable": "part1",
+     "file": "objects/obj_bara04.object.gmx",
+     "upstream_file": "objects/obj_bara04/Create_0.gml"
+    }
+   ]
+  },
+  "obj_doodlebug_body": {
+   "id": 453,
+   "sites": [
+    {
+     "object": "obj_doodlebug",
+     "event": "0:0",
+     "variable": "part1",
+     "file": "objects/obj_doodlebug.object.gmx",
+     "upstream_file": "objects/obj_doodlebug/Create_0.gml"
+    }
+   ]
+  },
+  "obj_drakehead": {
+   "id": 254,
+   "sites": [
+    {
+     "object": "obj_chilldrake",
+     "event": "0:0",
+     "variable": "part1",
+     "file": "objects/obj_chilldrake.object.gmx",
+     "upstream_file": "objects/obj_chilldrake/Create_0.gml"
+    },
+    {
+     "object": "obj_monster_extrabody",
+     "event": "2:0",
+     "variable": "part1",
+     "file": "objects/obj_monster_extrabody.object.gmx",
+     "upstream_file": "objects/obj_monster_extrabody/Alarm_0.gml"
+    },
+    {
+     "object": "obj_snowdrake",
+     "event": "0:0",
+     "variable": "part1",
+     "file": "objects/obj_snowdrake.object.gmx",
+     "upstream_file": "objects/obj_snowdrake/Create_0.gml"
+    }
+   ]
+  },
+  "obj_endogeny_body": {
+   "id": 556,
+   "sites": [
+    {
+     "object": "obj_endogeny",
+     "event": "0:0",
+     "variable": "part1",
+     "file": "objects/obj_endogeny.object.gmx",
+     "upstream_file": "objects/obj_endogeny/Create_0.gml"
+    }
+   ]
+  },
+  "obj_finalfroggit_body": {
+   "id": 386,
+   "sites": [
+    {
+     "object": "obj_finalfroggit",
+     "event": "0:0",
+     "variable": "part1",
+     "file": "objects/obj_finalfroggit.object.gmx",
+     "upstream_file": "objects/obj_finalfroggit/Create_0.gml"
+    }
+   ]
+  },
+  "obj_finalknight_body": {
+   "id": 379,
+   "sites": [
+    {
+     "object": "obj_finalknight",
+     "event": "0:0",
+     "variable": "part1",
+     "file": "objects/obj_finalknight.object.gmx",
+     "upstream_file": "objects/obj_finalknight/Create_0.gml"
+    }
+   ]
+  },
+  "obj_gyftrothead": {
+   "id": 236,
+   "sites": [
+    {
+     "object": "obj_gyftrot",
+     "event": "0:0",
+     "variable": "part1",
+     "file": "objects/obj_gyftrot.object.gmx",
+     "upstream_file": "objects/obj_gyftrot/Create_0.gml"
+    },
+    {
+     "object": "obj_monster_extrabody",
+     "event": "2:0",
+     "variable": "part1",
+     "file": "objects/obj_monster_extrabody.object.gmx",
+     "upstream_file": "objects/obj_monster_extrabody/Alarm_0.gml"
+    }
+   ]
+  },
+  "obj_lemonbread_body": {
+   "id": 529,
+   "sites": [
+    {
+     "object": "obj_lemonbread",
+     "event": "0:0",
+     "variable": "part1",
+     "file": "objects/obj_lemonbread.object.gmx",
+     "upstream_file": "objects/obj_lemonbread/Create_0.gml"
+    }
+   ]
+  },
+  "obj_maddum_drawer": {
+   "id": 288,
+   "sites": [
+    {
+     "object": "obj_maddummy",
+     "event": "0:0",
+     "variable": "part1",
+     "file": "objects/obj_maddummy.object.gmx",
+     "upstream_file": "objects/obj_maddummy/Create_0.gml"
+    }
+   ]
+  },
+  "obj_mandogbody": {
+   "id": 241,
+   "sites": [
+    {
+     "object": "obj_mandog",
+     "event": "0:0",
+     "variable": "part1",
+     "file": "objects/obj_mandog.object.gmx",
+     "upstream_file": "objects/obj_mandog/Create_0.gml"
+    },
+    {
+     "object": "obj_monster_extrabody",
+     "event": "2:0",
+     "variable": "part1",
+     "file": "objects/obj_monster_extrabody.object.gmx",
+     "upstream_file": "objects/obj_monster_extrabody/Alarm_0.gml"
+    }
+   ]
+  },
+  "obj_memoryhead_body": {
+   "id": 553,
+   "sites": [
+    {
+     "object": "obj_memoryhead",
+     "event": "0:0",
+     "variable": "part1",
+     "file": "objects/obj_memoryhead.object.gmx",
+     "upstream_file": "objects/obj_memoryhead/Create_0.gml"
+    }
+   ]
+  },
+  "obj_mettatonb_body": {
+   "id": 301,
+   "sites": [
+    {
+     "object": "obj_mettatonb_quiz",
+     "event": "0:0",
+     "variable": "part1",
+     "file": "objects/obj_mettatonb_quiz.object.gmx",
+     "upstream_file": "objects/obj_mettatonb_quiz/Create_0.gml"
+    }
+   ]
+  },
+  "obj_mettb_body": {
+   "id": 408,
+   "sites": [
+    {
+     "object": "obj_mettatonex",
+     "event": "0:0",
+     "variable": "part1",
+     "file": "objects/obj_mettatonex.object.gmx",
+     "upstream_file": "objects/obj_mettatonex/Create_0.gml"
+    },
+    {
+     "object": "obj_mettatonex",
+     "event": "0:0",
+     "variable": "part1",
+     "file": "objects/obj_mettatonex.object.gmx",
+     "upstream_file": "objects/obj_mettatonex/Create_0.gml"
+    }
+   ]
+  },
+  "obj_mkid_b_body": {
+   "id": 283,
+   "sites": [
+    {
+     "object": "obj_mkid_battle",
+     "event": "0:0",
+     "variable": "part1",
+     "file": "objects/obj_mkid_battle.object.gmx",
+     "upstream_file": "objects/obj_mkid_battle/Create_0.gml"
+    }
+   ]
+  },
+  "obj_moldsmalx_body": {
+   "id": 295,
+   "sites": [
+    {
+     "object": "obj_moldsmalx",
+     "event": "0:0",
+     "variable": "part1",
+     "file": "objects/obj_moldsmalx.object.gmx",
+     "upstream_file": "objects/obj_moldsmalx/Create_0.gml"
+    }
+   ]
+  },
+  "obj_movedogehead": {
+   "id": 248,
+   "sites": [
+    {
+     "object": "obj_movedoge",
+     "event": "0:0",
+     "variable": "part1",
+     "file": "objects/obj_movedoge.object.gmx",
+     "upstream_file": "objects/obj_movedoge/Create_0.gml"
+    }
+   ]
+  },
+  "obj_papyrus_friendscene": {
+   "id": 1671,
+   "sites": [
+    {
+     "object": "obj_ripoff_papyrus",
+     "event": "0:0",
+     "variable": "part1",
+     "file": "objects/obj_ripoff_papyrus.object.gmx",
+     "upstream_file": "objects/obj_ripoff_papyrus/Create_0.gml"
+    }
+   ]
+  },
+  "obj_pyropebody": {
+   "id": 342,
+   "sites": [
+    {
+     "object": "obj_pyrope",
+     "event": "0:0",
+     "variable": "part1",
+     "file": "objects/obj_pyrope.object.gmx",
+     "upstream_file": "objects/obj_pyrope/Create_0.gml"
+    }
+   ]
+  },
+  "obj_reaperbird_body": {
+   "id": 549,
+   "sites": [
+    {
+     "object": "obj_reaperbird",
+     "event": "0:0",
+     "variable": "part1",
+     "file": "objects/obj_reaperbird.object.gmx",
+     "upstream_file": "objects/obj_reaperbird/Create_0.gml"
+    }
+   ]
+  },
+  "obj_sadgore": {
+   "id": 1674,
+   "sites": [
+    {
+     "object": "obj_ripoff_asgore",
+     "event": "0:0",
+     "variable": "part1",
+     "file": "objects/obj_ripoff_asgore.object.gmx",
+     "upstream_file": "objects/obj_ripoff_asgore/Create_0.gml"
+    }
+   ]
+  },
+  "obj_sans_friendscene": {
+   "id": 1673,
+   "sites": [
+    {
+     "object": "obj_ripoff_sans",
+     "event": "0:0",
+     "variable": "part1",
+     "file": "objects/obj_ripoff_sans.object.gmx",
+     "upstream_file": "objects/obj_ripoff_sans/Create_0.gml"
+    }
+   ]
+  },
+  "obj_sansb_body": {
+   "id": 517,
+   "sites": [
+    {
+     "object": "obj_sansb",
+     "event": "0:0",
+     "variable": "part1",
+     "file": "objects/obj_sansb.object.gmx",
+     "upstream_file": "objects/obj_sansb/Create_0.gml"
+    }
+   ]
+  },
+  "obj_spiderb_body": {
+   "id": 362,
+   "sites": [
+    {
+     "object": "obj_spiderb",
+     "event": "0:0",
+     "variable": "part1",
+     "file": "objects/obj_spiderb.object.gmx",
+     "upstream_file": "objects/obj_spiderb/Create_0.gml"
+    }
+   ]
+  },
+  "obj_tembody": {
+   "id": 294,
+   "sites": [
+    {
+     "object": "obj_tembattle",
+     "event": "0:0",
+     "variable": "part1",
+     "file": "objects/obj_tembattle.object.gmx",
+     "upstream_file": "objects/obj_tembattle/Create_0.gml"
+    }
+   ]
+  },
+  "obj_torielbody": {
+   "id": 1679,
+   "sites": [
+    {
+     "object": "obj_ripoff_toriel",
+     "event": "0:0",
+     "variable": "part1",
+     "file": "objects/obj_ripoff_toriel.object.gmx",
+     "upstream_file": "objects/obj_ripoff_toriel/Create_0.gml"
+    }
+   ]
+  },
+  "obj_tsunderplane_body": {
+   "id": 329,
+   "sites": [
+    {
+     "object": "obj_tsunderplane",
+     "event": "0:0",
+     "variable": "part1",
+     "file": "objects/obj_tsunderplane.object.gmx",
+     "upstream_file": "objects/obj_tsunderplane/Create_0.gml"
+    }
+   ]
+  },
+  "obj_undyneb_body": {
+   "id": 273,
+   "sites": [
+    {
+     "object": "obj_undyneboss",
+     "event": "0:0",
+     "variable": "part1",
+     "file": "objects/obj_undyneboss.object.gmx",
+     "upstream_file": "objects/obj_undyneboss/Create_0.gml"
+    }
+   ]
+  },
+  "obj_vulkinbody": {
+   "id": 336,
+   "sites": [
+    {
+     "object": "obj_basicmonster",
+     "event": "0:0",
+     "variable": "part1",
+     "file": "objects/obj_basicmonster.object.gmx",
+     "upstream_file": "objects/obj_basicmonster/Create_0.gml"
+    },
+    {
+     "object": "obj_vulkin",
+     "event": "0:0",
+     "variable": "part1",
+     "file": "objects/obj_vulkin.object.gmx",
+     "upstream_file": "objects/obj_vulkin/Create_0.gml"
+    }
+   ]
+  },
+  "obj_whimsalot_body": {
+   "id": 396,
+   "sites": [
+    {
+     "object": "obj_whimsalot",
+     "event": "0:0",
+     "variable": "part1",
+     "file": "objects/obj_whimsalot.object.gmx",
+     "upstream_file": "objects/obj_whimsalot/Create_0.gml"
+    }
+   ]
+  },
+  "obj_wizardbody": {
+   "id": 368,
+   "sites": [
+    {
+     "object": "obj_wizard",
+     "event": "0:0",
+     "variable": "part1",
+     "file": "objects/obj_wizard.object.gmx",
+     "upstream_file": "objects/obj_wizard/Create_0.gml"
+    }
+   ]
+  },
+  "obj_womandogbody": {
+   "id": 242,
+   "sites": [
+    {
+     "object": "obj_monster_extrabody",
+     "event": "2:0",
+     "variable": "part1",
+     "file": "objects/obj_monster_extrabody.object.gmx",
+     "upstream_file": "objects/obj_monster_extrabody/Alarm_0.gml"
+    },
+    {
+     "object": "obj_womandog",
+     "event": "0:0",
+     "variable": "part1",
+     "file": "objects/obj_womandog.object.gmx",
+     "upstream_file": "objects/obj_womandog/Create_0.gml"
+    }
+   ]
+  },
+  "obj_woshbody": {
+   "id": 258,
+   "sites": [
+    {
+     "object": "obj_woshua",
+     "event": "0:0",
+     "variable": "part1",
+     "file": "objects/obj_woshua.object.gmx",
+     "upstream_file": "objects/obj_woshua/Create_0.gml"
+    }
+   ]
+  }
+ }
+}
