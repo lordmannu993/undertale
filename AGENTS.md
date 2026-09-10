@@ -42,10 +42,11 @@ explicitly **not a finished game** and every release note says so.
 
 | item | state |
 | --- | --- |
-| `master` | PRs 1-11 merged (through `e5705d2`): the LÖVE port, touch controls and Android tooling, the v0.1.1-v0.1.3 softlock/sprite/scenery fixes, path-recovery pieces 1-5, registry and room-159 evidence, the v0.1.4-v0.1.6 publications, and PR #11's Ruins spike-bridge softlock, X-skip text-overlap and touch COLLISION-toggle fixes |
-| Published release | `love-v0.1.7-experimental` (prerelease, 3 assets, checksum in notes) is published by the pinned workflow from this session's branch and carries PR #11's fixes. `love-v0.1.5/6-experimental` stay up, renamed with a "Superseded —" prefix. Every published release is immutable: do not re-publish over it |
-| Open PR | this session's PR: publish PR #11's three merged fixes as a downloadable `love-v0.1.7-experimental` build — `port/version.lua` bump, `docs/RELEASE_NOTES.md`, README download links and the "Fixed in v0.1.7" section, `docs/CONTROLS.md` for the new PAUSE row, and the workflow retarget. The **draft prerelease is created before** the workflow-touching push, because the job refuses to run without it |
-| Old releases | `love-v0.1.0`..`love-v0.1.6-experimental` are **kept on purpose** (owner declined deletion) and renamed with a "Superseded (…)" prefix as each is replaced. Version branches `v0.1.0`..`v0.1.3` point at each tagged build |
+| `master` | PRs 1-13 merged (through `229db7a`): the LÖVE port, touch controls and Android tooling, the v0.1.1-v0.1.3 softlock/sprite/scenery fixes, path-recovery pieces 1-5, registry and room-159 evidence, the v0.1.4-v0.1.7 publications, PR #11's Ruins spike-bridge softlock, X-skip text-overlap and touch COLLISION-toggle fixes, and PR #13's monster body-part ID recovery that fixed the reported "cannot battle in Snowdin — instance_create Missing object ID 255" crash |
+| Published release | `love-v0.1.8-experimental` (prerelease, 3 assets, checksum in notes) is published by the pinned workflow and carries PR #13's fix. `love-v0.1.5/6/7-experimental` stay up, renamed with a "Superseded —" prefix. Every published release is immutable: do not re-publish over it |
+| Open PR | none — PR #13 (monster body-part ID recovery + v0.1.8 publication) is merged |
+| Part-ID recovery | `tools/recover_parts.py` fetches nothing by default: the checked-in `port/recovered_parts.json` is imported by `convert.py`. Regenerate with `GITHUB_TOKEN="$(gh auth token)" python3 tools/recover_parts.py` (pinned to the same `249ffa27` ref as the registry/path recoveries), re-verify offline with `--check`. IDs come from this checkout's own `partN=` literals; only names are paired from upstream; 38 annotated sites are re-validated as anchors. `tests/test_monster_parts.py` guards all of it plus every Snowdin battlegroup end-to-end |
+| Old releases | `love-v0.1.0`..`love-v0.1.7-experimental` are **kept on purpose** (owner declined deletion) and renamed with a "Superseded (…)" prefix as each is replaced. Version branches `v0.1.0`..`v0.1.3` point at each tagged build |
 | Release plumbing | `.github/workflows/love-prerelease.yml` publishes on push to one pinned branch and **refuses unless a draft release with that tag already exists** |
 
 ### To publish a version (only when a piece list says a release is due)
@@ -87,7 +88,7 @@ want licence or legality re-litigated: record provenance in `docs/PATHS.md` and 
 ## Verification commands
 
 ```bash
-.venv/bin/python -m pytest -q                                   # headless suite (157 at time of writing)
+.venv/bin/python -m pytest -q                                   # headless suite (179 at time of writing)
 python3 tools/recover_paths.py --check                          # path data still matches its pinned source
 python3 tools/package.py --output artifacts/check.love          # reproducible archive + report gates
 bash tools/native_smoke.sh artifacts/check.love                 # needs LOVE+xvfb: CI only
