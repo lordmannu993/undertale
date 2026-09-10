@@ -244,3 +244,66 @@ def test_touch_pause_menu_collision_toggle_flips_testing_phasing(lua):
         fits()
         assert(collisionButton().label == "COLLISION: ON")
     ''')
+
+
+def test_alarm_is_one_shot_and_does_not_double_fire(lua):
+    # GameMaker alarms reset to -1 when they fire; the event may re-arm them.
+    # Before the fix, an alarm set to N fired twice (at 0 and at -1), which
+    # double-incremented conversation counters driven by alarm[4]++.
+    lua.execute('''
+        R:start();tick(5)
+        local fired=0
+        R.objects[18000].events["2:3"] = function(R,E) fired=fired+1 end
+        local d=R:create(18000,10,20)
+        d.v.alarm[3]=5
+        tick(20)
+        assert(fired==1, "alarm fired "..fired.." times, expected exactly once")
+        assert(d.v.alarm[3]==-1, "alarm did not reset to -1 after firing")
+        -- Re-arming from the event works (recurring alarm).
+        R.objects[18000].events["2:3"] = function(R,E) fired=fired+1; E._self.v.alarm[3]=3 end
+        d.v.alarm[3]=3
+        tick(10)
+        assert(fired>=3, "re-armed alarm did not fire repeatedly")
+    ''')
+
+
+def test_papyrus4_randoblock_completes_without_softlock(lua):
+    # Reported: "After I fully solve papyrus's puzzles I get softlocked and
+    # papyrus's overworld sprite doesn't move." The Snowdin tile randomizer
+    # (obj_papyrus4) stalled at conversation 53 with interact=1 because
+    # alarm[4]=110 double-fired 51->52->53, skipping the tile wait and never
+    # re-arming. Drive the scene like a player: trigger, answer Yes, wait.
+    new_game(lua)
+    lua.execute('''
+        R.global.plot=57
+        R:gotoRoom(R.constants.room_tundra_randoblock)
+        tick(10)
+        local p4=R:select(R.constants.obj_papyrus4)[1]
+        assert(p4 and p4.v.conversation==0)
+        hold(39,10)
+        tick(100)
+        -- Answer the intro choice (Yes) and let the tiles randomize.
+        local deadline=R.frame+3000
+        while R.frame<deadline do
+            p4=R:select(R.constants.obj_papyrus4)[1]
+            if not p4 or p4.v.conversation>=50 then break end
+            if #R:select(R.constants.OBJ_WRITER)>0 then tick(40);press(90) else tick(30) end
+        end
+        p4=R:select(R.constants.obj_papyrus4)[1]
+        assert(p4 and p4.v.conversation>=50, "papyrus4 intro did not reach the tile phase")
+        -- Finish the response text so the tile phase can start.
+        deadline=R.frame+2000
+        while R.frame<deadline and #R:select(R.constants.OBJ_WRITER)>0 do
+            tick(40);press(90)
+        end
+        assert(#R:select(R.constants.OBJ_WRITER)==0, "papyrus4 response text never finished")
+        deadline=R.frame+3000
+        while R.frame<deadline do
+            p4=R:select(R.constants.obj_papyrus4)[1]
+            if not p4 or not p4.alive then break end
+            tick(50)
+        end
+        assert((not p4) or (not p4.alive), "obj_papyrus4 stuck at conversation "..tostring(p4 and p4.v.conversation))
+        assert(R.global.plot==58, "plot="..tostring(R.global.plot)..", expected 58")
+        assert(R.global.interact==0, "player control was not restored")
+    ''')
