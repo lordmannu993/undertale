@@ -18,9 +18,9 @@ workspace. See [port status](docs/PORTING.md) and [validation](docs/VALIDATION.m
 
 ## Download the experimental `.love` file
 
-[**Download `undertale-love-v0.1.8-experimental.love` (~124 MB)**](https://github.com/lordmannu993/undertale/releases/download/love-v0.1.8-experimental/undertale-love-v0.1.8-experimental.love)
+[**Download `undertale-love-v0.1.9-experimental.love` (~124 MB)**](https://github.com/lordmannu993/undertale/releases/download/love-v0.1.9-experimental/undertale-love-v0.1.9-experimental.love)
 
-[Release notes, SHA-256 checksum, and conversion report](https://github.com/lordmannu993/undertale/releases/tag/love-v0.1.8-experimental)
+[Release notes, SHA-256 checksum, and conversion report](https://github.com/lordmannu993/undertale/releases/tag/love-v0.1.9-experimental)
 
 Download the **`.love` asset**, not GitHub's automatic “Source code” ZIP. It
 contains the generated Lua and supplied assets; you do not need Python or
@@ -31,6 +31,23 @@ APK and requires the LÖVE runtime.
 missing resources and native-testing limitations described above still apply.
 The large archive is hosted as a GitHub Release asset rather than committed to
 Git. To regenerate it yourself, follow the build instructions below.
+
+### Fixed in v0.1.9
+
+- **Alarms no longer fire twice — fixing the Snowdin tile-puzzle softlock and
+  every doubled text, enemy and dialogue.** GameMaker alarms are one-shot:
+  they reset to −1 when they fire. The runtime left them armed, so every alarm
+  event in the game ran twice. `obj_papyrus4` advances its cutscene with
+  `alarm[4]++`, so the double-fire skipped the tile-wait state and the scene
+  stalled with the player frozen and Papyrus standing still; every
+  alarm-spawned speech bubble, damage number, bullet and dialogue box was also
+  created twice, drawn overlapping itself.
+- The runtime now resets each alarm to −1 before running its event, matching
+  GameMaker; events may still re-arm recurring alarms.
+- **181 automated tests** passed for this release (was 179), including two new
+  regressions — an alarm one-shot unit test and a headless Papyrus4
+  playthrough to plot 58 with control restored — each verified to fail on the
+  unfixed code.
 
 ### Fixed in v0.1.8
 

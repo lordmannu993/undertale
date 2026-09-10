@@ -4,6 +4,32 @@ This prerelease makes the current `.love` package downloadable from GitHub. It
 contains the converted Lua and the assets supplied in this repository. **It is
 not a completed or native-device-verified game, and it is not an APK.**
 
+## v0.1.9 fixes
+
+- **Fix the Snowdin tile-puzzle softlock** (reported as: *after solving
+  Papyrus's puzzles the game softlocks and Papyrus's overworld sprite doesn't
+  move*). GameMaker alarms are one-shot — they reset to −1 when they fire —
+  but the runtime left them armed, so every alarm event ran twice.
+  `obj_papyrus4` advances its cutscene with `alarm[4]++`: the double-fire
+  incremented 51→52→53 in two frames, skipping the wait for the tiles to
+  finish randomizing and never setting the next alarm, so the scene stalled at
+  conversation 53 with `interact=1` (player frozen, Papyrus frozen). The
+  runtime now resets each alarm to −1 before running its event, matching
+  GameMaker; events may still re-arm recurring alarms.
+- **Fix every doubled text, enemy and dialogue** (reported as: *every single
+  text, enemy and dialogue is doubled and overlaps on itself*). The same
+  double-fire created two overlapping copies of everything an alarm spawns —
+  enemy speech bubbles, damage numbers, bullets, dialogue boxes — across the
+  whole game. One-shot alarms spawn exactly one instance now (verified:
+  one-shot spawns 1, a 10-step recurring alarm spawns 3 in 35 ticks, and the
+  Flowey fight contains exactly one of each object).
+- Two new regressions pin the fix (the suite grows from 179 to **181**): an
+  alarm one-shot unit test (fires exactly once, resets to −1, re-arming works)
+  and a headless Papyrus4 playthrough that answers the intro, waits out the
+  tiles, and asserts plot 58 with control restored. Each was verified to fail
+  on the unfixed code with the reported signature before passing after it.
+- Updated the GitHub download to the v0.1.9 experimental LOVE archive.
+
 ## v0.1.8 fixes
 
 - **Fix the crash on starting most battles outside the Ruins** (reported as:
@@ -165,7 +191,7 @@ recent-app thumbnail is not an in-game rendering setting.
 
 ## Download and try
 
-1. Download **`undertale-love-v0.1.7-experimental.love`** from the assets below
+1. Download **`undertale-love-v0.1.9-experimental.love`** from the assets below
    (approximately 124 MB). Do not download GitHub's automatic “Source code” ZIP
    if you want to try the packaged game.
 2. Install the official **LÖVE 11.5 runtime** for your platform:

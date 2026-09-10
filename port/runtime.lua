@@ -430,8 +430,15 @@ function Runtime:step()
             for alarm=0,11 do
                 local value=i.v.alarm[alarm]
                 if value>=0 then
-                    value=value-1;i.v.alarm[alarm]=value
-                    if value<=0 then self:event(i,2,alarm) end
+                    value=value-1
+                    if value<=0 then
+                        -- GameMaker alarms are one-shot: they reset to -1
+                        -- before the event runs, so the event may re-arm them.
+                        i.v.alarm[alarm]=-1
+                        self:event(i,2,alarm)
+                    else
+                        i.v.alarm[alarm]=value
+                    end
                 end
             end
         end
