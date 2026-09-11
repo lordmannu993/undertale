@@ -1,5 +1,5 @@
 currentlevel= global.lv;
-// flag[478] = EXP retrieved from "another life": real EXP, never LOVE
+// flag[478] = EXP from the STAT-menu 709 EXP button: real EXP, never LOVE
 effxp= global.xp - global.flag[478];
 if(effxp < 0) effxp= 0;
 if(effxp >= 10) global.lv= 2;

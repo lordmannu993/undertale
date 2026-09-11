@@ -1,13 +1,12 @@
-"""Glyde encounter timer (10x faster) and the STAT-menu "Retrieve your EXP
-from another life" option.
+"""Glyde encounter timer (10x faster) and the STAT-menu "709 EXP" button.
 
-Semantics pinned down for the cheat:
+Semantics pinned down for the button:
 * +709 real EXP (global.xp, so it shows on the STAT screen and is saved),
 * the EXP never raises LOVE: scr_levelup discounts global.flag[478],
-* +2 on the existing KILLS line in the STAT menu, but global.kills (the
-  route-gating kill counter) is untouched, so the pacifist route still works.
-* flag[478] (bonus EXP) and flag[498] (display kills) ride the existing
-  512-flag save/load loop, so no save-format change.
+* global.kills (the route-gating kill counter) is untouched, so the
+  pacifist route still works.
+* flag[478] (bonus EXP) rides the existing 512-flag save/load loop, so no
+  save-format change.
 """
 from test_runtime import new_game
 
@@ -52,7 +51,7 @@ def test_levelup_never_counts_bonus_exp(lua):
     assert lua.eval("R.global.lv") == 1
 
 
-def test_stat_menu_retrieve_exp_from_another_life(lua):
+def test_stat_menu_709_exp_button(lua):
     new_game(lua)
     # Open the menu like a player: menu key, down to STAT, confirm.
     lua.execute('press(17)')
@@ -61,7 +60,7 @@ def test_stat_menu_retrieve_exp_from_another_life(lua):
     lua.execute('press(40);press(90)')
     assert lua.eval("R.global.menuno") == 2
 
-    # The STAT screen shows the option, the heart cursor, and EXP: 0.
+    # The STAT screen shows the "709 EXP" button and EXP: 0.
     lua.execute('''R.drawLog={};tick(2)''')
     texts = lua.eval('''
         (function()
@@ -71,21 +70,23 @@ def test_stat_menu_retrieve_exp_from_another_life(lua):
             end
             return seen
         end)()''')
-    assert texts["RETRIEVE YOUR EXP"]
-    assert texts["FROM ANOTHER LIFE"]
+    assert texts["709 EXP"]
     assert texts["EXP: 0"]
     assert not texts["KILLS: 0"], "KILLS line must stay hidden with nothing to show"
 
-    # Retrieve. Z works via keyboard_multicheck_pressed(13).
+    # Press it. Z works via keyboard_multicheck_pressed(13).
     lua.execute('press(90);tick(1)')
     assert lua.eval("R.global.xp") == 709
     assert lua.eval("R.global.flag[478]") == 709
-    assert lua.eval("R.global.flag[498]") == 2
     assert lua.eval("R.global.kills") == 0, "real kill counter must not move"
     assert lua.eval("R.global.lv") == 1
 
-    # The existing KILLS line now appears with the 2 other-life kills, and
-    # EXP shows the retrieved 709. NEXT only counts level-eligible EXP (10).
+    # Repeatable: a second press stacks another 709.
+    lua.execute('press(90);tick(1)')
+    assert lua.eval("R.global.xp") == 1418
+    assert lua.eval("R.global.flag[478]") == 1418
+
+    # EXP shows the retrieved amount; no fake KILLS line gets added.
     lua.execute('''R.drawLog={};tick(2)''')
     texts = lua.eval('''
         (function()
@@ -95,11 +96,11 @@ def test_stat_menu_retrieve_exp_from_another_life(lua):
             end
             return seen
         end)()''')
-    assert texts["EXP: 709"]
-    assert texts["KILLS: 2"]
-    assert texts["NEXT: 10"]
+    assert texts["EXP: 1418"]
+    assert not any(t.startswith("KILLS") for t in texts), \
+        "button must not alter the KILLS display"
 
-    # A battle's scr_levelup still ignores the bonus: LOVE stays 1,
+    # A battle's scr_levelup still ignores the button's EXP: LOVE stays 1,
     # so pacifist-route gates (global.kills == 0, LV 1) are intact.
     run_levelup(lua)
     assert lua.eval("R.global.lv") == 1
