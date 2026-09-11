@@ -4,6 +4,43 @@ This prerelease makes the current `.love` package downloadable from GitHub. It
 contains the converted Lua and the assets supplied in this repository. **It is
 not a completed or native-device-verified game, and it is not an APK.**
 
+## v0.1.10 features
+
+- **Glyde encounters are 20× faster.** `obj_encounterer_glyde`'s `scr_steps`
+  timers are cut to 1/20 of stock: first encounter `3600 + random(150)` →
+  `180 + random(7.5)` steps, repeat encounters `840 + random(680)` →
+  `42 + random(34)` steps. Expected wait is exactly 1/20 of vanilla in both
+  phases; the area population factor is untouched.
+- **A "709 EXP" button in the STAT menu.** The STAT screen gains one
+  heart-selected row, **"709 EXP"**. Confirming it runs
+  `global.xp += 709` and then the game's own `scr_levelup`, so LOVE/HP/AT/DF
+  rise immediately and exactly as if the EXP were earned in battle
+  (709 → LV 8). The EXP is real `global.xp`: displayed, saved normally, and
+  repeatable with every press. `scr_levelup` itself is byte-identical to
+  stock — no masking, no accounting flags.
+- **Zero route impact.** The button touches **only** `global.xp`. The kill
+  counter `global.kills` stays 0, so every pacifist gate (`kills == 0` in
+  `obj_endflowey` / `obj_asgoreb` / `obj_dogfoodbag`) still passes, genocide
+  flag 27 never moves, and neutral runs stay neutral. No save-format change:
+  nothing new is persisted.
+- **Sans's Last Corridor judgment notices a bloodless LV rise.** In
+  `obj_lastsans_trigger`, when LOVE has risen with zero kills (a state only
+  reachable via the button), Sans gives his usual "EXP = execution points /
+  LOVE = Level of Violence" explanation, then seriously questions how your
+  LOVE went up — and ambiguously lets it go: *"... but you didn't hurt
+  anyone. not a single monster got hurt this time. so where'd all that exp
+  come from? some other life, maybe? heh. honestly? it doesn't really
+  matter. ... i'm still rooting for you. good luck."* He never says how he
+  knows. True LV-1 pacifists get the unchanged original "you never gained any
+  LOVE" speech.
+- **185 automated tests** (was 181), with four new cases in
+  `tests/test_statmenu_cheats.py`: Glyde timer values (conversion artifact +
+  live `steps` bound), vanilla leveling math, a player-driven menu run of the
+  button (EXP 709/LV 8/kills 0, stacking on repeat), and the Sans judgment
+  branching verified end-to-end through the real converted scene (classic
+  speech preserved at LV 1, custom speech at LV 8 with 0 kills).
+- The GitHub download now points at the v0.1.10 experimental LOVE archive.
+
 ## v0.1.9 fixes
 
 - **Fix the Snowdin tile-puzzle softlock** (reported as: *after solving

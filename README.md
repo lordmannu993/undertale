@@ -18,9 +18,9 @@ workspace. See [port status](docs/PORTING.md) and [validation](docs/VALIDATION.m
 
 ## Download the experimental `.love` file
 
-[**Download `undertale-love-v0.1.9-experimental.love` (~124 MB)**](https://github.com/lordmannu993/undertale/releases/download/love-v0.1.9-experimental/undertale-love-v0.1.9-experimental.love)
+[**Download `undertale-love-v0.1.10-experimental.love` (~124 MB)**](https://github.com/lordmannu993/undertale/releases/download/love-v0.1.10-experimental/undertale-love-v0.1.10-experimental.love)
 
-[Release notes, SHA-256 checksum, and conversion report](https://github.com/lordmannu993/undertale/releases/tag/love-v0.1.9-experimental)
+[Release notes, SHA-256 checksum, and conversion report](https://github.com/lordmannu993/undertale/releases/tag/love-v0.1.10-experimental)
 
 Download the **`.love` asset**, not GitHub's automatic “Source code” ZIP. It
 contains the generated Lua and supplied assets; you do not need Python or
@@ -31,6 +31,29 @@ APK and requires the LÖVE runtime.
 missing resources and native-testing limitations described above still apply.
 The large archive is hosted as a GitHub Release asset rather than committed to
 Git. To regenerate it yourself, follow the build instructions below.
+
+### Added in v0.1.10
+
+- **Glyde encounters are 20× faster.** The ice-cave encounterer's step timers
+  are cut to 1/20 of stock (`scr_steps` 3600+random(150) → 180+random(7.5)
+  first, 840+random(680) → 42+random(34) on repeats), so farming Glyde no
+  longer means walking in circles for ages. The population factor is
+  untouched.
+- **A "709 EXP" button in the STAT menu.** The STAT screen shows one
+  heart-selected row, **"709 EXP"**; confirming it adds 709 real EXP and runs
+  the game's own `scr_levelup`, so LOVE and stats rise exactly as if the EXP
+  came from battle. It touches only `global.xp`: the kill counter and every
+  route flag stay untouched, so pacifist runs still complete and neutral runs
+  stay neutral. Repeatable.
+- **Sans's judgment notices a bloodless LV rise.** If you reach the Last
+  Corridor with raised LOVE but zero kills, Sans questions how your LOVE went
+  up after his usual EXP/LOVE explanation — then lets it go ("... but you
+  didn't hurt anyone... it doesn't really matter... i'm still rooting for
+  you"). True LV-1 pacifists still get the untouched classic speech.
+- **185 automated tests** passed for this release (was 181), including four new
+  cases: Glyde timer values, vanilla leveling math, a player-driven menu run
+  of the button, and the Sans judgment branching verified end-to-end through
+  the real converted scene.
 
 ### Fixed in v0.1.9
 
