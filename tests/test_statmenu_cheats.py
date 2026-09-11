@@ -1,4 +1,4 @@
-"""Glyde encounter timer (10x faster) and the STAT-menu "709 EXP" button.
+"""Glyde encounter timer (20x faster) and the STAT-menu "709 EXP" button.
 
 Semantics pinned down for the button:
 * +709 real EXP on global.xp, and it levels you up exactly like battle
@@ -8,25 +8,26 @@ Semantics pinned down for the button:
   so pacifist stays pacifist and neutral stays neutral.
 * Sans's Last Corridor judgment notices a bloodless LV rise (LV > 1 with
   kills == 0 can only happen via the button): he questions it seriously,
-  then lets it go and keeps rooting for you.
+  then lets it go and keeps rooting for you - without ever saying how he
+  knows you didn't hurt anyone.
 """
 from test_runtime import new_game
 
 
-def test_glyde_encounterer_uses_tentimes_faster_timers(lua, converted):
-    # Conversion artifact pins the 10x values from the GMX source.
+def test_glyde_encounterer_uses_20x_faster_timers(lua, converted):
+    # Conversion artifact pins the /20 values from the GMX source.
     src = (converted / "objects/obj_encounterer_glyde.lua").read_text()
-    assert "101, 360, 15, 16, 203" in src, "create-event timer not reduced"
-    assert "101, 84, 68, 16, 203" in src, "step-event timer not reduced"
+    assert "101, 180, 7.5, 16, 203" in src, "create-event timer not reduced"
+    assert "101, 42, 34, 16, 203" in src, "step-event timer not reduced"
 
-    # Runtime check: creating the encounterer arms `steps` around 360
+    # Runtime check: creating the encounterer arms `steps` around 180
     # (populationfactor 1 with flag[203]==0), never near the old 3600.
     new_game(lua)
     lua.execute('''
         local g=R:create(R.constants.obj_encounterer_glyde,0,0)
         assert(g and g.v,"glyde encounterer was destroyed on create")
-        assert(g.v.steps>=360 and g.v.steps<400,
-               "expected steps around 360, got "..tostring(g.v.steps))
+        assert(g.v.steps>=180 and g.v.steps<200,
+               "expected steps around 180, got "..tostring(g.v.steps))
     ''')
 
 
@@ -106,7 +107,7 @@ def test_sans_judgment_questions_bloodless_lv_rise(lua, converted):
     # Conversion artifact pins the custom judgment speech.
     src = (converted / "objects/obj_lastsans_trigger.lua").read_text()
     assert "some other life" in src, "Sans bloodless-LV speech was not converted"
-    assert "zero kills" in src
+    assert "hurt anyone" in src
 
     new_game(lua)
     got = lua.execute('''
@@ -122,20 +123,21 @@ def test_sans_judgment_questions_bloodless_lv_rise(lua, converted):
         tick(2)
         out.classic1=tostring(R.global.msg[1])
         clear_dialogue()
-        -- Button-grown LV with zero kills: Sans questions it, then lets it go.
+        -- Button-grown LV with zero kills: Sans questions it, then lets it go,
+        -- without saying how he knows nobody got hurt.
         R.global.msg[0]="?";R.global.msg[1]="?"
         local t2=R:create(R.constants.obj_lastsans_trigger,0,0)
         t2.v.con=6
         R.global.lv=8
         tick(2)
-        out.custom11=tostring(R.global.msg[11])
+        out.custom9=tostring(R.global.msg[9])
+        out.custom12=tostring(R.global.msg[12])
         out.custom14=tostring(R.global.msg[14])
-        out.custom16=tostring(R.global.msg[16])
-        out.custom22=tostring(R.global.msg[22])
+        out.custom20=tostring(R.global.msg[20])
         return out
     ''')
     assert "never gained" in got["classic1"], "stock pacifist speech changed!"
-    assert "zero kills" in got["custom11"]
-    assert "some other life" in got["custom14"]
-    assert "really matter" in got["custom16"]
-    assert "still rooting" in got["custom22"]
+    assert "but you didn" in got["custom9"]
+    assert "some other life" in got["custom12"]
+    assert "really matter" in got["custom14"]
+    assert "still rooting" in got["custom20"]

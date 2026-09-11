@@ -27,7 +27,7 @@
             <kind>1</kind>
             <string>alldead= 0;
 global.encounter= 0;
-script_execute(101/* scr_steps */, 360, 15, 16, 203);
+script_execute(101/* scr_steps */, 180, 7.5, 16, 203);
 if(global.flag[203] == 0 &amp;&amp; global.plot &gt; 100) instance_destroy();
 if(global.flag[7] == 1) instance_destroy();
 if(global.flag[283] == 1) instance_destroy();
@@ -55,7 +55,7 @@ if(global.flag[283] == 1) instance_destroy();
             <kind>1</kind>
             <string>if(global.encounter &gt; steps &amp;&amp; global.phasing == 0) {
     if(global.interact == 0) {
-        script_execute(101/* scr_steps */, 84, 68, 16, 203);
+        script_execute(101/* scr_steps */, 42, 34, 16, 203);
         global.encounter= 0;
         global.battlegroup= 135;
         if(alldead == 2) global.battlegroup= 19;
