@@ -157,30 +157,36 @@ if(global.interact == 5) {
         draw_text(108 + xx, 156 + yy, "WEAPON: " + weaponname);
         draw_text(108 + xx, 172 + yy, "ARMOR: " + armorname);
         draw_text(108 + xx, 192 + yy, "GOLD: " + string(global.gold));
-        if(global.kills &gt; 20)
-            draw_text(192 + xx, 192 + yy, "KILLS: " + string(global.kills));
+        // flag[498] = kills from "another life": shown on the KILLS line only
+        killstotal= global.kills + global.flag[498];
+        if(killstotal &gt; 20 || global.flag[498] &gt; 0)
+            draw_text(192 + xx, 192 + yy, "KILLS: " + string(killstotal));
+        draw_text(108 + xx, 204 + yy, "RETRIEVE YOUR EXP");
+        draw_text(108 + xx, 212 + yy, "FROM ANOTHER LIFE");
         if(string_length(global.charname) &gt;= 7)
             draw_text(192 + xx, 32 + yy, "Easy to#change,#huh?");
         draw_text(192 + xx, 110 + yy, "EXP: " + string(global.xp));
-        if(global.lv == 1) nextlevel= 10 - global.xp;
-        if(global.lv == 2) nextlevel= 30 - global.xp;
-        if(global.lv == 3) nextlevel= 70 - global.xp;
-        if(global.lv == 4) nextlevel= 120 - global.xp;
-        if(global.lv == 5) nextlevel= 200 - global.xp;
-        if(global.lv == 6) nextlevel= 300 - global.xp;
-        if(global.lv == 7) nextlevel= 500 - global.xp;
-        if(global.lv == 8) nextlevel= 800 - global.xp;
-        if(global.lv == 9) nextlevel= 1200 - global.xp;
-        if(global.lv == 10) nextlevel= 1700 - global.xp;
-        if(global.lv == 11) nextlevel= 2500 - global.xp;
-        if(global.lv == 12) nextlevel= 3500 - global.xp;
-        if(global.lv == 13) nextlevel= 5000 - global.xp;
-        if(global.lv == 14) nextlevel= 7000 - global.xp;
-        if(global.lv == 15) nextlevel= 10000 - global.xp;
-        if(global.lv == 16) nextlevel= 15000 - global.xp;
-        if(global.lv == 17) nextlevel= 25000 - global.xp;
-        if(global.lv == 18) nextlevel= 50000 - global.xp;
-        if(global.lv == 19) nextlevel= 99999 - global.xp;
+        statxp= global.xp - global.flag[478];
+        if(statxp &lt; 0) statxp= 0;
+        if(global.lv == 1) nextlevel= 10 - statxp;
+        if(global.lv == 2) nextlevel= 30 - statxp;
+        if(global.lv == 3) nextlevel= 70 - statxp;
+        if(global.lv == 4) nextlevel= 120 - statxp;
+        if(global.lv == 5) nextlevel= 200 - statxp;
+        if(global.lv == 6) nextlevel= 300 - statxp;
+        if(global.lv == 7) nextlevel= 500 - statxp;
+        if(global.lv == 8) nextlevel= 800 - statxp;
+        if(global.lv == 9) nextlevel= 1200 - statxp;
+        if(global.lv == 10) nextlevel= 1700 - statxp;
+        if(global.lv == 11) nextlevel= 2500 - statxp;
+        if(global.lv == 12) nextlevel= 3500 - statxp;
+        if(global.lv == 13) nextlevel= 5000 - statxp;
+        if(global.lv == 14) nextlevel= 7000 - statxp;
+        if(global.lv == 15) nextlevel= 10000 - statxp;
+        if(global.lv == 16) nextlevel= 15000 - statxp;
+        if(global.lv == 17) nextlevel= 25000 - statxp;
+        if(global.lv == 18) nextlevel= 50000 - statxp;
+        if(global.lv == 19) nextlevel= 99999 - statxp;
         if(global.lv &gt;= 20) nextlevel= 0;
         draw_text(192 + xx, 126 + yy, "NEXT: " + string(nextlevel));
     }
@@ -252,6 +258,8 @@ if(global.interact == 5) {
         draw_sprite(49/* spr_heartsmall */, 0, 28 + xx, 88 + yy + 18 * global.menucoord[0]);
     if(global.menuno == 1)
         draw_sprite(49/* spr_heartsmall */, 0, 104 + xx, 34 + yy + 16 * global.menucoord[1]);
+    if(global.menuno == 2)
+        draw_sprite(49/* spr_heartsmall */, 0, 100 + xx, 208 + yy);
     if(global.menuno == 3)
         draw_sprite(49/* spr_heartsmall */, 0, 104 + xx, 34 + yy + 16 * global.menucoord[3]);
     if(global.menuno == 6)
@@ -267,6 +275,12 @@ if(global.interact == 5) {
             draw_sprite(49/* spr_heartsmall */, 0, 104 + xx + 45 * global.menucoord[5] + 15, 174 + yy);
     }
     if(keyboard_multicheck_pressed(13/* ENTER */)) {
+        if(global.menuno == 2) {
+            global.xp+= 709;
+            global.flag[478]+= 709;
+            global.flag[498]+= 2;
+            snd_play(111/* snd_select */);
+        }
         if(global.menuno == 5) {
             if(global.menucoord[5] == 0) {
                 global.menuno= 9;
