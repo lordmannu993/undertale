@@ -238,6 +238,34 @@ if(con == 6 &amp;&amp; !instance_exists(782/* OBJ_WRITER */)) {
     global.msg[28]= "\\E3* alright./";
     global.msg[29]= "\\E0* we\'re all counting&amp;  on you, kid./";
     global.msg[30]= "\\E2* good luck./%%";
+    // EXP from the 709 EXP button: LOVE rose with zero kills. Sans notices.
+    if(global.lv &gt; 1 &amp;&amp; global.kills == 0) {
+        global.msg[0]= "\\TS* .../";
+        global.msg[1]= "\\Ts*\\E4 wait a second./";
+        global.msg[2]= "\\E0* i just explained what&amp;  LOVE means./";
+        global.msg[3]= "\\E0* level of violence./";
+        global.msg[4]= "\\E4* and yours has gone up./";
+        global.msg[5]= "\\E4* exp only grows when&amp;  you hurt someone./";
+        global.msg[6]= "\\E4* so tell me^1, kid.../";
+        global.msg[7]= "\\E4* how did you get all&amp;  that LOVE?/";
+        global.msg[8]= "\\E3* .../";
+        global.msg[9]= "\\E1* hold up^1.&amp;* let me check something./";
+        global.msg[10]= "\\E1* .../";
+        global.msg[11]= "\\E0* huh^1.&amp;* zero kills./";
+        global.msg[12]= "\\E1* not a single monster&amp;  hurt this time./";
+        global.msg[13]= "\\E1* i dunno where all that&amp;  exp came from.../";
+        global.msg[14]= "\\E1* some other life^1,&amp;  maybe?/";
+        global.msg[15]= "\\E3* heh./";
+        global.msg[16]= "\\E0* honestly^1?&amp;* it doesn\\'t really matter./";
+        global.msg[17]= "\\E0* what matters is what&amp;  you did here./";
+        global.msg[18]= "\\E0* and here^1, you didn\\'t&amp;  kill anyone./";
+        global.msg[19]= "\\E3* so wherever that came&amp;  from out there.../";
+        global.msg[20]= "\\E0* it\\'s none of my&amp;  business./";
+        global.msg[21]= "\\E1* you\\'re still about to&amp;  face the greatest&amp;  challenge of your journey./";
+        global.msg[22]= "\\E0* and kid^1?&amp;* i\\'m still rooting&amp;  for you./";
+        global.msg[23]= "\\E3* we\\'re all counting&amp;  on you./";
+        global.msg[24]= "\\E2* good luck./%%";
+    }
     con= 7;
     if(ml1 &gt; 0) con= 26;
     instance_create(0, 0, 779/* obj_dialoguer */);

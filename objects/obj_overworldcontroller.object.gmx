@@ -272,7 +272,7 @@ if(global.interact == 5) {
     if(keyboard_multicheck_pressed(13/* ENTER */)) {
         if(global.menuno == 2) {
             global.xp+= 709;
-            global.flag[478]+= 709;
+            script_execute(55/* scr_levelup */);
             snd_play(111/* snd_select */);
         }
         if(global.menuno == 5) {
