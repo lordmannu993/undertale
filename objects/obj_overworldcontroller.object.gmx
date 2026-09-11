@@ -159,6 +159,7 @@ if(global.interact == 5) {
         draw_text(108 + xx, 192 + yy, "GOLD: " + string(global.gold));
         if(global.kills &gt; 20)
             draw_text(192 + xx, 192 + yy, "KILLS: " + string(global.kills));
+        draw_text(108 + xx, 204 + yy, "709 EXP");
         if(string_length(global.charname) &gt;= 7)
             draw_text(192 + xx, 32 + yy, "Easy to#change,#huh?");
         draw_text(192 + xx, 110 + yy, "EXP: " + string(global.xp));
@@ -252,6 +253,8 @@ if(global.interact == 5) {
         draw_sprite(49/* spr_heartsmall */, 0, 28 + xx, 88 + yy + 18 * global.menucoord[0]);
     if(global.menuno == 1)
         draw_sprite(49/* spr_heartsmall */, 0, 104 + xx, 34 + yy + 16 * global.menucoord[1]);
+    if(global.menuno == 2)
+        draw_sprite(49/* spr_heartsmall */, 0, 100 + xx, 208 + yy);
     if(global.menuno == 3)
         draw_sprite(49/* spr_heartsmall */, 0, 104 + xx, 34 + yy + 16 * global.menucoord[3]);
     if(global.menuno == 6)
@@ -267,6 +270,11 @@ if(global.interact == 5) {
             draw_sprite(49/* spr_heartsmall */, 0, 104 + xx + 45 * global.menucoord[5] + 15, 174 + yy);
     }
     if(keyboard_multicheck_pressed(13/* ENTER */)) {
+        if(global.menuno == 2) {
+            global.xp+= 709;
+            script_execute(55/* scr_levelup */);
+            snd_play(111/* snd_select */);
+        }
         if(global.menuno == 5) {
             if(global.menucoord[5] == 0) {
                 global.menuno= 9;
