@@ -33,7 +33,7 @@ objects → rooms → merged world. Each piece is one PR, merged before the next
 | 1 | Pinned source pipeline + merged asset registry + every sprite, sound, font and tileset texture converted | **complete** |
 | 2 | GMS2 GML: language support in the compiler, all 1 155 Yellow scripts converted, name→ID rewriting, GMS2 builtins in the runtime | **complete** |
 | 3 | All 3 224 Yellow objects and their events, with parents, masks and collision-event targets | **complete** |
-| 4 | All 287 Yellow rooms: instances, creation code, tile layers from tilesets, backgrounds, views; plus the 68 paths | not started |
+| 4 | All 287 Yellow rooms: instances, creation code, tile layers from tilesets, backgrounds, views; plus the 68 paths | **in progress** — complete source conversion, partial static rendering; animation/transform parity remains |
 | 5 | One world: River Person + UGPS cross-game destinations, Frisk as the only player (Clover's run sprites on X), Frisk's weapons/armours plus Clover's ammo/accessories, saves, packaging, release | not started |
 
 ## Rules this merge follows (same as the rest of the port)
@@ -194,3 +194,60 @@ python3 tools/yellow_convert.py --stage objects # convert assets, scripts and al
 
 Live gates skip (never pass silently) when `yellow_src/` is absent, and CI fetches it, so
 the full-asset conversion is proven on every pull request.
+
+## Pieces 4–5 work in progress (2026-09-13)
+
+**This is not completion of the requested combined chunks. Do not merge or release
+it as a connected game.** Piece 5 has not been implemented. Existing Undertale
+packaging and release links remain unchanged, and do not include Yellow.
+
+Implemented so far:
+
+- `tools/yellow_convert.py --stage rooms` builds the earlier stages plus all
+  **287 rooms**, **68 paths**, **7,637 placed instances**, **1,340 room/instance
+  creation-code files**, and **199,258 static/animated drawable records**.
+- `tools/yellow/rooms.py` validates tile RLE cardinality, resolves references
+  through the pinned registry, uses `RoomOrderNodes` for traversal order and
+  `instanceCreationOrder` for creation order, and retains original layer records.
+  Path coordinates/speeds/kind/closure/precision are copied, not inferred.
+- Editor instance IDs are explicitly **port handles**, reversibly encoded as
+  `2**32 + hexadecimal inst_ suffix`. They are not claimed to be recovered numeric
+  GameMaker runtime instance IDs. The band does not overlap runtime-created or
+  Undertale editor instances.
+- Room layer depth, instance transform/colour/alpha/image fields and numeric view
+  target IDs reach the runtime. Static sprite asset layers and static sprite
+  backgrounds can render without rebinding Undertale's asset names.
+- Unsupported room features stop **before** the old room receives Room End or
+  Clean Up. The generated report enumerates **506 feature findings across 107
+  rooms**: animated tiles/sprite assets, tile transform flags, moving backgrounds,
+  depth-sorted colour layers, effects and physics. Some findings refer to hidden
+  layers; these are conservatively blocked rather than silently losing features
+  when game scripts later enable them.
+- Fixed `fetch_yellow.py` deleting its non-cached tarball *before* extraction.
+  Both cached and temporary download paths have regression tests.
+
+Validation: the full local headless suite passed **272 tests**, including the
+**15-test** focused room suite. The live gates compile every generated room and its manifest in
+Lua 5.1 and LuaJIT, assert the pinned counts, and compare all 68 paths directly
+against their `.yy` source. These tests do **not** establish native Yellow pixels,
+working Yellow gameplay, or cross-game travel.
+
+Concrete startup blocker: starting the generated Yellow manifest headlessly reaches
+`obj_controller [Create] in rm_intro`, then stops at **`display_set_gui_size`**.
+No GUI-size handler has been silently stubbed. Getting past this one call would
+not prove the remaining game works.
+
+Remaining before completing pieces 4–5:
+
+1. Implement and verify animation timing, transformed tile drawing, layer
+   visibility/mutation and colour-depth behavior; add native Yellow render gates.
+   Check Studio instance image-speed multipliers against sprite playback speed.
+2. Resolve the startup and reachable-room runtime builtin gaps, preserving named
+   stops for explicitly unsupported effects/physics instead of claiming parity.
+3. Implement and test River Person ↔ UGPS routing and game initialization at both
+   ends, with no duplicate persistent controller/player instances.
+4. Add Frisk-only rendering plus X-run, ammo/accessory equipment integration, and
+   versioned shared saves with old-save migration and round-trip tests.
+5. Add an opt-in merged manifest/package with collision-safe script/asset
+   namespaces, build gates and native travel/save tests. Only then publish a new
+   immutable experimental release and update download links.

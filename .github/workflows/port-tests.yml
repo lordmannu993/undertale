@@ -26,8 +26,8 @@ jobs:
           key: yellow-${{ hashFiles('port/yellow_source.json') }}
       - name: Fetch the pinned Undertale Yellow decompilation
         run: python tools/fetch_yellow.py --tarball-cache .yellow-cache
-      - name: Convert every Yellow asset, script and object
-        run: python tools/yellow_convert.py --stage objects
+      - name: Convert Yellow assets, scripts, objects, rooms and paths
+        run: python tools/yellow_convert.py --stage rooms
       - name: Run the headless suite, Yellow live gates included
         env:
           PORT_REQUIRE_YELLOW: '1'

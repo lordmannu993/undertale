@@ -63,6 +63,7 @@ function Graphics.install(R)
             color(tint,alpha);g.draw(img,x,y,-math.rad(angle),sx,sy,s.xorig,s.yorigin)
         end
     end
+    local yellowDrawable=require("port.yellow_graphics").install(R,sprite)
     B.draw_sprite=function(E,index,sub,x,y) sprite(E,index,sub,x,y,1,1,0,16777215,state.alpha) end
     B.draw_sprite_ext=function(E,index,sub,x,y,sx,sy,angle,tint,alpha) sprite(E,index,sub,x,y,sx,sy,angle,tint,alpha) end
     B.draw_sprite_part=function(E,index,sub,l,t,w,h,x,y) sprite(E,index,sub,x,y,1,1,0,16777215,state.alpha,{l,t,w,h}) end
@@ -354,7 +355,9 @@ function Graphics.install(R)
             for _,item in ipairs(list) do
                 if item.tile then
                     local t=item.tile
-                    if not self.roomState.hiddenLayers[t.depth] then
+                    if t.sprite then
+                        if not self.roomState.hiddenLayers[t.depth] then yellowDrawable(t,view) end
+                    elseif t.visible~=false and not self.roomState.hiddenLayers[t.depth] then
                         local shift=self.roomState.tileOffsets[t.depth] or {0,0}
                         local x,y=t.x+shift[1],t.y+shift[2]
                         if x+t.w*(t.scaleX or 1)>=view.x and x<=view.x+view.w and y+t.h*(t.scaleY or 1)>=view.y and y<=view.y+view.h then
