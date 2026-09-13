@@ -1,0 +1,60 @@
+{
+  "format": 1,
+  "purpose": "Pinned source of the Undertale Yellow assets this port merges. Yellow assets are fetched at build time and are never committed to Git; this record is what makes the fetch reproducible and auditable.",
+  "upstream": "lordmannu993/UnderTale-Yellow",
+  "upstream_url": "https://github.com/lordmannu993/UnderTale-Yellow",
+  "fork_of": "burnedpopcorn/UnderTale-Yellow-Decompilation",
+  "description": "A Decompilation of UnderTale Yellow v1.2.1",
+  "gamemaker_version": "2023.4.0.84",
+  "ref": "4ec23bd944df8f4b44aef4882e69520d565fb4b4",
+  "tarball": {
+    "url": "https://codeload.github.com/lordmannu993/UnderTale-Yellow/tar.gz/4ec23bd944df8f4b44aef4882e69520d565fb4b4",
+    "sha256": "d63a51d055b453d5c4af9d23f11a407147f0a53c761e6c10997d101ae21f0df6",
+    "bytes": 309071545
+  },
+  "extract_to": "yellow_src",
+  "index_files": {
+    "project": {
+      "path": "Undertale_Yellow.yyp",
+      "sha256": "76c44ca35ce6214c1c33ccba692aa0c7e07c029c9e9768e95a9bdbed96be59d7",
+      "role": "resource order; independent evidence for every numeric asset ID"
+    },
+    "asset_order": {
+      "path": "notes/Asset_Order/Asset_Order.txt",
+      "sha256": "38851834353443023ad82e7539b5abda1e2019db9099ebbd83ebf2164495307a",
+      "role": "decompiler dump of the compiled asset IDs; the IDs Yellow's own code uses as raw numbers"
+    },
+    "readme": {
+      "path": "README.md",
+      "sha256": "d439ed3013534a7e1d577ea631765600535893568ef8019953895c09b446f2df",
+      "role": "states the decompiled game version and the GameMaker version"
+    }
+  },
+  "documented_counts": {
+    "sprites": 3799,
+    "objects": 3224,
+    "rooms": 287,
+    "sounds": 673,
+    "backgrounds": 112,
+    "shaders": 26,
+    "fonts": 11,
+    "paths": 68,
+    "scripts": 2345,
+    "sprite_folders_on_disk": 3908,
+    "script_folders_on_disk": 1155,
+    "sequence_folders_on_disk": 35,
+    "tileset_texture_folders": 112,
+    "game_speed": 30
+  },
+  "id_band": {
+    "yellow_base": 1000000,
+    "rule": "merged ID = yellow_base + the asset's own ID in notes/Asset_Order/Asset_Order.txt, cross-checked against the Undertale_Yellow.yyp resource order",
+    "undertale_max_observed_id": 22471
+  },
+  "generated_by": "tools/fetch_yellow.py",
+  "policy": [
+    "Never fetch a branch or tag: the ref above is an immutable commit.",
+    "A digest mismatch is a hard failure that names both digests; nothing is patched or substituted.",
+    "yellow_src/ is git-ignored and reproducible from this record alone."
+  ]
+}

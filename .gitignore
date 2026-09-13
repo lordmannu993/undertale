@@ -16,3 +16,7 @@ __pycache__/
 local.properties
 # Never package development/save files with the game
 /port-test-output/
+
+# Undertale Yellow source is fetched from the pinned commit, never committed
+/yellow_src/
+/.yellow-cache/
