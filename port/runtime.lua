@@ -256,6 +256,15 @@ function Runtime:increment(owner,key,amount,post,E)
 end
 
 function Runtime:call(name,E,...)
+    -- Studio 2 lets an event declare its own functions.  They live in the event
+    -- scope, not in the script table, so two objects can each own a function
+    -- with the same name without one shadowing the other -- and a local still
+    -- wins over a builtin, as it does in GameMaker.
+    local locals=E and rawget(E,"_locals")
+    local localFunction=locals and locals[name]
+    if type(localFunction)=="function" then
+        return localFunction(self,self:scope(E._self,E._other,{...},locals)) or 0
+    end
     local builtin=self.builtins[name]
     if builtin then return builtin(E,...) or 0 end
     -- GMS2 scripts are name-resolved because Studio 2 does not expose a stable
@@ -337,6 +346,11 @@ end
 function Runtime:create(objectIndex,x,y,spec,defer)
     local object=self:object(objectIndex)
     if not object then self:unsupported("instance_create","Missing original object ID "..tostring(objectIndex)) end
+    if self.truth(object.physics) then
+        self:unsupported("instance_create("..tostring(object.name or objectIndex)..")",
+            "This Yellow object is a GameMaker physics fixture and the runtime has no physics engine, "..
+            "so it would never move. Its Box2D record is preserved in the generated object and the conversion report.")
+    end
     spec=spec or {}
     local id=spec.id or self.nextId
     if not spec.id then self.nextId=self.nextId+1 end
@@ -357,6 +371,9 @@ function Runtime:destroy(inst,runEvent)
     if not inst or not inst.alive or inst.destroying then return end
     inst.destroying=true
     if runEvent~=false then self:event(inst,1,0) end
+    -- GameMaker runs Clean Up after Destroy, and runs it even when the Destroy
+    -- event itself was suppressed. Undertale has no Clean Up events at all.
+    self:event(inst,12,0)
     inst.alive=false;inst.destroying=false
 end
 function Runtime:compact()
@@ -397,6 +414,15 @@ function Runtime:loadRoom(index,first)
             tileOffsets=self.roomState.tileOffsets,hiddenLayers=self.roomState.hiddenLayers,vars=savedVars}
     elseif self.roomState then
         self.storedRooms[self.vars.room]=nil
+    end
+    if not (self.roomState and Runtime.truth(self.vars.room_persistent)) then
+        -- Instances a room change drops get their Clean Up event and then stop
+        -- existing, as in GameMaker: no Destroy event, and no ghost instance
+        -- left behind that a stale reference could still run events on. The
+        -- ones a persistent room stores come back later and keep theirs.
+        for _,i in ipairs(old) do
+            if i.alive and not Runtime.truth(i.v.persistent) then self:event(i,12,0);i.alive=false end
+        end
     end
     if self.roomState then self.roomPersistence[self.vars.room]=self.vars.room_persistent end
     for _,i in ipairs(self.instances) do if i.alive and Runtime.truth(i.v.persistent) then persistent[#persistent+1]=i end end
@@ -503,12 +529,26 @@ function Runtime:step()
         if self.input:check(key,"pressed") then each(9,key) end
         if self.input:check(key,"released") then each(10,key) end
     end
+    -- GameMaker's per-instance mouse events (0-11) need the pointer over the
+    -- instance's mask; the global family (50-58) does not. Both are driven by
+    -- the same button state, and the pointer test is skipped entirely unless a
+    -- converted object actually declares one of them.
+    local wanted={}
+    for _,subtype in ipairs(self.manifest.mouse_events or {}) do wanted[subtype]=true end
+    local function underPointer(subtype)
+        if not wanted[subtype] then return end
+        for _,i in ipairs(snapshot) do
+            if i.alive and i.active and self:maskPoint(i,self.vars.mouse_x,self.vars.mouse_y,true) then
+                self:event(i,6,subtype)
+            end
+        end
+    end
     -- The two source mouse handlers are global Left Down (50) and Right
     -- Pressed (54). Touching the game image aims; extra keys supply both buttons.
     for button=1,3 do
-        if self.input:checkMouse(button) then each(6,49+button) end
-        if self.input:checkMouse(button,"pressed") then each(6,52+button) end
-        if self.input:checkMouse(button,"released") then each(6,55+button) end
+        if self.input:checkMouse(button) then each(6,49+button);underPointer(button-1) end
+        if self.input:checkMouse(button,"pressed") then each(6,52+button);underPointer(3+button) end
+        if self.input:checkMouse(button,"released") then each(6,55+button);underPointer(6+button) end
     end
     each(3,0)
     for _,i in ipairs(snapshot) do

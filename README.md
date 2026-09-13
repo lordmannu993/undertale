@@ -217,16 +217,16 @@ any of it can run. That work is split into five pieces, tracked in
 |---|---|---|
 | 1 | Pinned source pipeline; every Yellow sprite, sound, font and tileset converted into the port's asset records, with Yellow's own numeric IDs recovered from two records inside the pinned source | **complete** |
 | 2 | GameMaker Studio 2 GML in the compiler; all 1,155 Yellow scripts converted with name-resolved calls and GMS2 runtime adapters | **complete** |
-| 3 | All 3,224 Yellow objects and their events | not started |
+| 3 | All 3,224 Yellow objects and their 8,494 events, with parents, masks and collision-event targets, plus the event dispatches they need (Clean Up, Draw Begin/End, Draw GUI, per-instance mouse) | **complete** |
 | 4 | All 287 Yellow rooms, tile layers and paths | not started |
 | 5 | The connected world: cross-game travel, one Frisk, one inventory | not started |
 
-**Nothing of Yellow is playable yet.** Pieces 1 and 2 convert the pinned assets and
-all 1,155 GMS2 script resources, but objects and rooms are still pieces 3 and 4, so
-no Yellow room can run and the published `.love` builds below still contain
-Undertale only. Yellow's ~580 MB of assets are fetched from the pinned commit at
-build time (`python3 tools/fetch_yellow.py`) and are never committed to this
-repository.
+**Nothing of Yellow is playable yet.** Pieces 1-3 convert the pinned assets, all
+1,155 GMS2 script resources and all 3,224 objects with their 8,494 events, but the
+rooms are still piece 4, so no converted Yellow object is ever placed and the
+published `.love` builds below still contain Undertale only. Yellow's ~580 MB of
+assets are fetched from the pinned commit at build time
+(`python3 tools/fetch_yellow.py`) and are never committed to this repository.
 
 ## Run with LÖVE
 
@@ -307,8 +307,8 @@ and the Undertale Yellow merge has its own piece list in
 ```sh
 python3 -m pip install -r requirements-dev.txt
 python3 tools/fetch_yellow.py                 # optional: the pinned Yellow source (~309 MB)
-python3 tools/yellow_convert.py --stage scripts # optional: pieces 1-2 of the Yellow merge
-python3 -m pytest -q                           # 234 tests; Yellow live gates skip without the fetch
+python3 tools/yellow_convert.py --stage objects # optional: pieces 1-3 of the Yellow merge
+python3 -m pytest -q                           # 255 tests; Yellow live gates skip without the fetch
 ```
 
 The converter processes **173 scripts, 1,703 objects, and 334 rooms**, including

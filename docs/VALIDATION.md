@@ -2,6 +2,41 @@
 
 ## Executed in this workspace
 
+### 2026-09-13 — Undertale Yellow merge, piece 3
+
+- **255 tests passed** in the headless suite (was 234): 21 new cases cover the
+  object converter, the event dispatch table and the real 3 224-object fetch.
+- `tools/yellow_convert.py --stage objects` converted all **3 224** Yellow objects
+  and **8 494** events (**243 470** GML lines) with **0 compile errors** in 15 s,
+  emitting one module per object into `generated/yellow/objects/`.
+- Reference resolution was checked for every object: 1 174 parents, 2 088 sprites,
+  62 masks and 53 collision targets all resolve to recovered `1 000 000+ID`
+  values, and all 3 224 modules were loaded through both LuaJIT 2.1 and Lua 5.1
+  with every parent, mask, sprite and collision key re-verified against the
+  manifest. No ID was invented and no parent chain closes.
+- Studio 2 gaps are recorded, not papered over: 10 physics objects keep their whole
+  Box2D record and stop with their own name at `instance_create`; every object
+  carries `depth = 0` with `yellow.depth_source` because Studio 2 objects have no
+  depth; the 48 Broadcast Message events and 1 Async HTTP event are converted and
+  listed as events nothing dispatches.
+- Sixteen event-local function declarations (two of them `state_switch` in
+  different objects) are bound into their own event scope; the runtime test proves
+  two same-named locals return their own values (3 and 7) and that a converted
+  Yellow script call from an event still resolves (`scr_a(21)` -> 42).
+- The runtime dispatch table was proved, not assumed: one probe object carrying an
+  event for every subtype piece 3 claims received all of them — Create, Destroy,
+  all 12 alarms, the three step events, 18 mouse subtypes, Outside Room, Intersect
+  Boundary, Game Start, Room Start/End, Animation End, all 16 user events, the
+  eight draw events, Escape key down/pressed/released and Clean Up.
+- A probe of the real object set (ad-hoc, not a committed test: it takes ~130 s)
+  created **1 665** of the 2 765 objects with a Create event cleanly; the other
+  **1 100** stop on a Studio 2 builtin `port/yellow_builtins.lua` has not
+  implemented, or on a raw numeric reference in Yellow's own ID band. Both stop
+  visibly with a name.
+- Not validated by piece 3, because piece 3 does not do it: no Yellow room exists,
+  so no converted object is placed in one; shaders, sequences, nine-slice drawing
+  and physics remain unsupported; the merged `.love` still contains Undertale only.
+
 ### 2026-09-13 — Undertale Yellow merge, piece 2
 
 - **234 tests passed** in the headless suite, including six new GMS2 compiler/runtime

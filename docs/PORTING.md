@@ -87,22 +87,23 @@ legacy Windows joystick poller; the old in-game joystick configuration is not
 used. All original debug keys remain available, but touch controls do **not**
 enable `global.debug`.
 
-## Undertale Yellow merge (pieces 1-2 of 5)
+## Undertale Yellow merge (pieces 1-3 of 5)
 
 A second GameMaker project is being merged in: **Undertale Yellow v1.2.1**, a
 GameMaker **Studio 2 (2023.4.0.84)** decompilation fetched from one pinned commit
 (`port/yellow_source.json`) into the git-ignored `yellow_src/`. Piece list,
 architecture and the recorded deviations live in [YELLOW.md](YELLOW.md).
 
-What pieces 1 and 2 add to the pipeline, and what they deliberately do not claim:
+What pieces 1-3 add to the pipeline, and what they deliberately do not claim:
 
-| resource | Yellow count | treatment through piece 2 |
+| resource | Yellow count | treatment through piece 3 |
 |---|---:|---|
 | Sprites | 3,799 IDs / 3,796 converted | Frame PNGs, origins, masks and animation metadata as GameMaker 1.4 records; 3 pinned IDs have no folder upstream and are listed, not substituted |
 | Sounds | 673 | Original audio files, volumes, durations |
 | Fonts | 11 | Bitmap atlases and every glyph, including the default-character glyph 9647 |
 | Tilesets | 112 | Texture page as a background plus the tile grid (`tile_width`, `out_columns`, `tile_count`, animation frames) needed by piece 4 |
-| Objects / rooms / paths | 3,224 / 287 / 68 | **IDs recovered, contents not converted yet** — pieces 3-4 |
+| Objects | 3,224 | All converted by piece 3: metadata, parents, masks and all 8,494 events, with collision targets renumbered to merged IDs. Studio 2 has no object depth (piece 4 takes it from the room layer) and 10 physics objects stop with their own name |
+| Rooms / paths | 287 / 68 | **IDs recovered, contents not converted yet** — piece 4 |
 | Scripts | 1,155 | All resources converted by piece 2; calls remain name-resolved and the 22 GMLive resources are explicit stops |
 | Shaders / sequences | 26 / 35 | No GameMaker 1.4 equivalent; enumerated for a visible stop, never substituted |
 
@@ -119,7 +120,15 @@ parameters, array literals and loop declarations to the existing strict compiler
 leaves unsupported Studio facilities as named `Runtime:unsupported` stops. The
 script manifest uses names rather than inventing a numeric GMS2 script index, and
 keeps Yellow names under `yellow_names` so a collision cannot rebind an Undertale
-name. Objects and rooms still require pieces 3 and 4.
+name.
+
+Piece 3 adds `tools/yellow/objects.py`, which writes each Yellow object in the same
+module shape `tools/convert.py` uses for Undertale (metadata plus
+`object.events["kind:number"]`), and `compile_gml2_event`, which compiles an event
+body and binds an event's own local functions into that event's scope instead of the
+shared script namespace. The runtime grew the dispatches those events need — Clean
+Up, Draw Begin/End, Draw GUI Begin/GUI/GUI End, Pre/Post-Draw and per-instance
+mouse events — each unused by every Undertale object. Rooms still require piece 4.
 
 ## Reproducible pipeline
 
@@ -219,8 +228,11 @@ The original GameMaker files have not been changed.
 
 - Explicit GML scopes keep instance fields, `global`, `self`, `other`, locals and
   script arguments separate. `with` iterates a snapshot, including descendants.
-- Create/Destroy, Begin/Normal/End Step, alarms, keyboard and mouse events,
-  inherited events, room events and animation-end events are dispatched.
+- Create/Destroy, Begin/Normal/End Step, alarms, keyboard and mouse events
+  (global and per-instance), inherited events, room events, animation-end, Clean
+  Up and the Draw Begin/Draw/Draw End, Draw GUI and Pre/Post-Draw passes are
+  dispatched. `tests/test_yellow_objects.py` drives one probe object through every
+  one of them, so the dispatch list is checked rather than claimed.
 - Fixed game ticks respect `room_speed`. **Draw executes once per game tick**,
   not once per monitor refresh: much of this game updates menus/dialogue in Draw.
 - Rendering uses a cached, nearest-filtered canvas, sprite origins/transforms,

@@ -90,6 +90,8 @@ class Converter:
         self.evidence = {}
         self.errors, self.missing = [], []
         self.calls, self.keys = Counter(), defaultdict(set)
+        #: per-instance mouse subtypes (0-11); the global 50-58 family needs no pointer test
+        self.mouse_subtypes = set()
         self.references = []
         self.external_files = defaultdict(set)
         self.digest = hashlib.sha256()
@@ -133,6 +135,8 @@ class Converter:
                 self.codes.append((f"objects/{name}/{key}", f"{path.relative_to(self.root)} event {key}", "\n".join(lines)))
                 if event.get("eventtype") in ("5", "9", "10"):
                     self.keys[int(event.get("enumb"))].add(f"{name} event {key}")
+                if event.get("eventtype") == "6" and int(event.get("enumb", "0")) < 12:
+                    self.mouse_subtypes.add(int(event.get("enumb")))
         for name, (path, room) in self.resources["rooms"].items():
             self.codes.append((f"rooms/{name}/create", f"{path.relative_to(self.root)} creation", room.findtext("code", "")))
             for inst in room.findall("instances/instance"):
@@ -538,6 +542,7 @@ class Converter:
                     "objects": {}, "scripts": {}, "rooms": {}, "room_order": self.room_order,
                     "paths": self.paths, "path_points": self.path_points,
                     "missing_rooms": self.missing_rooms, "keys": sorted(self.keys),
+                    "mouse_events": sorted(self.mouse_subtypes),
                     "asset_modules": [{"kind": k, "module": "generated." + m.replace("/", ".")} for k, m in asset_modules]}
         for category, mapping in self.ids.items():
             for name, index in mapping.items():

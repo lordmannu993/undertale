@@ -235,7 +235,8 @@ def test_script_stage_is_complete_but_later_stages_still_refuse_partial_games():
     manifest = (ROOT / "generated/yellow/manifest.lua").read_text()
     assert '"keyboard_multicheck_pressed"' in manifest
     assert '"yellow_names"' in manifest
-    for stage, piece in (("objects", 3), ("rooms", 4)):
+    # Piece 3 converted objects (tests/test_yellow_objects.py); piece 4 still stops.
+    for stage, piece in (("rooms", 4),):
         run = subprocess.run([sys.executable, "tools/yellow_convert.py", "--stage", stage],
                              cwd=ROOT, capture_output=True, text=True)
         assert run.returncode == 2, stage
