@@ -7,14 +7,15 @@ each piece of ``docs/YELLOW.md`` lands on its own, tested:
 
     --stage assets    every sprite, sound, font and tileset texture (piece 1)
     --stage scripts   every Yellow script, name-resolved      (piece 2)
-    --stage objects   every Yellow object and event           (piece 3, not yet)
+    --stage objects   every Yellow object and event           (piece 3)
     --stage rooms     every Yellow room, tile layer and path   (piece 4, not yet)
 
 Output goes to ``generated/yellow/`` (git-ignored, rebuilt on demand) and always
 includes a report: what was converted, which IDs came from which pinned record,
 and every GameMaker Studio 2 fact this port had to reinterpret. Asset conversion
-is piece 1; script conversion builds on it for piece 2. Later stages still say so
-and exit non-zero; they never emit a half-converted game that looks complete.
+is piece 1, script conversion builds on it for piece 2 and object conversion on
+both for piece 3. The room stage still says so and exits non-zero; no stage ever
+emits a half-converted game that looks complete.
 
 Usage::
 
@@ -33,9 +34,10 @@ sys.path.insert(0, str(ROOT / "tools"))
 
 from convert import lua  # noqa: E402 - same serialiser the .gmx converter uses
 from gml import CompileError, walk  # noqa: E402
-from gml2 import compile_gml2_functions  # noqa: E402
+from gml2 import compile_gml2_functions, function_expression  # noqa: E402
 from yellow.assets import AssetConverter  # noqa: E402
 from yellow.gms2 import GMS2Error  # noqa: E402
+from yellow.objects import ObjectConverter  # noqa: E402
 from yellow.registry import YELLOW_BASE, Registry, collisions  # noqa: E402
 
 STAGES = ("assets", "scripts", "objects", "rooms")
@@ -72,7 +74,8 @@ class Writer:
 
 def manifest_text(registry: Registry, provenance: dict, modules: list[tuple[str, str]], names: dict[str, int],
                   prefix: str = "generated.yellow", scripts: dict | None = None,
-                  yellow_names: dict | None = None) -> str:
+                  yellow_names: dict | None = None, objects: dict | None = None,
+                  keys: list[int] | None = None, mouse_events: list[int] | None = None) -> str:
     manifest = {
         "format": 1,
         "game": "undertale-yellow",
@@ -81,14 +84,20 @@ def manifest_text(registry: Registry, provenance: dict, modules: list[tuple[str,
         "yellow_base": YELLOW_BASE,
         "names": names,
         "yellow_names": yellow_names or {category: registry.names(category) for category in RESOURCE_KINDS},
-        "objects": {}, "scripts": scripts or {}, "rooms": {}, "room_order": [],
-        "paths": {}, "path_points": {}, "missing_rooms": {}, "keys": [],
+        "objects": objects or {}, "scripts": scripts or {}, "rooms": {}, "room_order": [],
+        "paths": {}, "path_points": {}, "missing_rooms": {}, "keys": sorted(keys or []),
+        # Per-instance mouse subtypes the converted objects actually use; the
+        # runtime skips the pointer test entirely when nothing needs it.
+        "mouse_events": sorted(mouse_events or []),
         "asset_modules": [{"kind": kind, "module": prefix + "." + module.replace("/", ".")}
                           for kind, module in modules],
     }
-    status = ("-- Piece 2 manifest: assets plus name-resolved GMS2 scripts.\n"
-              if scripts is not None else
-              "-- Partial manifest: piece 1 of docs/YELLOW.md converts assets only.\n")
+    if objects is not None:
+        status = "-- Piece 3 manifest: assets, name-resolved GMS2 scripts and every Yellow object.\n"
+    elif scripts is not None:
+        status = "-- Piece 2 manifest: assets plus name-resolved GMS2 scripts.\n"
+    else:
+        status = "-- Partial manifest: piece 1 of docs/YELLOW.md converts assets only.\n"
     return ("-- Recovered Yellow asset IDs, never alphabetical indices.\n"
             + status + "return " + lua(manifest) + "\n")
 
@@ -191,14 +200,6 @@ class ScriptConverter:
                 self.rewrites[node[1]] = self.rewrites.get(node[1], 0) + 1
 
     @staticmethod
-    def _function_expr(code: str) -> str:
-        marker = "return function"
-        position = code.find(marker)
-        if position < 0:
-            raise CompileError("GMS2 emitter did not return a function")
-        return code[position + len("return "):].strip()
-
-    @staticmethod
     def _unsupported_module(name: str, reason: str, functions: list[str]) -> str:
         message = lua(f"{name}: {reason}")
         fn = f"function(R, E) R:unsupported({lua(name)}, {message}) end"
@@ -233,7 +234,7 @@ class ScriptConverter:
             self.function_count += len(records)
             for _, _, ast in records:
                 self._note_calls(ast)
-            expressions = [(function, self._function_expr(code)) for function, code, _ in records]
+            expressions = [(function, function_expression(code)) for function, code, _ in records]
             if len(expressions) == 1:
                 text = "-- Generated from GMS2\nreturn " + expressions[0][1] + "\n"
             else:
@@ -285,6 +286,19 @@ class ScriptConverter:
         }
 
 
+def asset_module_pairs(report: dict) -> list[tuple[str, str]]:
+    """The asset modules an earlier stage emitted, taken from its own report.
+
+    ``stage_assets`` already wrote every module and listed them; rebuilding the
+    list from the serialized manifest text would only risk the two disagreeing.
+    """
+    pairs = []
+    for item in report.get("generated_files", []):
+        if item.startswith("assets/") and item.endswith(".lua"):
+            pairs.append((item.split("/", 1)[1].split("_", 1)[0], item[:-4]))
+    return pairs
+
+
 def stage_scripts(registry: Registry, provenance: dict, writer: Writer, root: Path = ROOT,
                   repository: Path = ROOT, prefix: str = "generated.yellow") -> dict:
     """Build piece 1 assets plus every GMS2 script for piece 2."""
@@ -292,15 +306,7 @@ def stage_scripts(registry: Registry, provenance: dict, writer: Writer, root: Pa
     converter = ScriptConverter(registry, root, provenance, prefix)
     scripts = converter.run(writer)
     asset_names = {category: registry.names(category) for category in RESOURCE_KINDS}
-    # Reuse the asset manifest's module list instead of reconstructing it from
-    # the serialized text.  stage_assets already wrote every module; its report
-    # is the canonical list of emitted asset files.
-    asset_modules = []
-    for item in asset_report.get("generated_files", []):
-        if item.startswith("assets/") and item.endswith(".lua"):
-            kind = item.split("/", 1)[1].split("_", 1)[0]
-            asset_modules.append((kind, item[:-4]))
-    manifest = manifest_text(registry, provenance, asset_modules,
+    manifest = manifest_text(registry, provenance, asset_module_pairs(asset_report),
                              {name: value for category in ASSET_KINDS for name, value in registry.names(category).items()},
                              prefix, scripts=scripts["script_modules"], yellow_names=asset_names)
     writer.write("manifest.lua", manifest)
@@ -308,6 +314,9 @@ def stage_scripts(registry: Registry, provenance: dict, writer: Writer, root: Pa
     report["stage"] = "scripts"
     report["status"] = "experimental; Yellow assets and scripts are converted, but objects and rooms are not executable yet"
     report["scripts"] = {key: value for key, value in scripts.items() if key != "script_modules"}
+    # The manifest's script table, kept in the report so a later stage can
+    # rewrite the manifest without re-deriving it from generated text.
+    report["script_modules"] = scripts["script_modules"]
     report["generated_files"] = sorted(writer.written + ["conversion-report.json"])
     report["limitations"] = [
         limitation for limitation in report.get("limitations", [])
@@ -322,13 +331,55 @@ def stage_scripts(registry: Registry, provenance: dict, writer: Writer, root: Pa
     return report
 
 
+def stage_objects(registry: Registry, provenance: dict, writer: Writer, root: Path = ROOT,
+                  repository: Path = ROOT, prefix: str = "generated.yellow") -> dict:
+    """Build pieces 1-2, then every Yellow object and event for piece 3."""
+    script_report = stage_scripts(registry, provenance, writer, root, repository, prefix)
+    converter = ObjectConverter(registry, root, provenance, prefix)
+    objects = converter.run(writer)
+    manifest = manifest_text(
+        registry, provenance, asset_module_pairs(script_report),
+        {name: value for category in ASSET_KINDS for name, value in registry.names(category).items()},
+        prefix, scripts=script_report["script_modules"],
+        yellow_names={category: registry.names(category) for category in RESOURCE_KINDS},
+        objects=converter.modules, keys=sorted(converter.keys),
+        mouse_events=sorted(converter.mouse_subtypes))
+    writer.write("manifest.lua", manifest)
+    report = dict(script_report)
+    report["stage"] = "objects"
+    report["status"] = ("experimental; Yellow assets, scripts and objects are converted, "
+                        "but no Yellow room exists yet, so none of it runs in a room")
+    report["objects"] = objects
+    report["generated_files"] = sorted(writer.written + ["conversion-report.json"])
+    report["limitations"] = [
+        limitation for limitation in report.get("limitations", [])
+        if not limitation.startswith("Piece 2 converts scripts only")
+    ] + [
+        "Piece 3 converts objects only: Yellow rooms, tile layers, backgrounds and paths are piece 4, so no "
+        "Yellow object is ever placed in a room yet.",
+        "GameMaker Studio 2 has no per-object depth; every converted object carries depth 0 and records "
+        "yellow.depth_source, and piece 4 assigns each instance the depth of the room layer it sits on.",
+        "Physics objects are converted with their whole Box2D record in yellow.physics, and Runtime:create "
+        "stops with the object's name: this runtime has no physics engine, and a silently motionless seesaw "
+        "would be worse than an error.",
+        "Yellow's Async HTTP event (GMLive's poll) and its Broadcast Message events (sprite frame events) are "
+        "converted and listed per object, but nothing dispatches them.",
+        "Clean Up events run when an instance is destroyed and when a non-persistent instance is dropped on a "
+        "room change; persistent instances keep GameMaker's rule of no Create/Destroy across rooms.",
+        "Draw Begin/Draw/Draw End run as three passes over instances in depth order, as GameMaker does; tiles "
+        "keep their own interleaved pass until piece 4 converts Yellow's tile layers.",
+    ]
+    writer.write("conversion-report.json", json.dumps(report, indent=2, ensure_ascii=False) + "\n")
+    return report
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--stage", choices=STAGES, default="assets")
     parser.add_argument("--source", type=Path, default=ROOT / "yellow_src", help="fetched Yellow project tree")
     parser.add_argument("--output", type=Path, default=ROOT / "generated" / "yellow")
     args = parser.parse_args()
-    if args.stage in ("objects", "rooms"):
+    if args.stage in ("rooms",):
         print(f"--stage {args.stage} is piece {PIECE[args.stage]} of docs/YELLOW.md and is not implemented yet.",
               file=sys.stderr)
         return 2
@@ -344,17 +395,27 @@ def main() -> int:
     try:
         registry = Registry(args.source.resolve(), provenance)
         writer = Writer(output)
-        report = (stage_scripts(registry, provenance, writer, ROOT, ROOT)
-                  if args.stage == "scripts" else stage_assets(registry, provenance, writer, ROOT))
+        report = {"scripts": stage_scripts, "objects": stage_objects}.get(args.stage, stage_assets)(
+            registry, provenance, writer, ROOT, ROOT)
     except (GMS2Error, CompileError, OSError, ValueError) as exc:
         print(f"Yellow conversion failed: {exc}", file=sys.stderr)
         return 1
     assets = report["assets"]
     print("Converted Yellow assets: " + ", ".join(f"{kind}={count}" for kind, count in sorted(assets["converted"].items())))
-    if args.stage == "scripts":
+    if args.stage in ("scripts", "objects"):
         print(f"Converted Yellow GMS2 scripts: {report['scripts']['converted']} resources, "
               f"{report['scripts']['functions']} functions")
         print(f"GMLive explicit stops: {len(report['scripts']['unsupported'])}")
+    if args.stage == "objects":
+        objects = report["objects"]
+        print(f"Converted Yellow objects: {objects['converted']} objects, {objects['events']} events "
+              f"({objects['source_lines']:,} GML lines)")
+        print(f"Parents: {objects['with_parent']}; sprites: {objects['with_sprite']}; masks: {objects['with_mask']}; "
+              f"collision events: {objects['collision_events']}; physics objects: {len(objects['physics_objects'])}")
+        if objects["undispatched_events"]:
+            print("Converted but not dispatched: "
+                  + ", ".join(f"{name} ({count['objects']} objects)"
+                              for name, count in objects["undispatched_events"].items()))
     print(f"Recovered IDs from two pinned records: {assets['recovered_ids']}")
     print(f"Missing asset files: {len(assets['missing_asset_files'])}; "
           f"unrecoverable pinned IDs: {len(assets['unrecoverable_ids'])}; findings: {assets['findings']}")

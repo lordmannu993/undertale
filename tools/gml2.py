@@ -19,9 +19,9 @@ from dataclasses import dataclass
 import re
 
 try:  # imported as ``tools.gml2`` from the repository root
-    from .gml import CompileError, Emitter, Parser, quote
+    from .gml import CompileError, Emitter, Parser, emit_module, quote
 except ImportError:  # loaded by the standalone conversion scripts
-    from gml import CompileError, Emitter, Parser, quote
+    from gml import CompileError, Emitter, Parser, emit_module, quote
 
 
 @dataclass(frozen=True)
@@ -297,6 +297,47 @@ def compile_gml2_functions(text: str, source: str = "GMS2", resolver=None) -> tu
     return records, {"enums": enums, "function_count": len(functions), "global_source": outside}
 
 
+def function_expression(module: str) -> str:
+    """The function expression of a generated module, without its ``return``.
+
+    Object events and multi-export scripts are embedded in a larger module, so
+    the header comment and the ``return`` keyword have to come off again.  One
+    implementation, used by both front ends.
+    """
+    marker = "return function"
+    position = module.find(marker)
+    if position < 0:
+        raise CompileError("the emitter did not return a function")
+    return module[position + len("return "):].strip()
+
+
+def compile_gml2_event(text: str, source: str = "GMS2", resolver=None) -> tuple[str, tuple, list[str]]:
+    """Compile one object event body, which is bare statements rather than a script.
+
+    Studio 2 lets an event declare its own functions.  They are *not* project
+    scripts, so lifting them into the script namespace would let one object's
+    ``state_switch`` shadow another's.  Each declaration is emitted into the
+    event's own GML scope (``E._locals``) instead, and ``Runtime:call`` resolves
+    a scope-local function before any builtin or script of the same name.
+
+    Returns the Lua module text, the body AST and the declared local names.
+    """
+    text, _ = strip_enums(text, source)
+    functions, outside = extract_functions(text, source)
+    constructors = [function.name for function in functions if function.constructor]
+    if constructors:
+        raise CompileError(f"{source}: constructor functions are unsupported: {constructors}")
+    prologue = []
+    for function in functions:
+        body = _parameter_prefix(function.parameters) + function.body
+        expression = Emitter(resolver=resolver).function_expression(
+            Parser(body).program(), f"{source}::{function.name}")
+        prologue.append(f"E._locals[{quote(function.name)}] = {expression}")
+    ast = Parser(outside).program()
+    return emit_module(ast, source, resolver=resolver, prologue=prologue), ast, [f.name for f in functions]
+
+
 # Spellings used by callers and hidden tooling; keep one implementation.
 compile_gms2 = compile_gml2
 compile_gms2_functions = compile_gml2_functions
+compile_gms2_event = compile_gml2_event

@@ -325,6 +325,17 @@ function Graphics.install(R)
         for i,tile in ipairs(self.roomState.tiles) do list[#list+1]={depth=tile.depth,order=i,tile=tile} end
         for i,inst in ipairs(self.instances) do if inst.alive and inst.active then list[#list+1]={depth=inst.v.depth,order=1000000+i,instance=inst} end end
         table.sort(list,function(a,b) if a.depth==b.depth then return a.order<b.order end;return a.depth>b.depth end)
+        -- GameMaker runs a whole Draw Begin pass over the instances, then Draw,
+        -- then Draw End, and skips all of them for an invisible instance. Tiles
+        -- keep their own interleaved pass: that is the order Undertale's draw
+        -- calls are verified against, and Yellow's tile layers arrive in piece 4.
+        local function drawPass(kind,number)
+            for _,item in ipairs(list) do
+                local inst=item.instance
+                if inst and inst.alive and inst.active and self.truth(inst.v.visible) then self:event(inst,kind,number) end
+            end
+        end
+        drawPass(8,76) -- Pre Draw: before this frame's own drawing starts
         for _,view in ipairs(views) do
             self.vars.view_current=view.index
             -- Clamp the displayed viewport to room bounds; camera parity still
@@ -339,6 +350,7 @@ function Graphics.install(R)
                 if g then require("port.opening_backdrops").draw(g,self.roomState.backdrop) end
             end
             backgrounds(false,view)
+            drawPass(8,72) -- Draw Begin
             for _,item in ipairs(list) do
                 if item.tile then
                     local t=item.tile
@@ -359,9 +371,18 @@ function Graphics.install(R)
                     end
                 end
             end
+            drawPass(8,73) -- Draw End
             backgrounds(true,view)
             if g then g.pop() end
         end
+        drawPass(8,77) -- Post Draw
+        -- Draw GUI is display space: no view transform, no viewport scissor.
+        -- The canvas this draws into is what love.draw presents, so GUI events
+        -- land on screen exactly where they say, unscaled by any view.
+        if g then g.setScissor();g.origin() end
+        drawPass(8,74) -- Draw GUI Begin
+        drawPass(8,64) -- Draw GUI
+        drawPass(8,75) -- Draw GUI End
         if g then g.setScissor();g.setCanvas();g.pop() end
         self.vars.view_current=0
     end

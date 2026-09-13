@@ -108,6 +108,118 @@ def tileset(name: str, texture: str, *, tile: int, count: int, columns: int) -> 
             "tileHeight": tile, "tileWidth": tile, "tilehsep": 0, "tilevsep": 0, "tilexoff": 0, "tileyoff": 0}
 
 
+#: GMS2 event type -> the code file name Studio 2 uses. Mirrored here on purpose:
+#: the fixture must not import the converter's own naming, or a wrong name in
+#: ``tools/yellow/objects.py`` would agree with itself and pass.
+EVENT_FILE_NAMES = {0: "Create", 1: "Destroy", 2: "Alarm", 3: "Step", 4: "Collision",
+                    5: "Keyboard", 6: "Mouse", 7: "Other", 8: "Draw", 9: "KeyPress",
+                    10: "KeyRelease", 11: "Trigger", 12: "CleanUp", 13: "Gesture", 14: "PreCreate"}
+
+
+def event(kind: int, number: int, code: str, target: str | None = None) -> dict:
+    """One Studio 2 event: its type/subtype, its code, and a collision target."""
+    return {"kind": kind, "number": number, "code": code, "target": target}
+
+
+def event_file_name(entry: dict) -> str:
+    # Collision code is named after the *other* object and carries no subtype.
+    if entry["kind"] == 4:
+        return f"Collision_{entry['target']}.gml"
+    return f"{EVENT_FILE_NAMES[entry['kind']]}_{entry['number']}.gml"
+
+
+def event_entry(entry: dict) -> dict:
+    target = entry["target"]
+    return {"resourceType": "GMEvent", "resourceVersion": "1.0", "name": "",
+            "collisionObjectId": {"name": target, "path": f"objects/{target}/{target}.yy"} if target else None,
+            "eventNum": entry["number"], "eventType": entry["kind"], "isDnD": False}
+
+
+def gms2_object(name: str, *, sprite: str | None = None, mask: str | None = None,
+                parent: str | None = None, solid: bool = False, visible: bool = True,
+                persistent: bool = False, physics: bool = False, events: list[dict] = ()) -> dict:
+    """A GMS2 object record carrying every field the piece 3 converter reads."""
+    reference = {"name": None, "path": None}
+    return {
+        "resourceType": "GMObject", "resourceVersion": "1.0", "name": name,
+        "eventList": [event_entry(entry) for entry in events],
+        "managed": True, "overriddenProperties": [],
+        "parent": {"name": "Objects", "path": "folders/Objects.yy"},
+        "parentObjectId": {"name": parent, "path": f"objects/{parent}/{parent}.yy"} if parent else None,
+        "persistent": persistent,
+        "physicsAngularDamping": 0.1, "physicsDensity": 0.5, "physicsFriction": 0.2,
+        "physicsGroup": 0, "physicsKinematic": False, "physicsLinearDamping": 0.1,
+        "physicsObject": physics, "physicsRestitution": 0.1, "physicsSensor": physics,
+        "physicsShape": 1 if physics else 0,
+        "physicsShapePoints": ([{"x": -8.0, "y": -8.0}, {"x": 8.0, "y": -8.0},
+                                {"x": 8.0, "y": 8.0}, {"x": -8.0, "y": 8.0}] if physics else []),
+        "physicsStartAwake": True, "properties": [], "solid": solid,
+        "spriteId": {"name": sprite, "path": f"sprites/{sprite}/{sprite}.yy"} if sprite else None,
+        "spriteMaskId": {"name": mask, "path": f"sprites/{mask}/{mask}.yy"} if mask else None,
+        "visible": visible,
+    }
+
+
+#: The miniature object set: a parent chain, a mask, a collision pair, a physics
+#: fixture, an invisible object and the two events nothing dispatches.
+OBJECTS = {
+    "obj_pl": {
+        "sprite": "spr_pl_down", "mask": "spr_a", "persistent": True,
+        "events": [
+            event(0, 0, "function helper() {\n    return 3;\n}\nvalue = helper();"),
+            event(3, 0, "if (keyboard_check(vk_left)) x -= 2;"),
+            event(8, 64, "draw_text(4, 4, \"gui\");"),
+        ],
+    },
+    "obj_parent": {
+        "solid": True,
+        "events": [
+            event(0, 0, "created = 1;"),
+            event(1, 0, "destroyed = 1;"),
+            event(12, 0, "cleaned = 1;"),
+            event(7, 10, "user_ran = 1;"),
+        ],
+    },
+    "obj_child": {
+        "parent": "obj_parent", "sprite": "spr_a",
+        "events": [
+            event(0, 0, "function helper() {\n    return 7;\n}\nvalue = helper();"),
+            event(2, 0, "alarm_ran = 1;"),
+            event(3, 1, "begin_ran = 1;"),
+            event(3, 2, "end_ran = 1;"),
+            event(4, 0, "hit = other.object_index;", target="obj_target"),
+            event(6, 4, "clicked = 1;"),
+            event(8, 72, "draw_begin_ran = 1;"),
+            event(8, 0, "draw_ran = 1;"),
+            event(8, 73, "draw_end_ran = 1;"),
+            event(8, 74, "gui_begin_ran = 1;"),
+            event(8, 75, "gui_end_ran = 1;"),
+            event(8, 76, "pre_draw_ran = 1;"),
+            event(8, 77, "post_draw_ran = 1;"),
+            event(10, 27, "escape_ran = 1;"),
+        ],
+    },
+    "obj_target": {
+        "parent": "obj_parent", "sprite": "spr_a",
+        "events": [event(0, 0, "doubled = scr_a(21);")],
+    },
+    "obj_physics": {
+        "sprite": "spr_a", "physics": True,
+        "events": [event(3, 0, "physics_step = 1;")],
+    },
+    "obj_broadcast": {
+        "events": [
+            event(7, 76, "if (ds_map_find_value(event_data, \"event_type\") == \"sprite event\") broadcast_ran = 1;"),
+            event(7, 62, "live_async_http();"),
+        ],
+    },
+    "obj_invisible": {
+        "sprite": "spr_a", "visible": False,
+        "events": [event(8, 0, "invisible_draw_ran = 1;")],
+    },
+}
+
+
 def asset_order(sections: dict[str, list[str]]) -> str:
     """The decompiler's ID dump: section headers plus ``<id> - <name>`` lines."""
     out = ["Generated by test fixture", "", "Assets Found:", ""]
@@ -143,7 +255,7 @@ FIXTURE = {
                                       65: {"h": 12, "offset": 1, "shift": 9, "w": 7, "x": 12, "y": 2},
                                       9647: {"h": 12, "offset": 0, "shift": 8, "w": 6, "x": 21, "y": 2}})},
     "tilesets": {"ts_a": tileset("ts_a", "_decompiled_ts_a", tile=20, count=6, columns=3)},
-    "objects": ["obj_pl", "obj_a"],
+    "objects": list(OBJECTS),
     "rooms": ["rm_a"],
     "paths": ["pt_a"],
     "scripts": ["scr_a"],
@@ -246,13 +358,24 @@ def build_source(root: Path, *, swap_sprite_order: bool = False,
         folder.mkdir(parents=True, exist_ok=True)
         (folder / f"{name}.yy").write_text(json.dumps(record, indent=2))
         resources.append((name, "tilesets"))
-    for folder_name, names in (("objects", FIXTURE["objects"]), ("rooms", FIXTURE["rooms"]),
-                               ("paths", FIXTURE["paths"]), ("scripts", FIXTURE["scripts"]),
-                               ("shaders", FIXTURE["shaders"])):
+    for name, spec in OBJECTS.items():
+        folder = source / "objects" / name
+        folder.mkdir(parents=True, exist_ok=True)
+        events = spec.get("events", [])
+        record = gms2_object(name, events=events, **{k: v for k, v in spec.items() if k != "events"})
+        (folder / f"{name}.yy").write_text(json.dumps(record, indent=2))
+        for entry in events:
+            (folder / event_file_name(entry)).write_text(entry["code"] + "\n")
+        resources.append((name, "objects"))
+    for folder_name, names in (("rooms", FIXTURE["rooms"]), ("paths", FIXTURE["paths"]),
+                               ("scripts", FIXTURE["scripts"]), ("shaders", FIXTURE["shaders"])):
         for name in names:
             (source / folder_name / name).mkdir(parents=True, exist_ok=True)
             (source / folder_name / name / f"{name}.yy").write_text(json.dumps({"name": name}))
             resources.append((name, folder_name))
+    # Piece 2 and 3 need the script's own GML, not just its .yy placeholder.
+    (source / "scripts" / "scr_a" / "scr_a.gml").write_text(
+        "function scr_a(value) {\n    return value * 2;\n}\n")
 
     # The project file's resource order has to agree with the ID dump, category by category.
     project_sections = dict(sections, sprites=project_names)

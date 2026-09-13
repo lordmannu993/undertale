@@ -32,7 +32,7 @@ objects → rooms → merged world. Each piece is one PR, merged before the next
 | --- | --- | --- |
 | 1 | Pinned source pipeline + merged asset registry + every sprite, sound, font and tileset texture converted | **complete** |
 | 2 | GMS2 GML: language support in the compiler, all 1 155 Yellow scripts converted, name→ID rewriting, GMS2 builtins in the runtime | **complete** |
-| 3 | All 3 224 Yellow objects and their events, with parents, masks and collision-event targets | not started |
+| 3 | All 3 224 Yellow objects and their events, with parents, masks and collision-event targets | **complete** |
 | 4 | All 287 Yellow rooms: instances, creation code, tile layers from tilesets, backgrounds, views; plus the 68 paths | not started |
 | 5 | One world: River Person + UGPS cross-game destinations, Frisk as the only player (Clover's run sprites on X), Frisk's weapons/armours plus Clover's ammo/accessories, saves, packaging, release | not started |
 
@@ -129,16 +129,67 @@ Piece 2 adds the GMS2 script front end without changing the existing GMX front e
   `Runtime:script` also continues to honor injected numeric GMX functions before
   loading a generated module.
 
-Piece 2 converts and validates scripts, but it does not make Yellow playable by
-itself: objects and rooms remain pieces 3 and 4, so no Yellow room is entered yet.
+## Piece 3, in detail
+
+Piece 3 converts all **3 224** Yellow objects and their **8 494** events
+(**243 470** lines of Studio 2 GML) into the module shape `tools/convert.py`
+already writes for Undertale, so `port/runtime.lua` loads either game without
+knowing which one it is looking at:
+
+- `tools/yellow/objects.py` reads each `objects/<name>/<name>.yy` and resolves
+  `spriteId`, `spriteMaskId`, `parentObjectId` and every collision event's
+  `collisionObjectId` to merged `1 000 000+ID` values. A collision event's
+  runtime key becomes `4:<merged target ID>`, the same renumbering
+  `tools/convert.py` applies to Undertale's `ename` targets, and its code file is
+  named after the *other* object (`Collision_obj_arcade_bullet.gml`) with no
+  subtype — the naming the pinned source actually uses.
+- `tools/gml2.py`'s `compile_gml2_event` compiles an event body rather than a
+  script resource. Studio 2 lets an event declare its own functions; Yellow has
+  sixteen such declarations, two of them named `state_switch` in different
+  objects. They are emitted into the event's own GML scope (`E._locals`) and
+  `Runtime:call` resolves a scope-local function before any builtin or script, so
+  no object can shadow another and a local still wins over a builtin, as in
+  GameMaker.
+- `tools/yellow_convert.py --stage objects` runs pieces 1-2, writes
+  `generated/yellow/objects/*.lua`, and extends the manifest with the object
+  modules, Yellow's keyboard keys (`27`) and the per-instance mouse subtypes its
+  objects declare (`0`, `4`).
+- The runtime grew the dispatches Yellow's events need. Every one is inert for
+  Undertale, whose objects use none of them: **Clean Up** (after Destroy, and for
+  the instances a room change drops, which now stop existing instead of lingering
+  alive but unlisted), **Draw Begin / Draw / Draw End** as three passes over
+  instances in depth order, **Draw GUI Begin / Draw GUI / Draw GUI End** in
+  display space, **Pre-Draw** and **Post-Draw** around the frame, and
+  **per-instance mouse events** (`0`-`9`) gated on the pointer being over the
+  instance's mask. Invisible instances still skip every Draw event, as
+  GameMaker's own manual says they must.
+- Parent loops would hang `Runtime:isA`, so the converter walks every chain and
+  refuses the build if one closes.
+
+Studio 2 facts piece 3 records rather than reinterprets:
+
+| GMS2 fact | merged-game handling |
+| --- | --- |
+| objects carry no depth; an instance takes its room layer's | every object is converted with `depth = 0` and `yellow.depth_source`, and piece 4 assigns the real depth |
+| 10 physics objects (the seesaw and piston puzzles) | the whole Box2D record is kept in `yellow.physics`, and `Runtime:create` stops with the object's name instead of dropping it into a world that will not move it |
+| object variables (`properties`) would have to become Create-event prologue code | Yellow declares none; an encounter is a hard conversion error, never a silent omission |
+| Async HTTP (`7:62`, GMLive's own poll) and Broadcast Message (`7:76`, sprite frame events) | both are converted, and both are listed per object in the report as events nothing dispatches |
+| No Button / Mouse Enter / Mouse Leave (`6:3`, `6:10`, `6:11`) and Resize (`8:65`) | no dispatch; no Yellow object uses them, and the report says why |
+| Drag and Drop events | Yellow has none (`isDnD` is false on all 8 494 events); an encounter is a hard error |
+
+Piece 3 converts and validates objects, but it does not make Yellow playable by
+itself: rooms remain piece 4, so no converted object is ever placed, and the
+Studio 2 builtins `port/yellow_builtins.lua` has not implemented still stop the
+events that call them. Piece 4 supplies the rooms; piece 5 the merged world.
 
 ## Verification
 
 ```bash
-python3 tools/fetch_yellow.py --check          # offline: is the pinned source really there?
-python3 tools/yellow_convert.py --stage assets # convert every sprite/sound/font/tileset
+python3 tools/fetch_yellow.py --check           # offline: is the pinned source really there?
+python3 tools/yellow_convert.py --stage assets  # convert every sprite/sound/font/tileset
 python3 tools/yellow_convert.py --stage scripts # convert assets plus all GMS2 scripts
-.venv/bin/python -m pytest -q                  # offline unit tests + live gates when fetched
+python3 tools/yellow_convert.py --stage objects # convert assets, scripts and all 3 224 objects
+.venv/bin/python -m pytest -q                   # offline unit tests + live gates when fetched
 ```
 
 Live gates skip (never pass silently) when `yellow_src/` is absent, and CI fetches it, so

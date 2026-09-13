@@ -530,17 +530,30 @@ class Emitter:
         else:
             raise CompileError(f"unsupported statement: {n}")
 
-    def function(self, ast, source="GML"):
+    def function_expression(self, ast, source="GML", prologue=()):
+        """The generated function *without* the module header, for embedding.
+
+        ``prologue`` lines are emitted inside the function, before the body.  The
+        Studio 2 front end uses them to bind an event's local functions into the
+        GML scope, which is the only place two objects can each own a function
+        with the same name without one shadowing the other.
+        """
+        for text in prologue:
+            self.line(text)
         self.stmt(ast)
         # Fall-through/exit have numeric zero return, as the original project's
         # option_variableerrors=false and keyboard_multicheck scripts require.
         self.line("return 0")
-        return f"-- Generated from {source}; edit the GMX/GML source or compiler.\nreturn function(R, E)\n" + "\n".join(self.lines) + "\nend\n"
+        return "function(R, E)\n" + "\n".join(self.lines) + "\nend"
+
+    def function(self, ast, source="GML", prologue=()):
+        body = self.function_expression(ast, source, prologue)
+        return f"-- Generated from {source}; edit the GMX/GML source or compiler.\nreturn {body}\n"
 
 
-def compile_gml(text: str, source="GML") -> tuple[str, tuple]:
-    ast = Parser(text).program()
-    compiled = Emitter().function(ast, source)
+def emit_module(ast, source="GML", resolver=None, prologue=()) -> str:
+    """One Lua module for one AST, partitioning a switch too large for LuaJIT."""
+    compiled = Emitter(resolver=resolver).function(ast, source, prologue)
     statements = [s for s in ast[1] if s[0] != "empty"]
     if len(compiled) > 200000 and len(statements) == 1 and statements[0][0] == "switch":
         # LuaJIT has a signed 16-bit jump limit. SCR_TEXT's large dispatch
@@ -555,11 +568,20 @@ def compile_gml(text: str, source="GML") -> tuple[str, tuple]:
             elif label[0] not in ("number", "string"):
                 raise CompileError("large switch labels must be constants")
             else:
-                out.append(f"labels[{Emitter().expr(label)}] = {i}")
-            emitter = Emitter()
+                out.append(f"labels[{Emitter(resolver=resolver).expr(label)}] = {i}")
+            emitter = Emitter(resolver=resolver)
             emitter.loops.append(("dispatch", None))
             emitter.stmt(body)
             out.append(f"handlers[{i}] = function(R, E)\n" + "\n".join(emitter.lines) + "\nend")
-        out.append("return function(R, E)\n    return R:dispatchSwitch(E, " + Emitter().expr(switch[1]) + f", labels, handlers, {default})\nend\n")
+        out.append("return function(R, E)")
+        out.extend("    " + line for line in prologue)
+        out.append("    return R:dispatchSwitch(E, " + Emitter(resolver=resolver).expr(switch[1])
+                   + f", labels, handlers, {default})")
+        out.append("end\n")
         compiled = "\n".join(out)
-    return compiled, ast
+    return compiled
+
+
+def compile_gml(text: str, source="GML") -> tuple[str, tuple]:
+    ast = Parser(text).program()
+    return emit_module(ast, source), ast
