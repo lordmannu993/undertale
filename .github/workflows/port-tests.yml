@@ -9,7 +9,8 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    # The Yellow fetch is a 309 MB pinned tarball with 58k files; keep the headroom.
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -18,7 +19,19 @@ jobs:
           cache: pip
           cache-dependency-path: requirements-dev.txt
       - run: python -m pip install -r requirements-dev.txt
-      - run: python -m pytest -q --junitxml=port-test-output/results.xml
+      - name: Cache the pinned Undertale Yellow tarball
+        uses: actions/cache@v4
+        with:
+          path: .yellow-cache
+          key: yellow-${{ hashFiles('port/yellow_source.json') }}
+      - name: Fetch the pinned Undertale Yellow decompilation
+        run: python tools/fetch_yellow.py --tarball-cache .yellow-cache
+      - name: Convert every Yellow sprite, sound, font and tileset
+        run: python tools/yellow_convert.py --stage assets
+      - name: Run the headless suite, Yellow live gates included
+        env:
+          PORT_REQUIRE_YELLOW: '1'
+        run: python -m pytest -q --junitxml=port-test-output/results.xml
       - name: Install native LOVE and a virtual display
         run: sudo apt-get update && sudo apt-get install -y love xvfb xauth
       - name: Test the packaged game with native graphics and touch callbacks

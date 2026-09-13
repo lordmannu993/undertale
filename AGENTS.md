@@ -12,6 +12,11 @@ export**. `tools/convert.py` translates the `.gmx`/`.gml` checkout into Lua unde
 GameMaker-semantics runtime; `tools/package.py` builds a `.love` release asset. It is
 explicitly **not a finished game** and every release note says so.
 
+Since piece 1 of the **Undertale Yellow merge** it also carries a GameMaker *Studio 2*
+front end (`tools/yellow/`, `tools/yellow_convert.py`, `tools/fetch_yellow.py`) that
+converts a second, fetched-on-demand project into the same runtime. That merge is the
+current job; its piece list is [docs/YELLOW.md](docs/YELLOW.md).
+
 ## Start here, in order
 
 1. `git fetch origin && git log --oneline origin/master -3` and `gh pr list --state all`.
@@ -22,6 +27,32 @@ explicitly **not a finished game** and every release note says so.
    small commits, one PR.
 5. Before pushing: `.venv/bin/python -m pytest -q` green, and update the piece list in the
    same commit. CI runs the rest (`pytest` **and** the native LÖVE gate).
+
+### Undertale Yellow merge: what to know before touching it
+
+- The goal is **one traversable world**: River Person boat rides (`obj_dogboat_thing`,
+  `SCR_TEXT` cases 587-585, destination `global.flag[459]`) and Yellow's UGPS mail whale
+  (`obj_mail_whale` → `obj_fast_travel_menu`, `global.fast_travel_list`) are the two hubs
+  that will connect the games. The owner explicitly rejected bolting Yellow items onto
+  Undertale shops as a shortcut.
+- The player is **Frisk** (`obj_mainchara`) everywhere. Clover is not playable; Yellow's
+  `obj_pl` keeps its mechanics but is drawn as Frisk, with Clover's `spr_pl_run_*` set
+  supplying the run animation the owner wants on the **X button**.
+- Frisk keeps Undertale's weapons/armours and gains Clover's **ammunition** (weapon
+  modifier: Rubber/Pebble/Silver/Glass/Ice Pellets/Cff Bean/Flint/Nails/Friendliness
+  Pellets, `scr_item_stats_weapon_mod`) and **accessories** (armour modifier: Patch,
+  Feather, Honeydew Pin, Band Merch Pin, Safety Jacket, Steel Buckle, Fancy Holster,
+  Safety Goggles, Silver Scarf, G. Bandana, Delta Rune Patch, Golden Scarf,
+  `scr_item_stats_armor_mod`).
+- Yellow assets are **never committed** (~580 MB). Fetch once with
+  `python3 tools/fetch_yellow.py` (309 MB tarball, ~11 s to extract, 856 MB on disk);
+  CI caches the tarball in `.yellow-cache/` and sets `PORT_REQUIRE_YELLOW=1` so the live
+  gates fail rather than skip. Without `yellow_src/`, those gates skip locally.
+- Yellow IDs live at `1000000 + the pinned Asset_Order ID`. Undertale's highest ID is
+  22,471, so the bands cannot meet; `tests/test_yellow_source.py` asserts that.
+- Ten sprite, ten object, twenty-one sound and one font name exist in **both** games.
+  The merged manifest must keep Undertale's `names` map and Yellow's beside it, never
+  overwrite one with the other.
 
 ### Sandbox gotchas that cost time
 
@@ -44,7 +75,8 @@ explicitly **not a finished game** and every release note says so.
 | --- | --- |
 | `master` | PRs 1-13 merged (through `229db7a`): the LÖVE port, touch controls and Android tooling, the v0.1.1-v0.1.3 softlock/sprite/scenery fixes, path-recovery pieces 1-5, registry and room-159 evidence, the v0.1.4-v0.1.7 publications, PR #11's Ruins spike-bridge softlock, X-skip text-overlap and touch COLLISION-toggle fixes, and PR #13's monster body-part ID recovery that fixed the reported "cannot battle in Snowdin — instance_create Missing object ID 255" crash |
 | Published release | `love-v0.1.8-experimental` (prerelease, 3 assets, checksum in notes) is published by the pinned workflow and carries PR #13's fix. `love-v0.1.5/6/7-experimental` stay up, renamed with a "Superseded —" prefix. Every published release is immutable: do not re-publish over it |
-| Open PR | none — PR #13 (monster body-part ID recovery + v0.1.8 publication) is merged |
+| Open PR | the Undertale Yellow merge, piece 1 of 5 (pinned source pipeline + all Yellow assets converted) |
+| Yellow merge | Piece 1 complete: `tools/fetch_yellow.py` pins commit `4ec23bd9` of `lordmannu993/UnderTale-Yellow`, `tools/yellow_convert.py --stage assets` converts 3,796 sprites / 673 sounds / 11 fonts / 112 tilesets into `generated/yellow/`, and Yellow's numeric IDs are recovered from two records inside that source. Pieces 2-5 (scripts, objects, rooms, the connected world) are not started. **No Yellow content runs yet.** |
 | Part-ID recovery | `tools/recover_parts.py` fetches nothing by default: the checked-in `port/recovered_parts.json` is imported by `convert.py`. Regenerate with `GITHUB_TOKEN="$(gh auth token)" python3 tools/recover_parts.py` (pinned to the same `249ffa27` ref as the registry/path recoveries), re-verify offline with `--check`. IDs come from this checkout's own `partN=` literals; only names are paired from upstream; 38 annotated sites are re-validated as anchors. `tests/test_monster_parts.py` guards all of it plus every Snowdin battlegroup end-to-end |
 | Old releases | `love-v0.1.0`..`love-v0.1.7-experimental` are **kept on purpose** (owner declined deletion) and renamed with a "Superseded (…)" prefix as each is replaced. Version branches `v0.1.0`..`v0.1.3` point at each tagged build |
 | Release plumbing | `.github/workflows/love-prerelease.yml` publishes on push to one pinned branch and **refuses unless a draft release with that tag already exists** |
@@ -88,7 +120,9 @@ want licence or legality re-litigated: record provenance in `docs/PATHS.md` and 
 ## Verification commands
 
 ```bash
-.venv/bin/python -m pytest -q                                   # headless suite (179 at time of writing)
+.venv/bin/python -m pytest -q                                   # headless suite (228 at time of writing)
+python3 tools/fetch_yellow.py --check                           # pinned Yellow source present and intact
+python3 tools/yellow_convert.py --stage assets                  # Yellow piece 1: 3,796 sprites, 673 sounds, 11 fonts, 112 tilesets
 python3 tools/recover_paths.py --check                          # path data still matches its pinned source
 python3 tools/package.py --output artifacts/check.love          # reproducible archive + report gates
 bash tools/native_smoke.sh artifacts/check.love                 # needs LOVE+xvfb: CI only

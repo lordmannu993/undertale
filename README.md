@@ -197,6 +197,36 @@ other rooms are not replaced by a generic background. Movement path point data
 is recovered and played back from v0.1.4 (docs/PATHS.md); frame-level fidelity
 against the original engine is not yet certified.
 
+## Undertale Yellow merge — in progress
+
+A second game is being merged into this port: **Undertale Yellow v1.2.1**, from the
+pinned public decompilation
+[`lordmannu993/UnderTale-Yellow`](https://github.com/lordmannu993/UnderTale-Yellow).
+The goal is **one traversable world**, not two builds side by side: Undertale's
+River Person and Yellow's UGPS mail whale each gain destinations into the other
+game's areas, Frisk is the only playable character (Clover's sprite set supplies
+what Frisk's does not have, including a run animation on the X button), Frisk
+keeps Undertale's weapons and armours and gains Clover's ammunition and
+accessories.
+
+Yellow is a GameMaker **Studio 2** project, so it needs its own front end before
+any of it can run. That work is split into five pieces, tracked in
+[docs/YELLOW.md](docs/YELLOW.md), each landed as its own pull request.
+
+| piece | what it delivers | state |
+|---|---|---|
+| 1 | Pinned source pipeline; every Yellow sprite, sound, font and tileset converted into the port's asset records, with Yellow's own numeric IDs recovered from two records inside the pinned source | **complete** |
+| 2 | GameMaker Studio 2 GML in the compiler; all 1,155 Yellow scripts converted | not started |
+| 3 | All 3,224 Yellow objects and their events | not started |
+| 4 | All 287 Yellow rooms, tile layers and paths | not started |
+| 5 | The connected world: cross-game travel, one Frisk, one inventory | not started |
+
+**Nothing of Yellow is playable yet.** Piece 1 converts assets; it does not make a
+single Yellow room, object or script run, and the published `.love` builds below
+still contain Undertale only. Yellow's ~580 MB of assets are fetched from the
+pinned commit at build time (`python3 tools/fetch_yellow.py`) and are never
+committed to this repository.
+
 ## Run with LÖVE
 
 Install **LÖVE 11.4 or 11.5** and **Python 3.10+**. No GameMaker installation or
@@ -267,13 +297,17 @@ screens still need testing.
 
 Start at [AGENTS.md](AGENTS.md): current state, the open piece list, sandbox gotchas
 (no LOVE in the sandbox, so the native gate runs in CI) and the rules this repo is
-built on. The per-claim detail for recovered data is in [docs/PATHS.md](docs/PATHS.md).
+built on. The per-claim detail for recovered data is in [docs/PATHS.md](docs/PATHS.md),
+and the Undertale Yellow merge has its own piece list in
+[docs/YELLOW.md](docs/YELLOW.md).
 
 ## Conversion and tests
 
 ```sh
 python3 -m pip install -r requirements-dev.txt
-python3 -m pytest -q
+python3 tools/fetch_yellow.py                 # optional: the pinned Yellow source (~309 MB)
+python3 tools/yellow_convert.py --stage assets # optional: piece 1 of the Yellow merge
+python3 -m pytest -q                           # 228 tests; Yellow live gates skip without the fetch
 ```
 
 The converter processes **173 scripts, 1,703 objects, and 334 rooms**, including
