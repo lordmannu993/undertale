@@ -2,6 +2,23 @@
 
 ## Executed in this workspace
 
+### 2026-09-13 — Undertale Yellow merge, piece 2
+
+- **234 tests passed** in the headless suite, including six new GMS2 compiler/runtime
+  checks; Undertale's existing runtime/compiler tests remain green.
+- `tools/yellow_convert.py --stage scripts --source yellow_src --output generated/yellow`
+  converted all **1,155** Yellow script resources into **1,155** Lua modules and
+  **1,137** named function exports from **66,812** source lines. The 22 GMLive
+  resources are explicit compatibility stops; no script was silently discarded.
+- The generated Yellow manifest was checked for name-resolved script entries and a
+  separate `yellow_names` namespace. Asset names retain the `1000000+ID` band;
+  script names are passed as strings, and Undertale's flat name map is not rebound.
+- All **1,230** generated Yellow Lua files compiled successfully with LuaJIT 2.1.
+  Runtime smoke checks covered `array_length_1d`, `is_undefined`, Yellow asset lookup,
+  visible unsupported stops, and injected numeric Undertale script functions.
+- Objects and rooms are intentionally still not executable: they remain pieces 3 and
+  4, so this validation does not claim a playable Yellow room or a merged `.love`.
+
 ### 2026-09-13 — Undertale Yellow merge, piece 1
 
 - **228 tests passed** in the headless suite (was 185): 43 new cases cover the

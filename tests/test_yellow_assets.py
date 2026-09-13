@@ -220,8 +220,22 @@ def test_tilesets_become_backgrounds_carrying_their_tile_grid(fixture):
 
 
 # -- the driver ------------------------------------------------------------
-def test_a_stage_that_is_not_built_yet_says_so_instead_of_emitting_half_a_game():
-    for stage, piece in (("scripts", 2), ("objects", 3), ("rooms", 4)):
+@live
+def test_script_stage_is_complete_but_later_stages_still_refuse_partial_games():
+    scripts = subprocess.run([sys.executable, "tools/yellow_convert.py", "--stage", "scripts"],
+                             cwd=ROOT, capture_output=True, text=True)
+    assert scripts.returncode == 0, scripts.stderr
+    assert "Converted Yellow GMS2 scripts: 1155 resources" in scripts.stdout
+    report = json.loads((ROOT / "generated/yellow/conversion-report.json").read_text())
+    assert report["stage"] == "scripts"
+    assert report["scripts"]["converted"] == 1155
+    assert report["scripts"]["functions"] == 1137
+    assert len(report["scripts"]["unsupported"]) == 22
+    assert len(list((ROOT / "generated/yellow/scripts").glob("*.lua"))) == 1155
+    manifest = (ROOT / "generated/yellow/manifest.lua").read_text()
+    assert '"keyboard_multicheck_pressed"' in manifest
+    assert '"yellow_names"' in manifest
+    for stage, piece in (("objects", 3), ("rooms", 4)):
         run = subprocess.run([sys.executable, "tools/yellow_convert.py", "--stage", stage],
                              cwd=ROOT, capture_output=True, text=True)
         assert run.returncode == 2, stage

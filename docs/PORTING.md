@@ -87,23 +87,24 @@ legacy Windows joystick poller; the old in-game joystick configuration is not
 used. All original debug keys remain available, but touch controls do **not**
 enable `global.debug`.
 
-## Undertale Yellow merge (piece 1 of 5)
+## Undertale Yellow merge (pieces 1-2 of 5)
 
 A second GameMaker project is being merged in: **Undertale Yellow v1.2.1**, a
 GameMaker **Studio 2 (2023.4.0.84)** decompilation fetched from one pinned commit
 (`port/yellow_source.json`) into the git-ignored `yellow_src/`. Piece list,
 architecture and the recorded deviations live in [YELLOW.md](YELLOW.md).
 
-What piece 1 adds to the pipeline, and what it deliberately does not claim:
+What pieces 1 and 2 add to the pipeline, and what they deliberately do not claim:
 
-| resource | Yellow count | piece 1 treatment |
+| resource | Yellow count | treatment through piece 2 |
 |---|---:|---|
 | Sprites | 3,799 IDs / 3,796 converted | Frame PNGs, origins, masks and animation metadata as GameMaker 1.4 records; 3 pinned IDs have no folder upstream and are listed, not substituted |
 | Sounds | 673 | Original audio files, volumes, durations |
 | Fonts | 11 | Bitmap atlases and every glyph, including the default-character glyph 9647 |
 | Tilesets | 112 | Texture page as a background plus the tile grid (`tile_width`, `out_columns`, `tile_count`, animation frames) needed by piece 4 |
-| Objects / rooms / scripts / paths | 3,224 / 287 / 1,155 / 68 | **IDs recovered, contents not converted yet** — pieces 2-4 |
-| Shaders / sequences / GMLive | 26 / 35 / present | No GameMaker 1.4 equivalent; enumerated for a visible stop, never substituted |
+| Objects / rooms / paths | 3,224 / 287 / 68 | **IDs recovered, contents not converted yet** — pieces 3-4 |
+| Scripts | 1,155 | All resources converted by piece 2; calls remain name-resolved and the 22 GMLive resources are explicit stops |
+| Shaders / sequences | 26 / 35 | No GameMaker 1.4 equivalent; enumerated for a visible stop, never substituted |
 
 Yellow's numeric IDs are recovered from two independent records inside the pinned
 source — `Undertale_Yellow.yyp`'s resource order and the decompiler's
@@ -112,16 +113,25 @@ disagree. Merged IDs are `1000000 + the Yellow ID`, so Undertale's recovered IDs
 (which reach 22,471) are untouched. Output goes to `generated/yellow/` with its
 own `conversion-report.json`.
 
+Piece 2 also adds `tools/gml2.py`, which adapts named GMS2 functions, enums, default
+parameters, array literals and loop declarations to the existing strict compiler;
+`port/yellow_builtins.lua` handles the GMS2 array/type/string/math/asset aliases and
+leaves unsupported Studio facilities as named `Runtime:unsupported` stops. The
+script manifest uses names rather than inventing a numeric GMS2 script index, and
+keeps Yellow names under `yellow_names` so a collision cannot rebind an Undertale
+name. Objects and rooms still require pieces 3 and 4.
+
 ## Reproducible pipeline
 
 ```text
-projectA.project.gmx + GMX/GML files
-              |
-      tools/convert.py
-      tools/gml.py (lexer, Pratt parser, Lua emitter)
-              |
-          generated/
-              |
+projectA.project.gmx + GMX/GML files       yellow_src/ + GMS2/GML files
+              |                                      |
+      tools/convert.py                    tools/yellow_convert.py
+      tools/gml.py (lexer, Pratt parser,   tools/gml2.py + tools/gml.py
+      Lua emitter)                         (GMS2 adapter + shared emitter)
+              |                                      |
+          generated/                         generated/yellow/
+              |                                      |
   port/runtime.lua + input/storage/graphics/audio/collision
               |
         tools/package.py

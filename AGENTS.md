@@ -12,10 +12,10 @@ export**. `tools/convert.py` translates the `.gmx`/`.gml` checkout into Lua unde
 GameMaker-semantics runtime; `tools/package.py` builds a `.love` release asset. It is
 explicitly **not a finished game** and every release note says so.
 
-Since piece 1 of the **Undertale Yellow merge** it also carries a GameMaker *Studio 2*
-front end (`tools/yellow/`, `tools/yellow_convert.py`, `tools/fetch_yellow.py`) that
-converts a second, fetched-on-demand project into the same runtime. That merge is the
-current job; its piece list is [docs/YELLOW.md](docs/YELLOW.md).
+Since pieces 1 and 2 of the **Undertale Yellow merge** it also carries a GameMaker
+*Studio 2* front end (`tools/yellow/`, `tools/gml2.py`, `tools/yellow_convert.py`,
+`tools/fetch_yellow.py`) that converts a second, fetched-on-demand project into the
+same runtime. That merge is the current job; its piece list is [docs/YELLOW.md](docs/YELLOW.md).
 
 ## Start here, in order
 
@@ -75,8 +75,8 @@ current job; its piece list is [docs/YELLOW.md](docs/YELLOW.md).
 | --- | --- |
 | `master` | PRs 1-13 merged (through `229db7a`): the LÖVE port, touch controls and Android tooling, the v0.1.1-v0.1.3 softlock/sprite/scenery fixes, path-recovery pieces 1-5, registry and room-159 evidence, the v0.1.4-v0.1.7 publications, PR #11's Ruins spike-bridge softlock, X-skip text-overlap and touch COLLISION-toggle fixes, and PR #13's monster body-part ID recovery that fixed the reported "cannot battle in Snowdin — instance_create Missing object ID 255" crash |
 | Published release | `love-v0.1.8-experimental` (prerelease, 3 assets, checksum in notes) is published by the pinned workflow and carries PR #13's fix. `love-v0.1.5/6/7-experimental` stay up, renamed with a "Superseded —" prefix. Every published release is immutable: do not re-publish over it |
-| Open PR | the Undertale Yellow merge, piece 1 of 5 (pinned source pipeline + all Yellow assets converted) |
-| Yellow merge | Piece 1 complete: `tools/fetch_yellow.py` pins commit `4ec23bd9` of `lordmannu993/UnderTale-Yellow`, `tools/yellow_convert.py --stage assets` converts 3,796 sprites / 673 sounds / 11 fonts / 112 tilesets into `generated/yellow/`, and Yellow's numeric IDs are recovered from two records inside that source. Pieces 2-5 (scripts, objects, rooms, the connected world) are not started. **No Yellow content runs yet.** |
+| Open PR | the Undertale Yellow merge, piece 2 of 5 (GMS2 compiler + all Yellow scripts converted) |
+| Yellow merge | Pieces 1-2 complete: `tools/fetch_yellow.py` pins commit `4ec23bd9` of `lordmannu993/UnderTale-Yellow`; `tools/yellow_convert.py --stage scripts` converts 3,796 sprites / 673 sounds / 11 fonts / 1,155 script resources into `generated/yellow/`, with 1,137 named function exports and 22 explicit GMLive stops. Yellow's numeric asset IDs are recovered from two records inside that source and scripts remain name-resolved. Pieces 3-5 (objects, rooms, the connected world) are not started. **No Yellow room runs yet.** |
 | Part-ID recovery | `tools/recover_parts.py` fetches nothing by default: the checked-in `port/recovered_parts.json` is imported by `convert.py`. Regenerate with `GITHUB_TOKEN="$(gh auth token)" python3 tools/recover_parts.py` (pinned to the same `249ffa27` ref as the registry/path recoveries), re-verify offline with `--check`. IDs come from this checkout's own `partN=` literals; only names are paired from upstream; 38 annotated sites are re-validated as anchors. `tests/test_monster_parts.py` guards all of it plus every Snowdin battlegroup end-to-end |
 | Old releases | `love-v0.1.0`..`love-v0.1.7-experimental` are **kept on purpose** (owner declined deletion) and renamed with a "Superseded (…)" prefix as each is replaced. Version branches `v0.1.0`..`v0.1.3` point at each tagged build |
 | Release plumbing | `.github/workflows/love-prerelease.yml` publishes on push to one pinned branch and **refuses unless a draft release with that tag already exists** |
@@ -120,9 +120,9 @@ want licence or legality re-litigated: record provenance in `docs/PATHS.md` and 
 ## Verification commands
 
 ```bash
-.venv/bin/python -m pytest -q                                   # headless suite (228 at time of writing)
+.venv/bin/python -m pytest -q                                   # headless suite (234 at this validation)
 python3 tools/fetch_yellow.py --check                           # pinned Yellow source present and intact
-python3 tools/yellow_convert.py --stage assets                  # Yellow piece 1: 3,796 sprites, 673 sounds, 11 fonts, 112 tilesets
+python3 tools/yellow_convert.py --stage scripts                 # Yellow pieces 1-2: assets plus 1,155 GMS2 script resources
 python3 tools/recover_paths.py --check                          # path data still matches its pinned source
 python3 tools/package.py --output artifacts/check.love          # reproducible archive + report gates
 bash tools/native_smoke.sh artifacts/check.love                 # needs LOVE+xvfb: CI only

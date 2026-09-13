@@ -31,7 +31,7 @@ objects → rooms → merged world. Each piece is one PR, merged before the next
 | # | piece | state |
 | --- | --- | --- |
 | 1 | Pinned source pipeline + merged asset registry + every sprite, sound, font and tileset texture converted | **complete** |
-| 2 | GMS2 GML: language support in the compiler, all 1 155 Yellow scripts converted, name→ID rewriting, GMS2 builtins in the runtime | not started |
+| 2 | GMS2 GML: language support in the compiler, all 1 155 Yellow scripts converted, name→ID rewriting, GMS2 builtins in the runtime | **complete** |
 | 3 | All 3 224 Yellow objects and their events, with parents, masks and collision-event targets | not started |
 | 4 | All 287 Yellow rooms: instances, creation code, tile layers from tilesets, backgrounds, views; plus the 68 paths | not started |
 | 5 | One world: River Person + UGPS cross-game destinations, Frisk as the only player (Clover's run sprites on X), Frisk's weapons/armours plus Clover's ammo/accessories, saves, packaging, release | not started |
@@ -102,11 +102,42 @@ Known deviations recorded by piece 1 (all reported, none hidden):
 | 3 sprite IDs in the order list have no folder on disk (`_filter_*` shader textures) | reported as missing, never substituted |
 | 112 `_decompiled_*_tileset` sprite folders are tileset texture pages, not sprites | mapped through their tileset's background ID, not the sprite list |
 
+## Piece 2, in detail
+
+Piece 2 adds the GMS2 script front end without changing the existing GMX front end:
+
+- `tools/gml2.py` extracts named GMS2 functions with a string/comment-aware scanner,
+  binds parameters and defaults to the existing GameMaker scope, removes enum
+  declarations after recovering their integer values, and reuses the strict Pratt
+  parser/emitter for arrays, loop declarations, compound/bitwise operators and the
+  GMS2 `@'...'` pragma argument form. Unsupported syntax remains a conversion error;
+  it is never turned into an empty function.
+- `tools/yellow_convert.py --stage scripts` runs the complete asset stage, then
+  emits one Lua module for each of the **1,155** project script folders. The pinned
+  checkout produced **1,137** named function exports from **66,812** source lines.
+  The 22 GMLive resources are emitted as named compatibility stops, so a live-editing
+  call fails visibly instead of becoming a no-op.
+- `generated/yellow/manifest.lua` keeps scripts name-resolved: `script_execute` and
+  direct calls use Yellow script names, never the decompiler's 2,345-entry synthetic
+  script audit list as invented runtime IDs. Asset/object/room/path names remain in
+  the nested `yellow_names` namespace, while Undertale's flat `names` map is not
+  rebound. Asset references are emitted in Yellow's disjoint `1000000+ID` band.
+- `port/yellow_builtins.lua` supplies the GMS2 array, type, string, math, asset,
+  instance, input and colour aliases used by the converted scripts. Studio facilities
+  without a safe 1.4 equivalent retain their builtin name and stop through
+  `Runtime:unsupported`; a generated script with the same name is never shadowed.
+  `Runtime:script` also continues to honor injected numeric GMX functions before
+  loading a generated module.
+
+Piece 2 converts and validates scripts, but it does not make Yellow playable by
+itself: objects and rooms remain pieces 3 and 4, so no Yellow room is entered yet.
+
 ## Verification
 
 ```bash
 python3 tools/fetch_yellow.py --check          # offline: is the pinned source really there?
 python3 tools/yellow_convert.py --stage assets # convert every sprite/sound/font/tileset
+python3 tools/yellow_convert.py --stage scripts # convert assets plus all GMS2 scripts
 .venv/bin/python -m pytest -q                  # offline unit tests + live gates when fetched
 ```
 

@@ -28,7 +28,7 @@ LEXER = re.compile(
     r"|(?P<string>\"(?:\\[\s\S]|[^\"\\])*\"|'(?:\\[\s\S]|[^'\\])*')"
     r"|(?P<number>\$[\da-fA-F]+|0[xX][\da-fA-F]+|(?:\d+\.\d*|\.\d+|\d+)(?:[eE][+-]?\d+)?)"
     r"|(?P<name>[a-zA-Z_][a-zA-Z_0-9]*)"
-    r"|(?P<op>\+\+|--|\+=|-=|\*=|/=|%=|==|!=|<>|<=|>=|&&|\|\||\^\^|<<|>>|[{}()\[\],;:.?+*/%<>=!~&|^\-])"
+    r"|(?P<op>\*\*=|\*\*|<<=|>>=|\+=|-=|\*=|/=|%=|&=|\|=|\^=|\+\+|--|==|!=|<>|<=|>=|&&|\|\||\^\^|\?\?|\.\.\.|<<|>>|[{}()\[\],;:.?+*/%<>=!~&|^\-@])"
 )
 
 
@@ -71,11 +71,11 @@ def quote(s: str) -> str:
 
 
 # AST nodes are tuples, kept intentionally simple so the audit can walk them.
-PRECEDENCE = {"or": 1, "||": 1, "xor": 2, "^^": 2, "and": 3, "&&": 3,
+PRECEDENCE = {"or": 1, "||": 1, "??": 1, "xor": 2, "^^": 2, "and": 3, "&&": 3,
               "|": 4, "^": 5, "&": 6, "=": 7, "==": 7, "!=": 7, "<>": 7,
               "<": 8, "<=": 8, ">": 8, ">=": 8, "<<": 9, ">>": 9,
-              "+": 10, "-": 10, "*": 11, "/": 11, "%": 11, "div": 11, "mod": 11}
-ASSIGN = {"=", "+=", "-=", "*=", "/=", "%="}
+              "+": 10, "-": 10, "*": 11, "/": 11, "%": 11, "div": 11, "mod": 11, "**": 12}
+ASSIGN = {"=", "+=", "-=", "*=", "/=", "%=", "&=", "|=", "^=", "<<=", ">>=", "**="}
 
 
 class Parser:
@@ -147,7 +147,10 @@ class Parser:
             return ("with", self.expr(), self.statement())
         if self.accept("for"):
             self.expect("(")
-            init = self.simple() if self.t.value != ";" else ("empty",)
+            if self.t.value in ("var", "globalvar"):
+                init = self.declaration(semicolon=False)
+            else:
+                init = self.simple() if self.t.value != ";" else ("empty",)
             self.expect(";")
             test = self.expr(equal=True) if self.t.value != ";" else ("number", "1")
             self.expect(";")
@@ -186,21 +189,31 @@ class Parser:
             self.accept(";")
             return ("return", val)
         if v in ("var", "globalvar"):
-            self.pop()
-            declarations = []
-            while True:
-                name = self.pop()
-                if name.kind != "name":
-                    self.fail("expected variable name")
-                value = self.expr() if self.accept("=") else ("number", "0")
-                declarations.append((name.value, value))
-                if not self.accept(","):
-                    break
-            self.accept(";")
-            return (v, declarations)
+            return self.declaration()
         node = self.simple()
         self.accept(";")
         return node
+
+    def declaration(self, semicolon=True):
+        """Parse a GML declaration, including the ``for (var i = ...)`` form.
+
+        Studio 2 emits loop declarations routinely.  Treating the declaration as
+        a normal statement keeps the zero-based/runtime scope semantics identical
+        in both compiler front ends.
+        """
+        kind = self.pop().value
+        declarations = []
+        while True:
+            name = self.pop()
+            if name.kind != "name":
+                self.fail("expected variable name")
+            value = self.expr() if self.accept("=") else ("number", "0")
+            declarations.append((name.value, value))
+            if not self.accept(","):
+                break
+        if semicolon:
+            self.accept(";")
+        return (kind, declarations)
 
     def simple(self):
         left = self.expr()
@@ -220,6 +233,22 @@ class Parser:
         elif tok.value == "(":
             node = self.expr(equal=equal)
             self.expect(")")
+        elif tok.value == "[":
+            items = []
+            if self.t.value != "]":
+                while True:
+                    items.append(self.expr(equal=equal))
+                    if not self.accept(","):
+                        break
+            self.expect("]")
+            node = ("array", items)
+        elif tok.value == "@":
+            # GMS2's @'...' form is used by gml_pragma.  It is a compiler
+            # directive, but preserving its payload is safer than dropping it.
+            value = self.pop()
+            if value.kind != "string":
+                self.fail("expected a string after @")
+            node = ("string", decode_string(value.value))
         elif tok.kind == "number":
             node = ("number", tok.value)
         elif tok.kind == "string":
@@ -281,11 +310,15 @@ def walk(node):
 
 
 class Emitter:
-    def __init__(self):
+    def __init__(self, resolver=None):
         self.lines = []
         self.indent = 1
         self.counter = 0
         self.loops = []
+        # Optional Studio 2 name resolver.  The GMX compiler leaves names as
+        # scope lookups; Yellow's front end resolves asset names to its merged
+        # numeric band (and script names to strings) before Lua is emitted.
+        self.resolver = resolver or {}
 
     def line(self, text):
         self.lines.append("    " * self.indent + text)
@@ -300,6 +333,8 @@ class Emitter:
         if op in ("&&", "and", "||", "or"):
             logical = "and" if op in ("&&", "and") else "or"
             return f"R.num(R.truth({a}) {logical} R.truth({b}))"
+        if op == "??":
+            return f"R.coalesce({a}, function() return {b} end)"
         if op in ("^^", "xor"):
             return f"R.num(R.truth({a}) ~= R.truth({b}))"
         if op in ("=", "==", "!=", "<>", "<", ">", "<=", ">="):
@@ -311,6 +346,8 @@ class Emitter:
             return f"R.div({a}, {b})"
         if op in ("&", "|", "^", "<<", ">>"):
             return f"R.bit.{ {'&':'band','|':'bor','^':'bxor','<<':'lshift','>>':'rshift'}[op]}({a}, {b})"
+        if op == "**":
+            return f"({a} ^ {b})"
         return f"({a} {op} {b})"
 
     def reference(self, n):
@@ -333,7 +370,17 @@ class Emitter:
         if k == "string":
             return quote(n[1])
         if k == "name":
-            return f"E[{quote(n[1])}]"
+            name = n[1]
+            resolved = self.resolver.get(name) if isinstance(self.resolver, dict) else self.resolver(name)
+            if resolved is not None:
+                return resolved if isinstance(resolved, str) and resolved.startswith(("R.", "function", "{")) else quote(resolved) if isinstance(resolved, str) else str(resolved)
+            if name == "undefined":
+                return "R.UNDEFINED"
+            return f"E[{quote(name)}]"
+        if k == "array":
+            # Lua's sequence operator is one-based, while both GM runtimes use
+            # zero-based arrays.  Explicit keys preserve empty/sparse literals.
+            return "{" + ",".join(f"[{i}]={self.expr(item)}" for i, item in enumerate(n[1])) + "}"
         if k in ("member", "index"):
             owner, key = self.reference(n)
             return f"R:get({owner}, {key}, E)"
@@ -391,7 +438,10 @@ class Emitter:
             self.line(f"local {o}, {q} = {owner}, {key}")
             rhs = self.expr(n[3])
             if n[1] != "=":
-                rhs = self.binary(n[1][0], f"R:get({o}, {q}, E)", rhs)
+                compound = {"+=": "+", "-=": "-", "*=": "*", "/=": "/", "%=": "%",
+                            "&=": "&", "|=": "|", "^=": "^", "<<=": "<<", ">>=": ">>", "**=": "*"}
+                rhs = self.binary("**" if n[1] == "**=" else compound.get(n[1], n[1][0]),
+                                  f"R:get({o}, {q}, E)", rhs)
             self.line(f"R:set({o}, {q}, {rhs}, E)")
             self.indent -= 1
             self.line("end")

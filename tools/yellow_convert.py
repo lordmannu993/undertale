@@ -6,15 +6,15 @@ Yellow is a GameMaker Studio 2 project; ``tools/convert.py`` reads GameMaker 1.4
 each piece of ``docs/YELLOW.md`` lands on its own, tested:
 
     --stage assets    every sprite, sound, font and tileset texture (piece 1)
-    --stage scripts   every Yellow script, name-resolved      (piece 2, not yet)
+    --stage scripts   every Yellow script, name-resolved      (piece 2)
     --stage objects   every Yellow object and event           (piece 3, not yet)
     --stage rooms     every Yellow room, tile layer and path   (piece 4, not yet)
 
 Output goes to ``generated/yellow/`` (git-ignored, rebuilt on demand) and always
 includes a report: what was converted, which IDs came from which pinned record,
-and every GameMaker Studio 2 fact this port had to reinterpret. A stage that is
-not implemented yet says so and exits non-zero; it never emits a half-converted
-game that looks complete.
+and every GameMaker Studio 2 fact this port had to reinterpret. Asset conversion
+is piece 1; script conversion builds on it for piece 2. Later stages still say so
+and exit non-zero; they never emit a half-converted game that looks complete.
 
 Usage::
 
@@ -32,6 +32,8 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
 
 from convert import lua  # noqa: E402 - same serialiser the .gmx converter uses
+from gml import CompileError, walk  # noqa: E402
+from gml2 import compile_gml2_functions  # noqa: E402
 from yellow.assets import AssetConverter  # noqa: E402
 from yellow.gms2 import GMS2Error  # noqa: E402
 from yellow.registry import YELLOW_BASE, Registry, collisions  # noqa: E402
@@ -39,6 +41,7 @@ from yellow.registry import YELLOW_BASE, Registry, collisions  # noqa: E402
 STAGES = ("assets", "scripts", "objects", "rooms")
 PIECE = {"scripts": 2, "objects": 3, "rooms": 4}
 ASSET_KINDS = ("sprites", "sounds", "fonts", "backgrounds")
+RESOURCE_KINDS = ("sprites", "objects", "rooms", "sounds", "fonts", "backgrounds", "paths")
 
 
 class Writer:
@@ -68,7 +71,8 @@ class Writer:
 
 
 def manifest_text(registry: Registry, provenance: dict, modules: list[tuple[str, str]], names: dict[str, int],
-                  prefix: str = "generated.yellow") -> str:
+                  prefix: str = "generated.yellow", scripts: dict | None = None,
+                  yellow_names: dict | None = None) -> str:
     manifest = {
         "format": 1,
         "game": "undertale-yellow",
@@ -76,14 +80,17 @@ def manifest_text(registry: Registry, provenance: dict, modules: list[tuple[str,
                    "fork_of": provenance.get("fork_of"), "gamemaker": provenance.get("gamemaker_version")},
         "yellow_base": YELLOW_BASE,
         "names": names,
-        "objects": {}, "scripts": {}, "rooms": {}, "room_order": [],
+        "yellow_names": yellow_names or {category: registry.names(category) for category in RESOURCE_KINDS},
+        "objects": {}, "scripts": scripts or {}, "rooms": {}, "room_order": [],
         "paths": {}, "path_points": {}, "missing_rooms": {}, "keys": [],
         "asset_modules": [{"kind": kind, "module": prefix + "." + module.replace("/", ".")}
                           for kind, module in modules],
     }
+    status = ("-- Piece 2 manifest: assets plus name-resolved GMS2 scripts.\n"
+              if scripts is not None else
+              "-- Partial manifest: piece 1 of docs/YELLOW.md converts assets only.\n")
     return ("-- Recovered Yellow asset IDs, never alphabetical indices.\n"
-            "-- Partial manifest: piece 1 of docs/YELLOW.md converts assets only.\n"
-            "return " + lua(manifest) + "\n")
+            + status + "return " + lua(manifest) + "\n")
 
 
 def stage_assets(registry: Registry, provenance: dict, writer: Writer, root: Path = ROOT,
@@ -137,13 +144,191 @@ def stage_assets(registry: Registry, provenance: dict, writer: Writer, root: Pat
     return report
 
 
+
+class ScriptConverter:
+    """Convert Yellow's on-disk GMS2 script resources by name.
+
+    Studio 2 does not give the decompiler a stable script index.  Asset names
+    still use the recovered ``YELLOW_BASE`` IDs, while script calls remain
+    explicit names in the manifest.  This avoids treating the 2,345-name
+    decompiler audit list (which includes synthetic ``gml_Script_*`` entries)
+    as 1,155 executable resources.
+    """
+
+    def __init__(self, registry: Registry, root: Path, provenance: dict, prefix: str):
+        self.registry = registry
+        self.source = registry.source
+        self.root = root
+        self.provenance = provenance
+        self.prefix = prefix
+        self.script_names = list(registry.project_order.get("scripts", []))
+        self.resolver: dict[str, int | str] = {}
+        for category in RESOURCE_KINDS:
+            # GMS2 has no stable runtime script index.  Its script section in
+            # Asset_Order also contains synthetic gml_Script_* audit entries,
+            # so never feed that numeric list to the expression resolver.
+            if category != "scripts":
+                self.resolver.update(registry.names(category))
+        # A script reference is a name, not an invented numeric ID.  The
+        # emitter writes these as string constants when they occur as values
+        # (script_execute(foo)); ordinary calls stay name-resolved in Runtime.
+        for name in self.script_names:
+            self.resolver[name] = name
+        self.records: dict[str, dict] = {}
+        self.calls: dict[str, int] = {}
+        self.rewrites: dict[str, int] = {}
+        self.unsupported: list[dict] = []
+        self.compile_errors: list[dict] = []
+        self.total_lines = 0
+        self.function_count = 0
+
+    def _note_calls(self, ast) -> None:
+        for node in walk(ast):
+            if node[0] == "call" and node[1][0] == "name":
+                name = node[1][1]
+                self.calls[name] = self.calls.get(name, 0) + 1
+            if node[0] == "name" and node[1] in self.resolver:
+                self.rewrites[node[1]] = self.rewrites.get(node[1], 0) + 1
+
+    @staticmethod
+    def _function_expr(code: str) -> str:
+        marker = "return function"
+        position = code.find(marker)
+        if position < 0:
+            raise CompileError("GMS2 emitter did not return a function")
+        return code[position + len("return "):].strip()
+
+    @staticmethod
+    def _unsupported_module(name: str, reason: str, functions: list[str]) -> str:
+        message = lua(f"{name}: {reason}")
+        fn = f"function(R, E) R:unsupported({lua(name)}, {message}) end"
+        if len(functions) == 1:
+            return "-- Explicit compatibility stop for an unsupported Studio 2 subsystem.\nreturn " + fn + "\n"
+        return "-- Explicit compatibility stops for an unsupported Studio 2 subsystem.\nlocal exports={}\n" + \
+            "\n".join(f"exports[{lua(function)}]={fn}" for function in functions) + "\nreturn exports\n"
+
+    def convert_one(self, name: str, writer: Writer) -> None:
+        path = self.source / "scripts" / name / f"{name}.gml"
+        if not path.is_file():
+            raise GMS2Error(f"scripts/{name}: missing GMS2 source file")
+        source = path.read_text(encoding="utf-8-sig", errors="replace")
+        self.total_lines += len(source.splitlines())
+        module = f"scripts/{name}"
+        # GMLive is deliberately not emulated.  It is a Studio extension and
+        # docs/YELLOW.md requires its use to stop visibly rather than becoming
+        # a no-op.  Keep every named export addressable for a precise stop.
+        if name.startswith("GMLive"):
+            import re
+            functions = re.findall(r"(?m)^\s*function\s+([A-Za-z_]\w*)\s*\(", source)
+            exports = functions or [name]
+            text = self._unsupported_module("GMLive", "GMLive/Steam live editing is not supported", exports)
+            writer.write(module + ".lua", text)
+            self.records[name] = {"module": self.prefix + "." + module.replace("/", "."),
+                                  "exports": exports, "status": "explicit-stop"}
+            self.unsupported.append({"script": name, "feature": "GMLive", "exports": exports,
+                                     "reason": "Studio live editing has no GameMaker 1.4 runtime equivalent"})
+            return
+        try:
+            records, meta = compile_gml2_functions(source, str(path), self.resolver)
+            self.function_count += len(records)
+            for _, _, ast in records:
+                self._note_calls(ast)
+            expressions = [(function, self._function_expr(code)) for function, code, _ in records]
+            if len(expressions) == 1:
+                text = "-- Generated from GMS2\nreturn " + expressions[0][1] + "\n"
+            else:
+                text = "-- Generated exports from GMS2\nlocal exports={}\n" + \
+                    "\n".join(f"exports[{lua(function)}]={expression}" for function, expression in expressions) + \
+                    "\nreturn exports\n"
+            writer.write(module + ".lua", text)
+            self.records[name] = {"module": self.prefix + "." + module.replace("/", "."),
+                                  "exports": [function for function, _ in expressions],
+                                  "enums": sorted(meta.get("enums", {})), "status": "converted"}
+        except (CompileError, RecursionError) as exc:
+            self.compile_errors.append({"script": name, "source": str(path), "error": str(exc)})
+
+    def run(self, writer: Writer) -> dict:
+        for name in self.script_names:
+            self.convert_one(name, writer)
+        # All on-disk project resources must have a module.  This is separate
+        # from compilation errors so a missing source can never look converted.
+        missing = sorted(set(self.script_names) - set(self.records))
+        if self.compile_errors:
+            raise CompileError(f"{len(self.compile_errors)} Yellow scripts failed; see the conversion report")
+        if missing:
+            raise GMS2Error(f"Yellow scripts without generated modules: {missing[:5]}")
+        modules: dict[str, str | dict] = {}
+        for name, record in self.records.items():
+            path = record["module"]
+            exports = record["exports"]
+            if len(exports) == 1 and exports[0] == "__main__":
+                modules[name] = path
+            elif len(exports) == 1:
+                modules[name] = {"module": path, "export": exports[0]}
+                modules.setdefault(exports[0], {"module": path, "export": exports[0]})
+            else:
+                for export in exports:
+                    modules[export] = {"module": path, "export": export}
+                # A resource name is still callable even when its file contains
+                # several decompiler functions; use the first named export only
+                # for the file-level alias.
+                modules.setdefault(name, {"module": path, "export": exports[0]})
+        return {
+            "converted": len(self.records), "functions": self.function_count,
+            "source_lines": self.total_lines, "compile_errors": self.compile_errors,
+            "unsupported": self.unsupported,
+            "calls": dict(sorted(self.calls.items())),
+            "builtin_calls": {name: self.calls[name] for name in sorted(self.calls) if name not in modules},
+            "name_rewrites": dict(sorted(self.rewrites.items())),
+            "script_modules": modules,
+            "script_names": self.script_names,
+        }
+
+
+def stage_scripts(registry: Registry, provenance: dict, writer: Writer, root: Path = ROOT,
+                  repository: Path = ROOT, prefix: str = "generated.yellow") -> dict:
+    """Build piece 1 assets plus every GMS2 script for piece 2."""
+    asset_report = stage_assets(registry, provenance, writer, root, repository, prefix)
+    converter = ScriptConverter(registry, root, provenance, prefix)
+    scripts = converter.run(writer)
+    asset_names = {category: registry.names(category) for category in RESOURCE_KINDS}
+    # Reuse the asset manifest's module list instead of reconstructing it from
+    # the serialized text.  stage_assets already wrote every module; its report
+    # is the canonical list of emitted asset files.
+    asset_modules = []
+    for item in asset_report.get("generated_files", []):
+        if item.startswith("assets/") and item.endswith(".lua"):
+            kind = item.split("/", 1)[1].split("_", 1)[0]
+            asset_modules.append((kind, item[:-4]))
+    manifest = manifest_text(registry, provenance, asset_modules,
+                             {name: value for category in ASSET_KINDS for name, value in registry.names(category).items()},
+                             prefix, scripts=scripts["script_modules"], yellow_names=asset_names)
+    writer.write("manifest.lua", manifest)
+    report = dict(asset_report)
+    report["stage"] = "scripts"
+    report["status"] = "experimental; Yellow assets and scripts are converted, but objects and rooms are not executable yet"
+    report["scripts"] = {key: value for key, value in scripts.items() if key != "script_modules"}
+    report["generated_files"] = sorted(writer.written + ["conversion-report.json"])
+    report["limitations"] = [
+        limitation for limitation in report.get("limitations", [])
+        if not limitation.startswith("Piece 1 converts assets only")
+    ] + [
+        "Piece 2 converts scripts only: Yellow objects, events and rooms remain unavailable until pieces 3 and 4.",
+        "GMS2 script names are resolved by name; the decompiler's synthetic gml_Script_* audit entries are not executable resources.",
+        "GMLive scripts are emitted as explicit compatibility stops because live editing has no safe Studio 1.4 equivalent.",
+        "GMS2 builtins without a handler remain named Runtime:unsupported stops; no call is silently discarded.",
+    ]
+    writer.write("conversion-report.json", json.dumps(report, indent=2, ensure_ascii=False) + "\n")
+    return report
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--stage", choices=STAGES, default="assets")
     parser.add_argument("--source", type=Path, default=ROOT / "yellow_src", help="fetched Yellow project tree")
     parser.add_argument("--output", type=Path, default=ROOT / "generated" / "yellow")
     args = parser.parse_args()
-    if args.stage != "assets":
+    if args.stage in ("objects", "rooms"):
         print(f"--stage {args.stage} is piece {PIECE[args.stage]} of docs/YELLOW.md and is not implemented yet.",
               file=sys.stderr)
         return 2
@@ -158,12 +343,18 @@ def main() -> int:
         parser.error("output must be a dedicated generated directory inside the repository, never .git")
     try:
         registry = Registry(args.source.resolve(), provenance)
-        report = stage_assets(registry, provenance, Writer(output), ROOT)
-    except (GMS2Error, OSError, ValueError) as exc:
+        writer = Writer(output)
+        report = (stage_scripts(registry, provenance, writer, ROOT, ROOT)
+                  if args.stage == "scripts" else stage_assets(registry, provenance, writer, ROOT))
+    except (GMS2Error, CompileError, OSError, ValueError) as exc:
         print(f"Yellow conversion failed: {exc}", file=sys.stderr)
         return 1
     assets = report["assets"]
     print("Converted Yellow assets: " + ", ".join(f"{kind}={count}" for kind, count in sorted(assets["converted"].items())))
+    if args.stage == "scripts":
+        print(f"Converted Yellow GMS2 scripts: {report['scripts']['converted']} resources, "
+              f"{report['scripts']['functions']} functions")
+        print(f"GMLive explicit stops: {len(report['scripts']['unsupported'])}")
     print(f"Recovered IDs from two pinned records: {assets['recovered_ids']}")
     print(f"Missing asset files: {len(assets['missing_asset_files'])}; "
           f"unrecoverable pinned IDs: {len(assets['unrecoverable_ids'])}; findings: {assets['findings']}")
