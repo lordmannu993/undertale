@@ -218,3 +218,23 @@ def test_the_yellow_band_cannot_reach_an_undertale_id(converted):
     assert highest < YELLOW_BASE, f"Undertale reaches ID {highest}; the Yellow band would collide"
     rooms = re.search(r'\["room_order"\]=\{(.*?)\}', manifest, re.S)
     assert max(int(v) for v in re.findall(r"-?\d+", rooms.group(1))) < YELLOW_BASE
+
+
+@pytest.mark.parametrize('cache_enabled', [False, True])
+def test_fetch_extracts_before_deleting_temporary_tarball(tmp_path, monkeypatch, cache_enabled):
+    record = dict(PROVENANCE)
+    monkeypatch.setattr(fetch_yellow, 'already_fetched', lambda _: False)
+    monkeypatch.setattr(fetch_yellow.tempfile, 'gettempdir', lambda: str(tmp_path))
+    observed = []
+    def download(_, path):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(b'verified archive')
+    def extract(_, path):
+        assert path.read_bytes() == b'verified archive'
+        observed.append(path)
+        return 123
+    monkeypatch.setattr(fetch_yellow, 'download', download)
+    monkeypatch.setattr(fetch_yellow, 'extract', extract)
+    monkeypatch.setattr(fetch_yellow, 'verify_index_files', lambda _: None)
+    assert fetch_yellow.fetch(record, tmp_path / 'cache' if cache_enabled else None, False) == 123
+    assert observed[0].exists() == cache_enabled

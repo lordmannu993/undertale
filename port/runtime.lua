@@ -363,6 +363,13 @@ function Runtime:create(objectIndex,x,y,spec,defer)
            hspeed=0,vspeed=0,speed=0,direction=0,friction=0,gravity=0,gravity_direction=270,
            alarm=defaults(-1),path_index=-1,path_position=0,path_positionprevious=0,
            path_speed=0,path_scale=1,path_orientation=0,path_endaction=0}}
+    if spec.yellow then
+        instance.v.depth=spec.depth
+        instance.v.image_index=spec.imageIndex
+        instance.v.image_speed=spec.imageSpeed
+        instance.v.image_alpha=math.floor(spec.colour/16777216)/255
+        if spec.layerVisible==false then instance.v.visible=false end
+    end
     self.instances[#self.instances+1]=instance;self.byId[id]=instance
     if not defer then self:event(instance,0,0) end
     return instance
@@ -396,6 +403,12 @@ function Runtime:roomData(index)
     return self.rooms[index]
 end
 function Runtime:loadRoom(index,first)
+    -- Reject unsupported Studio features BEFORE Room End/Clean Up mutate the
+    -- current world. Conversion preserves these features, never omits them.
+    local room=self:roomData(index)
+    if room.yellow and #(room.yellow.unsupported or {})>0 then
+        self:unsupported("room_goto("..room.name..")",table.concat(room.yellow.unsupported,"; "))
+    end
     self.pendingRoom=nil
     local persistent={}
     local old=copy(self.instances)
@@ -428,7 +441,6 @@ function Runtime:loadRoom(index,first)
     for _,i in ipairs(self.instances) do if i.alive and Runtime.truth(i.v.persistent) then persistent[#persistent+1]=i end end
     self.instances=persistent;self.byId={}
     for _,i in ipairs(persistent) do self.byId[i.id]=i end
-    local room=self:roomData(index)
     self.roomState={name=room.name,backdrop=room.port_backdrop,tiles={},backgrounds={},tileOffsets={},hiddenLayers={}}
     self.vars.room=index;self.vars.room_width=room.width;self.vars.room_height=room.height
     self.vars.room_speed=room.speed;self.vars.room_persistent=self.roomPersistence[index]~=nil and self.roomPersistence[index] or room.persistent
@@ -438,7 +450,7 @@ function Runtime:loadRoom(index,first)
         for _,field in ipairs({"xview","yview","wview","hview","xport","yport","wport","hport","visible"}) do
             self.vars["view_"..field][i-1]=view[field] or 0
         end
-        self.vars.view_object[i-1]=self.manifest.names[view.objName] or -1
+        self.vars.view_object[i-1]=view.object or self.manifest.names[view.objName] or -1
         self.vars.view_hborder[i-1]=view.hborder or 32;self.vars.view_vborder[i-1]=view.vborder or 32
         self.vars.view_hspeed[i-1]=view.hspeed or -1;self.vars.view_vspeed[i-1]=view.vspeed or -1
         self.vars.view_angle[i-1]=0

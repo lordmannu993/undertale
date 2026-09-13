@@ -8,14 +8,13 @@ each piece of ``docs/YELLOW.md`` lands on its own, tested:
     --stage assets    every sprite, sound, font and tileset texture (piece 1)
     --stage scripts   every Yellow script, name-resolved      (piece 2)
     --stage objects   every Yellow object and event           (piece 3)
-    --stage rooms     every Yellow room, tile layer and path   (piece 4, not yet)
+    --stage rooms     every Yellow room, tile layer and path   (piece 4)
 
 Output goes to ``generated/yellow/`` (git-ignored, rebuilt on demand) and always
 includes a report: what was converted, which IDs came from which pinned record,
 and every GameMaker Studio 2 fact this port had to reinterpret. Asset conversion
 is piece 1, script conversion builds on it for piece 2 and object conversion on
-both for piece 3. The room stage still says so and exits non-zero; no stage ever
-emits a half-converted game that looks complete.
+both for piece 3. Room conversion builds on all three stages; unsupported features remain named stops.
 
 Usage::
 
@@ -37,7 +36,8 @@ from gml import CompileError, walk  # noqa: E402
 from gml2 import compile_gml2_functions, function_expression  # noqa: E402
 from yellow.assets import AssetConverter  # noqa: E402
 from yellow.gms2 import GMS2Error  # noqa: E402
-from yellow.objects import ObjectConverter  # noqa: E402
+from yellow.objects import ObjectConverter
+from yellow.rooms import RoomConverter  # noqa: E402
 from yellow.registry import YELLOW_BASE, Registry, collisions  # noqa: E402
 
 STAGES = ("assets", "scripts", "objects", "rooms")
@@ -75,7 +75,7 @@ class Writer:
 def manifest_text(registry: Registry, provenance: dict, modules: list[tuple[str, str]], names: dict[str, int],
                   prefix: str = "generated.yellow", scripts: dict | None = None,
                   yellow_names: dict | None = None, objects: dict | None = None,
-                  keys: list[int] | None = None, mouse_events: list[int] | None = None) -> str:
+                  keys: list[int] | None = None, mouse_events: list[int] | None = None, rooms=None) -> str:
     manifest = {
         "format": 1,
         "game": "undertale-yellow",
@@ -92,6 +92,8 @@ def manifest_text(registry: Registry, provenance: dict, modules: list[tuple[str,
         "asset_modules": [{"kind": kind, "module": prefix + "." + module.replace("/", ".")}
                           for kind, module in modules],
     }
+    if rooms is not None:
+        manifest.update(rooms=rooms.modules, room_order=rooms.order, paths=rooms.paths, path_points=rooms.path_points)
     if objects is not None:
         status = "-- Piece 3 manifest: assets, name-resolved GMS2 scripts and every Yellow object.\n"
     elif scripts is not None:
@@ -373,16 +375,35 @@ def stage_objects(registry: Registry, provenance: dict, writer: Writer, root: Pa
     return report
 
 
+def stage_rooms(registry: Registry, provenance: dict, writer: Writer, root: Path = ROOT,
+                repository: Path = ROOT, prefix: str = "generated.yellow") -> dict:
+    report = stage_objects(registry, provenance, writer, root, repository, prefix)
+    converter = RoomConverter(registry, root, provenance, prefix)
+    report["rooms"] = converter.run(writer)
+    writer.write("manifest.lua", manifest_text(
+        registry, provenance, asset_module_pairs(report),
+        {name: value for category in ASSET_KINDS for name, value in registry.names(category).items()},
+        prefix, scripts=report["script_modules"],
+        objects={registry.merged("objects", name): prefix + ".objects." + name
+                 for name in registry.project_order["objects"]},
+        keys=report["objects"]["keyboard_keys"], mouse_events=report["objects"]["mouse_subtypes"], rooms=converter))
+    report["stage"] = "rooms"
+    report["status"] = "experimental room conversion; not a connected or playable Yellow game"
+    report["limitations"] = [s for s in report["limitations"]
+                              if not s.startswith("Piece 3 converts objects only")]
+    report["limitations"].append("Unsupported room features stop before room entry; see rooms.unsupported. "
+                                  "Cross-game travel, state, packaging and release remain piece 5.")
+    report["generated_files"] = sorted(writer.written)
+    writer.write("conversion-report.json", json.dumps(report, indent=2, ensure_ascii=False) + "\n")
+    return report
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--stage", choices=STAGES, default="assets")
     parser.add_argument("--source", type=Path, default=ROOT / "yellow_src", help="fetched Yellow project tree")
     parser.add_argument("--output", type=Path, default=ROOT / "generated" / "yellow")
     args = parser.parse_args()
-    if args.stage in ("rooms",):
-        print(f"--stage {args.stage} is piece {PIECE[args.stage]} of docs/YELLOW.md and is not implemented yet.",
-              file=sys.stderr)
-        return 2
     provenance_path = ROOT / "port" / "yellow_source.json"
     try:
         provenance = json.loads(provenance_path.read_text())
@@ -395,18 +416,18 @@ def main() -> int:
     try:
         registry = Registry(args.source.resolve(), provenance)
         writer = Writer(output)
-        report = {"scripts": stage_scripts, "objects": stage_objects}.get(args.stage, stage_assets)(
+        report = {"scripts": stage_scripts, "objects": stage_objects, "rooms": stage_rooms}.get(args.stage, stage_assets)(
             registry, provenance, writer, ROOT, ROOT)
     except (GMS2Error, CompileError, OSError, ValueError) as exc:
         print(f"Yellow conversion failed: {exc}", file=sys.stderr)
         return 1
     assets = report["assets"]
     print("Converted Yellow assets: " + ", ".join(f"{kind}={count}" for kind, count in sorted(assets["converted"].items())))
-    if args.stage in ("scripts", "objects"):
+    if args.stage in ("scripts", "objects", "rooms"):
         print(f"Converted Yellow GMS2 scripts: {report['scripts']['converted']} resources, "
               f"{report['scripts']['functions']} functions")
         print(f"GMLive explicit stops: {len(report['scripts']['unsupported'])}")
-    if args.stage == "objects":
+    if args.stage in ("objects", "rooms"):
         objects = report["objects"]
         print(f"Converted Yellow objects: {objects['converted']} objects, {objects['events']} events "
               f"({objects['source_lines']:,} GML lines)")
@@ -416,6 +437,9 @@ def main() -> int:
             print("Converted but not dispatched: "
                   + ", ".join(f"{name} ({count['objects']} objects)"
                               for name, count in objects["undispatched_events"].items()))
+    if args.stage == "rooms":
+        print(f"Converted Yellow rooms: {report['rooms']['converted']}; paths: {report['rooms']['paths']}; "
+              f"named room feature stops: {len(report['rooms']['unsupported'])}")
     print(f"Recovered IDs from two pinned records: {assets['recovered_ids']}")
     print(f"Missing asset files: {len(assets['missing_asset_files'])}; "
           f"unrecoverable pinned IDs: {len(assets['unrecoverable_ids'])}; findings: {assets['findings']}")

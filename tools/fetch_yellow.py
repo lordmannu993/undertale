@@ -185,10 +185,12 @@ def fetch(record: dict, cache: Path | None, force: bool) -> int:
         if tarball.is_file():
             tarball.unlink()
         download(record, tarball)
+    try:
+        count = extract(record, tarball)
+        verify_index_files(record)
+    finally:
         if cache is None:
             tarball.unlink(missing_ok=True)
-    count = extract(record, tarball)
-    verify_index_files(record)
     print(f"Extracted {count} files into {record['extract_to']}/ at commit {record['ref'][:12]}.")
     return count
 
