@@ -3,14 +3,22 @@
 local Runtime = {}
 Runtime.__index = Runtime
 Runtime.SWITCH_BREAK = {}
+-- GMS2 has a distinct undefined value.  A sentinel keeps comparisons and
+-- is_undefined() meaningful without making Lua's nil erase array members.
+Runtime.UNDEFINED = setmetatable({}, {__tostring=function() return "undefined" end})
 Runtime.bit = require("bit")
 local atan2 = math.atan2
 local unpack = unpack
 
 function Runtime.num(b) return b and 1 or 0 end
 function Runtime.truth(v)
+    if v==Runtime.UNDEFINED then return false end
     if type(v)=="number" then return v>0.5 end
     return v~=nil and v~=false
+end
+function Runtime.coalesce(value, fallback)
+    if value==nil or value==Runtime.UNDEFINED then return fallback() end
+    return value
 end
 function Runtime.add(a,b)
     if type(a)=="string" and type(b)=="string" then return a..b end
@@ -32,7 +40,7 @@ end
 
 function Runtime.new(manifest,input,options)
     local self=setmetatable({manifest=manifest,input=input,options=options or {},global=defaults(0),
-        vars={},constants=copy(manifest.names),instances={},byId={},objects={},scripts={},rooms={},
+        vars={},constants=copy(manifest.names or {}),instances={},byId={},objects={},scripts={},rooms={},
         assets={sprites={},backgrounds={},sounds={},fonts={}},builtins={},warnings={},warningList={},
         storedRooms={},roomPersistence={},nextId=200000,frame=0,budget=0,globalNames={},currentEvent=nil,
         pathData={},roomState=nil},Runtime)
@@ -51,7 +59,17 @@ function Runtime.new(manifest,input,options)
         ev_create=0,ev_destroy=1,ev_alarm=2,ev_step=3,ev_collision=4,ev_keyboard=5,
         ev_other=7,ev_draw=8,ev_keypress=9,ev_keyrelease=10,ev_step_normal=0,ev_step_begin=1,ev_step_end=2}
     constants["true"],constants["false"]=1,0
+    constants["undefined"]=Runtime.UNDEFINED
     for k,v in pairs(constants) do self.constants[k]=v end
+    -- Yellow keeps its complete name map beside Undertale's original flat
+    -- names table.  Asset references in generated Yellow code are already
+    -- rewritten, but exposing the map here makes mixed-world scripts resolve
+    -- the same way when a later piece selects a name dynamically.
+    for _,category in pairs(manifest.yellow_names or {}) do
+        for name,value in pairs(category) do
+            if self.constants[name]==nil then self.constants[name]=value end
+        end
+    end
     self.constants.working_directory="";self.constants.program_directory=""
     self.vars.mouse_x=0;self.vars.mouse_y=0
     self.vars.os_type=(love and love.system and love.system.getOS()=="Android") and 5 or 0
@@ -74,6 +92,7 @@ function Runtime.new(manifest,input,options)
     require("port.audio")(self)
     require("port.graphics").install(self)
     require("port.collision").install(self)
+    require("port.yellow_builtins")(self)
     return self
 end
 
@@ -168,28 +187,34 @@ function Runtime:scope(instance,other,args,locals)
     local env={_scope=true,_self=instance,_other=other,_args=args or {},_locals=locals or {}}
     return setmetatable(env,{
         __index=function(E,key)
-            if E._locals[key]~=nil then return E._locals[key] end
+            local locals=rawget(E,"_locals") or {}
+            local self_instance=rawget(E,"_self")
+            local other_instance=rawget(E,"_other")
+            local args=rawget(E,"_args") or {}
+            if locals[key]~=nil then return locals[key] end
             if key=="global" then return R.global end
-            if key=="self" then return E._self and E._self.id or -4 end
-            if key=="other" then return E._other and E._other.id or -4 end
-            if key=="argument_count" then return #E._args end
-            if key=="argument" then local a=defaults(0);for i,v in ipairs(E._args) do a[i-1]=v end;return a end
+            if key=="self" then return self_instance and self_instance.id or -4 end
+            if key=="other" then return other_instance and other_instance.id or -4 end
+            if key=="argument_count" then return #args end
+            if key=="argument" then local a=defaults(0);for i,v in ipairs(args) do a[i-1]=v end;return a end
             local arg=key:match("^argument(%d+)$")
-            if arg then return E._args[tonumber(arg)+1] or 0 end
+            if arg then return args[tonumber(arg)+1] or 0 end
             if R.globalNames[key] then return R.global[key] end
             if R.constants[key]~=nil then return R.constants[key] end
             if key=="keyboard_lastkey" then return R.input.lastkey end
             if key=="instance_count" then return #R:select(-3,E) end
             if R.vars[key]~=nil then return R.vars[key] end
-            if E._self then return R:instanceGet(E._self,key) end
+            if self_instance then return R:instanceGet(self_instance,key) end
             return 0
         end,
         __newindex=function(E,key,val)
-            if E._locals[key]~=nil then E._locals[key]=val
+            local locals=rawget(E,"_locals") or {}
+            local self_instance=rawget(E,"_self")
+            if locals[key]~=nil then locals[key]=val
             elseif R.globalNames[key] then R.global[key]=val
             elseif R.vars[key]~=nil then
                 if key=="room" then R:gotoRoom(val) else R.vars[key]=val end
-            elseif E._self then R:instanceSet(E._self,key,val)
+            elseif self_instance then R:instanceSet(self_instance,key,val)
             else R.vars[key]=val end
         end,
     })
@@ -233,14 +258,44 @@ end
 function Runtime:call(name,E,...)
     local builtin=self.builtins[name]
     if builtin then return builtin(E,...) or 0 end
-    local index=self.manifest.names[name]
-    if index and self.manifest.scripts[index] then return self:script(index,E,...) end
+    -- GMS2 scripts are name-resolved because Studio 2 does not expose a stable
+    -- script index to the decompiler.  Prefer that string key before checking
+    -- the GMX name-to-numeric-index table, so a cross-game name collision can
+    -- never redirect a Yellow call through Undertale's numeric namespace.
+    local scripts=self.manifest.scripts or {}
+    if scripts[name] then return self:script(name,E,...) end
+    local index=(self.manifest.names or {})[name]
+    if index~=nil and scripts[index] then return self:script(index,E,...) end
     self:unsupported(name,"Unknown GML function. Nothing was silently stubbed.")
 end
 function Runtime:script(index,E,...)
-    local path=self.manifest.scripts[index]
-    if not path then self:unsupported("script_execute", "Missing original script ID "..tostring(index)) end
-    local fn=self.scripts[index] or require(path);self.scripts[index]=fn
+    local scripts=self.manifest.scripts or {}
+    local entry=scripts[index]
+    if not entry then self:unsupported("script_execute", "Missing original script "..tostring(index)) end
+    local path,export
+    if type(entry)=="table" then path,export=entry.module,entry.export else path=entry end
+    if type(path)~="string" then self:unsupported("script_execute", "Malformed generated script entry "..tostring(index)) end
+
+    -- Tests, overlays and the generated Undertale compatibility layer may
+    -- inject a callable under the numeric GMX script ID.  Prefer that value
+    -- over loading a module; otherwise a harmless refactor of the module cache
+    -- would silently change script_execute semantics.
+    local loaded=self.scripts[index]
+    local injected=loaded~=nil
+    if not injected then
+        loaded=self.scripts[path]
+    end
+    if loaded==nil then
+        loaded=require(path)
+        self.scripts[path]=loaded
+    end
+    local fn=loaded
+    if type(loaded)=="table" then
+        fn=loaded[export or "__main"] or loaded[index] or loaded.main
+    end
+    if type(fn)~="function" then
+        self:unsupported("script_execute", "Generated script "..tostring(index).." has no callable export")
+    end
     return fn(self,self:scope(E._self,E._other,{...})) or 0
 end
 function Runtime:dispatchSwitch(E,value,labels,handlers,default)
