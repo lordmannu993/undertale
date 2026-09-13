@@ -2,6 +2,32 @@
 
 ## Executed in this workspace
 
+### 2026-09-13 — Undertale Yellow merge, piece 1
+
+- **228 tests passed** in the headless suite (was 185): 43 new cases cover the
+  pinned-source pipeline and the Yellow asset conversion.
+- `tools/fetch_yellow.py --check` verified the fetched tree against the pinned
+  commit `4ec23bd9`, the tarball digest and the digests of both ID records.
+- `tools/yellow_convert.py --stage assets` converted **3,796 sprites, 673 sounds,
+  11 fonts and 112 tilesets** with **0 missing asset files**; the only pinned IDs
+  it could not convert are the three `_filter_*` shader textures upstream never
+  shipped, and they are listed rather than substituted.
+- The real Yellow manifest was loaded by the unmodified LÖVE runtime through
+  LuaJIT: all four asset kinds resolve, `spr_pl_run_down` is ID `1000018` with its
+  6 frames, 20x32 size and custom origin `(9, 17)`, and `fnt_main`'s glyphs are
+  addressable.
+- Every asset file the emitted records point at (over 18,000 of them) was
+  confirmed present on disk, and re-running the conversion reproduced the
+  manifest byte for byte.
+- Undertale is untouched: the existing 185 tests, the converter's own report and
+  the native LÖVE gate all still pass, and Undertale's highest ID (22,471) stays
+  far below the Yellow band (1,000,000).
+- Not validated by piece 1, because piece 1 does not do it: no Yellow script,
+  object or room runs; no Yellow room can be entered; shaders, sequences and
+  nine-slice drawing are still unsupported; the merged `.love` still contains
+  Undertale only.
+
+
 Validation date: **2026-09-07** (v0.1.4).
 
 - Converted all **20,285** source units with **zero parse failures**.

@@ -87,6 +87,31 @@ legacy Windows joystick poller; the old in-game joystick configuration is not
 used. All original debug keys remain available, but touch controls do **not**
 enable `global.debug`.
 
+## Undertale Yellow merge (piece 1 of 5)
+
+A second GameMaker project is being merged in: **Undertale Yellow v1.2.1**, a
+GameMaker **Studio 2 (2023.4.0.84)** decompilation fetched from one pinned commit
+(`port/yellow_source.json`) into the git-ignored `yellow_src/`. Piece list,
+architecture and the recorded deviations live in [YELLOW.md](YELLOW.md).
+
+What piece 1 adds to the pipeline, and what it deliberately does not claim:
+
+| resource | Yellow count | piece 1 treatment |
+|---|---:|---|
+| Sprites | 3,799 IDs / 3,796 converted | Frame PNGs, origins, masks and animation metadata as GameMaker 1.4 records; 3 pinned IDs have no folder upstream and are listed, not substituted |
+| Sounds | 673 | Original audio files, volumes, durations |
+| Fonts | 11 | Bitmap atlases and every glyph, including the default-character glyph 9647 |
+| Tilesets | 112 | Texture page as a background plus the tile grid (`tile_width`, `out_columns`, `tile_count`, animation frames) needed by piece 4 |
+| Objects / rooms / scripts / paths | 3,224 / 287 / 1,155 / 68 | **IDs recovered, contents not converted yet** — pieces 2-4 |
+| Shaders / sequences / GMLive | 26 / 35 / present | No GameMaker 1.4 equivalent; enumerated for a visible stop, never substituted |
+
+Yellow's numeric IDs are recovered from two independent records inside the pinned
+source — `Undertale_Yellow.yyp`'s resource order and the decompiler's
+`notes/Asset_Order/Asset_Order.txt` — and the converter refuses to run if they
+disagree. Merged IDs are `1000000 + the Yellow ID`, so Undertale's recovered IDs
+(which reach 22,471) are untouched. Output goes to `generated/yellow/` with its
+own `conversion-report.json`.
+
 ## Reproducible pipeline
 
 ```text
