@@ -319,6 +319,9 @@ It has not been executed as part of this change.
 - **PAUSE** provides size/opacity adjustment, left-handed layout, optional
   vibration, reset, a control tester, and (from v0.1.7) a runtime-only
   **COLLISION** toggle for testing.
+- **AUTO RUN** (merged build): PAUSE also shows **AUTO RUN: ON/OFF**, saved with
+  the other settings. It drives Undertale Yellow's own option of that name —
+  moving runs, and the run button (**X**) walks instead.
 - Android **Back** pauses. Desktop **F2** opens the same pause screen.
 - Simultaneous fingers, gamepads, and physical keys have independent ownership;
   lifting one source does not cancel another. Short taps survive between ticks.

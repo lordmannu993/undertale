@@ -307,3 +307,83 @@ def test_papyrus4_randoblock_completes_without_softlock(lua):
         assert(R.global.plot==58, "plot="..tostring(R.global.plot)..", expected 58")
         assert(R.global.interact==0, "player control was not restored")
     ''')
+
+
+def test_touch_autorun_toggle_drives_the_pause_menu_setting(lua):
+    """AUTO RUN is a persisted pause-menu setting, not a runtime-only toggle.
+
+    It is the port's spelling of Undertale Yellow's own option of that name:
+    with it on, moving runs and the run button walks. Its callback is wired in
+    main.lua; here the menu button, the label, the persisted setting and the
+    callback are all exercised together, and RESET CONTROLS must turn it off
+    again because it is one of the defaults.
+    """
+    lua.execute('''
+        local Touch=require("port.touch")
+        local touch=Touch.new(input,false)
+        touch:resize(960,540)
+        assert(touch.settings.autorun == false, "AUTO RUN must default to off")
+        local applied=nil
+        -- Wired exactly like main.lua's love.load does.
+        touch.onAutorun=function(enabled) applied=enabled end
+        local function autorunButton()
+            for _,b in ipairs(touch.menuButtons) do if b.action=="autorun" then return b end end
+        end
+        local function fits()
+            local m=touch.menu
+            for _,b in ipairs(touch.menuButtons) do
+                assert(b.x>=m.x and b.y>=m.y and b.x+b.w<=m.x+m.w+0.01 and b.y+b.h<=m.y+m.h+0.01,
+                    "menu button escapes the panel: "..b.label)
+            end
+        end
+        fits()
+        local button=autorunButton()
+        assert(button and button.label=="AUTO RUN: OFF", "the pause menu has no AUTO RUN row")
+        touch:setPaused(true)
+        touch:pressed("finger", button.x+button.w/2, button.y+button.h/2)
+        assert(touch.settings.autorun == true and applied == true,
+            "tapping AUTO RUN must turn the setting on and notify the game")
+        assert(autorunButton().label == "AUTO RUN: ON", "the button label did not refresh")
+        touch:pressed("finger", autorunButton().x+2, autorunButton().y+2)
+        assert(touch.settings.autorun == false and applied == false,
+            "tapping AUTO RUN again must turn the setting off")
+        assert(autorunButton().label == "AUTO RUN: OFF")
+        -- RESET CONTROLS restores the defaults, AUTO RUN included.
+        touch.settings.autorun=true
+        touch:pressed("finger", autorunButton().x+2, autorunButton().y+2)  -- off
+        for _,b in ipairs(touch.menuButtons) do
+            if b.action=="reset" then touch:pressed("reset", b.x+2, b.y+2) end
+        end
+        assert(touch.settings.autorun == false, "reset must leave AUTO RUN off")
+        -- The eighth button must still fit on a small phone panel.
+        touch:resize(480,320)
+        fits()
+        assert(autorunButton().label == "AUTO RUN: OFF")
+    ''')
+
+
+def test_touch_settings_persist_autorun_across_launches(lua):
+    """AUTO RUN is written to touch-settings-v1.txt and read back on launch."""
+    lua.execute('''
+        local files={}
+        love={filesystem={
+            read=function(name) return files[name] end,
+            write=function(name,data) files[name]=data; return true end,
+            getInfo=function() return nil end,
+        }}
+        local Touch=require("port.touch")
+        local touch=Touch.new(input,false)
+        touch:resize(960,540)
+        touch.settings.autorun=true
+        touch:save()
+        local written=files["touch-settings-v1.txt"]
+        assert(written and written:find("autorun=true",1,true),
+            "AUTO RUN was not written to the touch settings file: "..tostring(written))
+        local reloaded=Touch.new(input,false)
+        assert(reloaded.settings.autorun == true, "AUTO RUN did not survive a relaunch")
+        reloaded.settings.autorun=false
+        reloaded:save()
+        assert(files["touch-settings-v1.txt"]:find("autorun=false",1,true),
+            "turning AUTO RUN off must be saved too")
+        love=nil
+    ''')

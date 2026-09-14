@@ -35,6 +35,14 @@ local WHALE_DESTINATIONS = {
 -- while Yellow checks ord("X") itself. Holding either counts as holding X.
 local X_BUTTONS = {88, 16}
 
+-- AUTO RUN is Undertale Yellow's own option (obj_config case 4, ini
+-- "Controls"/"autorun"), and it means exactly what the pause-menu label says:
+-- scr_normal_state sprints whenever the player is moving and the run cluster
+-- is untouched, so walking runs; holding the run cluster then walks instead.
+-- The value is a number, exactly as ini_read_real produces it - Yellow's own
+-- checks compare it against GML's true/false (1/0).
+local AUTORUN_ON, AUTORUN_OFF = 1, 0
+
 function Travel.install(R)
     if R.manifest.game ~= "merged" then return nil end
     local base = R.manifest.yellow_base or 1000000
@@ -67,6 +75,10 @@ function Travel.install(R)
     local gotoRoom = R.gotoRoom
     function R:gotoRoom(index)
         return gotoRoom(self, travel:resolve(index))
+    end
+    -- The port's AUTO RUN setting, applied through the game's own global.
+    function R:setAutorun(value)
+        travel:setAutorun(value)
     end
     local loadRoom = R.loadRoom
     function R:loadRoom(...)
@@ -161,6 +173,8 @@ function Travel:beginCrossing(world, room)
         -- scr_initialize leaves the modifier slots at new-game state; a merged
         -- save carries what the player actually equipped (see applyEquipment).
         self:applyEquipment(scope)
+        -- ...and it resets Yellow's own options with them, AUTO RUN included.
+        self:applyAutorun()
     end
     if world == "yellow" and self.pendingCoordinates then
         -- Yellow's rooms spawn their own player from these globals while the
@@ -238,6 +252,42 @@ function Travel:applyEquipment(scope)
     B.ini_close()
 end
 
+-- AUTO RUN, as the pause menu's setting. Nil means "whatever the game itself
+-- has", which is how a single-game build and a merged build that never touched
+-- the toggle both stay out of the way. The global only exists once Yellow's own
+-- initializer has run, so the value is remembered until then and re-applied at
+-- every crossing afterwards.
+function Travel:setAutorun(value)
+    self.autorun = value and true or false
+    if self.autorun then
+        self.runtime:warn("travel-autorun",
+            "AUTO RUN is on: moving in Yellow's world runs, and holding the run button (X) walks.")
+    end
+    self:applyAutorun()
+    self:saveAutorun()
+end
+
+function Travel:applyAutorun()
+    if self.autorun == nil then return end
+    local R = self.runtime
+    if R.global.option_autorun == nil then return end
+    local wanted = self.autorun and AUTORUN_ON or AUTORUN_OFF
+    if R.global.option_autorun ~= wanted then
+        R.global.option_autorun = wanted
+    end
+end
+
+-- The same key Yellow's own scr_savecontrols writes, so the game's config and
+-- the port's menu cannot disagree: whoever opens Yellow's controls next reads
+-- the value the pause menu shows here.
+function Travel:saveAutorun()
+    if self.autorun == nil then return end
+    local B = self.runtime.builtins
+    B.ini_open(nil, "Controls.sav")
+    B.ini_write_real(nil, "Controls", "autorun", self.autorun and AUTORUN_ON or AUTORUN_OFF)
+    B.ini_close()
+end
+
 function Travel:afterLoadRoom(roomId)
     local pending = self.pendingInit
     if not pending or pending.room ~= roomId then return end
@@ -291,6 +341,10 @@ function Travel:beforeStep()
         end
         return
     end
+    -- Yellow's controller re-reads its ini whenever it is created (the
+    -- Steamworks vents recreate it), which would silently drop AUTO RUN; the
+    -- pause menu is this build's menu for that option, so it is asserted here.
+    self:applyAutorun()
     self:offerWhaleDestinations()
     -- The whale menu only knows its own seven entries; fill the travel globals
     -- for ours so Yellow's own whale code carries out the trip.

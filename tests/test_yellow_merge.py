@@ -654,3 +654,85 @@ def test_every_run_family_the_game_selects_stays_clover(vm):
         return "ok"
     ''')
     assert result == "ok", result
+
+
+@live
+def test_autorun_runs_while_walking_and_x_walks_instead(vm):
+    """AUTO RUN is Yellow's own option, driven from the port's pause menu.
+
+    With it on, moving runs - which is also the fastest way to see Clover's run
+    animation - and the run cluster becomes the walk key, exactly as Yellow's
+    own scr_normal_state decides it. It has to survive a crossing, because
+    scr_initialize resets Yellow's globals on the way in.
+    """
+    assert vm.execute("local ok,err=pcall(function() R:start() end) return ok and 'ok' or tostring(err)") == "ok"
+    crossToYellow(vm)
+    result = vm.execute('''
+        local sprites=R.manifest.yellow_names.sprites
+        local pl
+        -- Crossing destroys the other world's persistent instances, so the
+        -- player is looked up again after every crossing instead of kept.
+        local function player()
+            for _,inst in ipairs(R.instances) do
+                if inst.alive and inst.v.object_index==R.manifest.yellow_names.objects["obj_pl"] then pl=inst end
+            end
+            assert(pl and pl.alive, "no live player instance in Yellow's world")
+            return pl
+        end
+        player()
+        local function probe(keys)
+            player()
+            pl.v.x,pl.v.y=170,120
+            local y0=pl.v.y
+            input:setSource("test",keys); tick(4)
+            local moved=pl.v.y-y0
+            local sprite,sprinting=pl.v.sprite_index,pl.v.is_sprinting
+            input:setSource("test",{}); tick(1)
+            return moved,sprite,sprinting
+        end
+        if R.global.option_autorun~=0 then return "AUTO RUN must start off" end
+        R:setAutorun(true)
+        if R.global.option_autorun~=1 then
+            return "AUTO RUN did not reach Yellow's own option: "..tostring(R.global.option_autorun)
+        end
+        local runDistance,runSprite,sprinting=probe({40})
+        if not R.truth(sprinting) or runSprite~=sprites["spr_pl_run_down"] then
+            return "AUTO RUN did not run while walking: sprite "..tostring(runSprite)
+                ..", is_sprinting "..tostring(sprinting)
+        end
+        local walkDistance,walkSprite,walkSprinting=probe({40,88})
+        if R.truth(walkSprinting) or walkSprite~=sprites["spr_pl_down"] then
+            return "holding the run button must walk with AUTO RUN on: sprite "..tostring(walkSprite)
+                ..", is_sprinting "..tostring(walkSprinting)
+        end
+        if runDistance<=walkDistance then
+            return "AUTO RUN run distance "..runDistance.." is not faster than walking "..walkDistance
+        end
+        -- The port's setting is written where the game itself keeps it.
+        local B=R.builtins
+        B.ini_open(nil,"Controls.sav")
+        local saved=B.ini_read_real(nil,"Controls","autorun",0)
+        B.ini_close()
+        if saved~=1 then return "Controls.sav autorun is "..tostring(saved) end
+        -- ...and it survives leaving and re-entering Yellow's world.
+        R:gotoRoom(70); R:applyTransitions(); tick(2)
+        R.global.plot=122
+        R:gotoRoom(140); R:applyTransitions(); tick(3)
+        input:setSource("test",{88}); tick(2); input:setSource("test",{})
+        R:gotoRoom(140); R:applyTransitions(); tick(10)
+        if R.global.option_autorun~=1 then
+            return "AUTO RUN was lost across a crossing: "..tostring(R.global.option_autorun)
+        end
+        player()
+        R:setAutorun(false)
+        local offDistance,offSprite,offSprinting=probe({40})
+        if R.truth(offSprinting) or offSprite~=sprites["spr_pl_down"] then
+            return "AUTO RUN off must walk again: sprite "..tostring(offSprite)
+        end
+        local xDistance,xSprite,xSprinting=probe({40,88})
+        if not R.truth(xSprinting) or xSprite~=sprites["spr_pl_run_down"] then
+            return "with AUTO RUN off the run button must run again: sprite "..tostring(xSprite)
+        end
+        return "ok"
+    ''')
+    assert result == "ok", result
