@@ -168,6 +168,8 @@ return function(R)
         local entry,index=layer(id)
         if not entry then return end
         entry.destroyed=true
+        -- Studio 2 destroys a layer's particle systems with the layer.
+        if R.destroyLayerParticleSystems then R:destroyLayerParticleSystems(index) end
         local st=state()
         local kept={}
         for _,tile in ipairs(st.tiles) do if tile.layer~=index then kept[#kept+1]=tile end end

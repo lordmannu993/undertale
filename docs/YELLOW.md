@@ -337,12 +337,58 @@ startup under its own warning key.
   `view_camera[0]` directly (a mail station places its whale at
   `camera_get_view_y(view_camera[0]) - 40`). Before this, ringing any bell
   stopped the frame with *"Camera 0 does not exist"*.
-- **Known gap:** the stop *"Snowdin - Forest"* lands in
-  `rm_snowdin_11_yellow`, whose `part_snow` needs the particle system (30+
-  `part_*` builtins) this runtime does not implement; the room is a named
-  compatibility stop. All 20 of Yellow's Snowdin rooms place `part_snow`, so
-  Yellow's Snowdin region is behind that piece — as is Undertale's Snowdin boat
-  crossing, which targets the same room.
+
+### Piece 5, round 3: the particle system (v1.2.1)
+
+Round 2 left one named stop: *"Snowdin - Forest"* lands in
+`rm_snowdin_11_yellow`, whose `part_snow` needs GameMaker's particle system.
+Round 3 implements it, so all ten UGPS stops and all three dock crossings
+travel and land. 19 of Yellow's 32 Snowdin rooms place `part_snow` (an
+earlier note said 20; the pinned source places it in 19).
+
+- **`port/particles.lua` — the four families.** `part_system_*` (create,
+  create_layer, destroy, exists, clear, draw_order, depth, position,
+  automatic_update/draw, update, drawit), `part_type_*` (create, destroy,
+  exists, clear, shape, sprite, size, scale, speed, direction, orientation,
+  gravity, colour/color 1-3 and mix, alpha 1-3, blend, life, step, death),
+  `part_emitter_*` (create, destroy, destroy_all, exists, clear, region,
+  burst, stream) and `part_particles_create/clear` (plus the colour-tinted
+  create). Systems tick once per game step after End Step and draw at their
+  own depth among the instances and tiles; `part_snow`'s snowfall draws at
+  −9999. Undertale calls none of these, so the family is inert there.
+- **33 objects create systems** (37 reference the family; the other four only
+  emit into or destroy systems owned elsewhere). A static test pins every
+  `part_*` callee in the pinned source against the implemented set, so a new
+  call site cannot slip past the suite.
+- **Yellow's sprite numbers resolve through the merged band.**
+  `part_type_sprite` sites pass the decompiler's raw numbers (636 for
+  `spr_snowflake`, 665, 238, …). For a Yellow caller they resolve to
+  `1000000 +` the number with a `particle-sprite:<n>` warning; a Yellow
+  number with no banded sprite draws nothing and warns instead of drawing an
+  unrelated Undertale sprite. Undertale callers keep exact IDs.
+- **Documented particle deviations:** `part_system_create` ignores the extra
+  argument two Yellow sites pass (`particles-create-args`); destroy/clear on
+  a gone handle are lenient no-ops as in GameMaker, while burst/stream/create
+  on one warn once per builtin (`particles-missing:<builtin>`);
+  inverse-gaussian sampling is min/max-of-two-uniforms edge bias; shape pixel
+  sizes are approximate (sprite particles are exact); fractional burst/stream
+  counts are floored; particle ids start at 1 so a stored handle stays truthy
+  in GML.
+- **The same room needed three more rules, all riding along reported.** Its
+  shadow system (`obj_shadow_master`, spawned by `obj_shadow_collider`)
+  switches `object_get_parent()` against raw Yellow numbers (1130 for
+  `obj_npc_base`, 1133, 1191) and creates `with(drawer_object)` /
+  `instance_create_depth(..., 829/obj_shadow_drawer)` through them, so (1)
+  `Runtime:resolveObjectIndex` bands any small object number a Yellow caller
+  passes to `with`/select, `instance_create` and `instance_create_depth`
+  (`object-band:<n>`; stale instance ids and Undertale callers are untouched),
+  (2) new `object_get_parent` answers a Yellow caller in Yellow's number
+  space so those switches match (both call sites are pinned by test), and (3)
+  `texture_set_stage` joins the documented report-and-skip shader flow —
+  `scr_draw_palette_shader` binds its palette through it on every shaded
+  actor, and stopping there while `shader_set` is a skip was incoherent.
+  `part_snow` itself, the shadow drawers and the palette binding are all
+  proven in the Snowdin landing tests, headless and native.
 
 ### Piece 5: what shipped
 

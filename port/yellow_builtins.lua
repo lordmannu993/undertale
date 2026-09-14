@@ -98,8 +98,8 @@ return function(R)
     reg("room_get_name", function(index) local room=R.manifest.rooms[index] and R:roomData(index);return room and room.name or "" end)
 
     if B.instance_create_depth == nil and not has_script("instance_create_depth") then
-        B.instance_create_depth=function(_,x,y,depth,object)
-            local instance=R:create(object,x,y);instance.v.depth=depth;return instance.id
+        B.instance_create_depth=function(E,x,y,depth,object)
+            local instance=R:create(R:resolveObjectIndex(object,E),x,y);instance.v.depth=depth;return instance.id
         end
     end
     if B.instance_place == nil and not has_script("instance_place") then
@@ -173,7 +173,7 @@ return function(R)
         "path_set_closed", "path_set_kind", "room_get_camera", "room_set_camera", "room_set_viewport",
         "sprite_add",
         "sprite_get_uvs", "sprite_prefetch", "sprite_prefetch_multi",
-        "sprite_save", "sprite_set_alpha_from_sprite", "texture_set_stage", "timeline_add", "timeline_clear",
+        "sprite_save", "sprite_set_alpha_from_sprite", "timeline_add", "timeline_clear",
         "timeline_exists", "vertex_begin", "vertex_colour", "vertex_create_buffer_from_buffer",
         "vertex_delete_buffer", "vertex_end", "vertex_format_add_colour", "vertex_format_add_normal",
         "vertex_format_add_position_3d", "vertex_format_add_texcoord", "vertex_format_begin",

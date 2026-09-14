@@ -6,7 +6,7 @@ mkdir -p port-test-output
 command -v love >/dev/null || { echo 'Install LOVE, xvfb and xauth for native validation.' >&2; exit 1; }
 set +e
 # The wall timeout covers the scripted Undertale opening plus the fused-world
-# section (both rooms, two crossings, two captures) on a merged archive; it
+# section (three rooms, two crossings, three captures) on a merged archive; it
 # was raised when the fused gates were added - keep it raised, or the gate flakes.
 ALSOFT_DRIVERS=null LIBGL_ALWAYS_SOFTWARE=1 timeout 600s \
   xvfb-run -a -s '-screen 0 1600x900x24' \
@@ -29,9 +29,10 @@ grep -q 'NATIVE SMOKE PASS' port-test-output/native.log
 # native-toriel-walk is the recovered-path gate: Toriel must be drawn where
 # path_torielwalk1 walked her, not where room_ruins1 placed her. The
 # native-fusion-* captures are the merged-build gates: the fused boat ride,
-# Frisk rendered in Yellow, and the versioned merged save. The smoke driver
-# only produces them for a merged archive, and both CI jobs package merged.
-for image in native-flowers native-corridor native-greeting native-flowey native-integer-scale native-toriel-walk native-fusion-yellow native-fusion-back; do
+# Frisk rendered in Yellow, snow drawn in the Snowdin forest, and the
+# versioned merged save. The smoke driver only produces them for a merged
+# archive, and both CI jobs package merged.
+for image in native-flowers native-corridor native-greeting native-flowey native-integer-scale native-toriel-walk native-fusion-yellow native-fusion-snowdin native-fusion-back; do
   test -s "port-test-output/$image.png"
 done
 grep -q 'fused boat ride' port-test-output/native.log || {

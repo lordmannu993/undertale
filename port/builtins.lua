@@ -47,7 +47,7 @@ return function(R)
     end
 
     B.script_execute=function(E,index,...) return R:script(index,E,...) end
-    B.instance_create=function(E,x,y,index) return R:create(index,x,y).id end
+    B.instance_create=function(E,x,y,index) return R:create(R:resolveObjectIndex(index,E),x,y).id end
     B.instance_exists=function(E,index) return N(#R:select(index,E)>0) end
     B.instance_number=function(E,index) return #R:select(index,E) end
     B.instance_find=function(E,index,number) local a=R:select(index,E);return a[math.floor(number)+1] and a[math.floor(number)+1].id or -4 end
@@ -87,7 +87,7 @@ return function(R)
     B.action_set_friction=function(E,amount) E.friction=amount end
     B.action_set_alarm=function(E,steps,alarm) E.alarm[alarm]=steps end
     B.action_move_to=function(E,x,y) E.x=x;E.y=y end
-    B.action_create_object=function(E,object,x,y) return R:create(object,x,y).id end
+    B.action_create_object=function(E,object,x,y) return R:create(R:resolveObjectIndex(object,E),x,y).id end
     B.action_move=function(E,choices,speed)
         local angles={225,270,315,180,-1,0,135,90,45};local available={}
         for i=1,9 do if choices:sub(i,i)=="1" then available[#available+1]=angles[i] end end

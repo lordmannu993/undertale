@@ -170,6 +170,24 @@ function Smoke.new(game,touch)
         capture("native-fusion-yellow")
         write("native-fusion-yellow.txt","room="..game.roomState.name.." player="..
             string.format("%.0f,%.0f",landed.v.x,landed.v.y).." crossings="..tostring(game.travel.crossings).."\n")
+        -- Snowdin leg. The particle system is what used to stop this room, so
+        -- the forest landing is gated renderer-side: part_snow must be placed
+        -- and its snowfall must actually draw at depth -9999. Same-world room
+        -- changes record no crossing, so the merged save below still reads 2.
+        local forest=game.manifest.yellow_names.rooms["rm_snowdin_11_yellow"]
+        game:gotoRoom(forest);game:applyTransitions();wait(10)
+        assert(game.roomState.name=="rm_snowdin_11_yellow",
+            "The Snowdin forest did not load: "..tostring(game.roomState.name))
+        local snowfall=game.manifest.yellow_names.objects["part_snow"]
+        assert(countInstances(snowfall)>=1,"part_snow never placed in the forest")
+        game.drawLog={};wait(2)
+        local flakes=0
+        for _,entry in ipairs(game.drawLog) do
+            if entry[1]=="particles" and entry[4]==-9999 then flakes=flakes+entry[3] end
+        end
+        assert(flakes>0,"No snow particles drew natively in the forest")
+        capture("native-fusion-snowdin")
+        write("native-fusion-snowdin.txt","room="..game.roomState.name.." flakes="..tostring(flakes).."\n")
         -- Back through the UGPS whale's own travel globals.
         game.global.fast_travel_point="Waterfall - Dock";wait(2)
         game:gotoRoom(125);game:applyTransitions();wait(10)

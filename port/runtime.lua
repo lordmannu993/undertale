@@ -102,6 +102,7 @@ function Runtime.new(manifest,input,options)
     -- would otherwise register for the same builtin.
     require("port.yellow_studio")(self)
     require("port.yellow_layers")(self)
+    require("port.particles")(self)
     require("port.yellow_builtins")(self)
     -- Only a merged manifest has two worlds to travel between.
     require("port.travel").install(self)
@@ -142,6 +143,42 @@ function Runtime:isA(instance,selector)
     end
     return false
 end
+-- A Yellow caller is Yellow code running in either world: an instance of a
+-- Yellow object (one that survived a crossing still counts), or room creation
+-- code of a Yellow room, which runs with no calling instance. Only Yellow's
+-- own decompiler numbers resolve through the merged ID band; Undertale
+-- callers keep exact numeric IDs, so Undertale's behaviour is unchanged.
+function Runtime:callerIsYellow(E)
+    local base=self.manifest.yellow_base or 1000000
+    local caller=E and E._self
+    if caller and caller.v and type(caller.v.object_index)=="number"
+        and caller.v.object_index>=base then
+        return true
+    end
+    return type(self.vars.room)=="number" and self.vars.room>=base
+end
+-- Yellow's decompiler emits a raw asset number wherever it could not prove a
+-- number was an asset ("it can only GUESS what is an Asset and what is just a
+-- Number"): with(drawer_object) over 829/obj_shadow_drawer, switch labels over
+-- 1130/obj_npc_base, part_type_sprite(..., 636, ...). Those are Yellow's own
+-- numbers, so for a Yellow caller they resolve through the merged ID band to
+-- the Yellow object, even when an unrelated Undertale object shares the
+-- number. Anything else passes through to the existing paths below.
+function Runtime:resolveObjectIndex(selector,E)
+    local base=self.manifest.yellow_base or 1000000
+    if type(selector)~="number" or selector<0 or selector>=base then return selector end
+    if not self:callerIsYellow(E) then return selector end
+    selector=math.floor(selector)
+    local banded=base+selector
+    local object=self.manifest.objects[banded] and self:object(banded) or nil
+    if object then
+        self:warn("object-band:"..selector,
+            "Object "..selector.." is Yellow's own asset number; resolved to "..banded..
+            " ("..tostring(object.name)..") through the merged ID band.")
+        return banded
+    end
+    return selector
+end
 function Runtime:select(selector,E)
     if type(selector)=="table" and rawget(selector,"_instance")==true then return selector.alive and selector.active and {selector} or {} end
     if selector==-1 then return E and E._self and E._self.alive and {E._self} or {} end
@@ -149,6 +186,7 @@ function Runtime:select(selector,E)
     if selector==-4 or selector==nil then return {} end
     local found=self.byId[selector]
     if found then return found.alive and found.active and {found} or {} end
+    selector=self:resolveObjectIndex(selector,E)
     if selector~=-3 and not self.manifest.objects[selector] then
         if type(selector)=="number" and selector>=0 and selector<100000 then
             self:warn("object:"..selector,"Unresolved original object ID "..selector.." (see conversion-report.json). Queries cannot match it.")
@@ -432,6 +470,9 @@ function Runtime:loadRoom(index,first)
     local persistent={}
     local old=copy(self.instances)
     for _,i in ipairs(old) do if i.alive then self:event(i,7,5) end end
+    -- Room End handlers destroy their own particle systems first; what remains
+    -- on a room layer dies with the room unless it was made persistent.
+    if self.clearRoomParticleSystems then self:clearRoomParticleSystems() end
     if self.roomState and Runtime.truth(self.vars.room_persistent) then
         local stored={}
         for _,i in ipairs(self.instances) do
@@ -635,6 +676,10 @@ function Runtime:step()
         end
     end
     each(3,2) -- End Step
+    -- Particle systems with automatic update tick once per game step, after
+    -- every instance had its End Step. Undertale owns no systems, so this
+    -- loops over nothing there.
+    if self.updateParticles then self:updateParticles() end
     self:compact()
     self:applyTransitions()
     self:updateViews()

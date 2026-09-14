@@ -100,6 +100,149 @@ function Graphics.install(R)
         g.rectangle("fill",math.min(x1,x2),math.min(y1,y2),math.abs(x2-x1)+1,math.abs(y2-y1)+1)
     end
     local yellowDrawable=require("port.yellow_graphics").install(R,sprite,backgroundPart)
+
+    -- Particle shapes. Sprite particles use the sprite's own pixels exactly;
+    -- the fourteen built-in shapes below are this port's documented
+    -- approximation of GameMaker's particle glyphs, sized in pixels at size 1
+    -- (the particle's own size and scale multiply them). Yellow's Snowdin
+    -- snow, smoke, embers, glass shards and battle backgrounds are all sprite
+    -- particles, so they are exact; the shapes only carry battle and ambient
+    -- effects whose systems this port does not otherwise certify.
+    local function particleShape(kind,x,y,size,sx,sy,angle,tint,alpha)
+        if not g or size<=0 then return end
+        color(tint,alpha)
+        local radians=math.rad(angle or 0)
+        local cosA,sinA=math.cos(radians),math.sin(radians)
+        local function point(dx,dy)
+            -- GameMaker angles run counterclockwise from east; the screen's y
+            -- axis points down, so the rotated y is negated on the way out.
+            return x+dx*cosA-dy*sinA,y-(dx*sinA+dy*cosA)
+        end
+        local function poly(points)
+            local flat={}
+            for _,p in ipairs(points) do flat[#flat+1],flat[#flat+2]=point(p[1],p[2]) end
+            g.polygon("fill",flat)
+        end
+        local function seg(x1,y1,x2,y2)
+            local ax,ay=point(x1,y1)
+            local bx,by=point(x2,y2)
+            g.line(ax,ay,bx,by)
+        end
+        if kind==0 then
+            local w,h=math.max(1,math.floor(size*sx+0.5)),math.max(1,math.floor(size*sy+0.5))
+            g.rectangle("fill",x-w/2,y-h/2,w,h)
+        elseif kind==1 or kind==7 or kind==10 or kind==11 or kind==12 then
+            local base=kind==1 and 3 or kind==7 and 4 or kind==10 and 8 or 6
+            local radius=base*size*(sx+sy)/2
+            if radius>=0.5 then g.circle("fill",x,y,radius,16) end
+        elseif kind==2 then
+            local h=3*size
+            poly({{-h*sx,-h*sy},{h*sx,-h*sy},{h*sx,h*sy},{-h*sx,h*sy}})
+        elseif kind==3 then
+            g.setLineWidth(math.max(1,math.floor(size*sy+0.5)))
+            local h=8*size*sx
+            seg(-h,0,h,0)
+            g.setLineWidth(1)
+        elseif kind==4 then
+            local outer,inner=5*size,2*size
+            local points={}
+            for i=0,9 do
+                local r=i%2==0 and outer or inner
+                local a=math.pi/2+i*math.pi/5
+                points[#points+1]={math.cos(a)*r*sx,math.sin(a)*r*sy}
+            end
+            poly(points)
+        elseif kind==5 then
+            local radius=4*size*(sx+sy)/2
+            if radius>=0.5 then g.circle("line",x,y,radius,24) end
+        elseif kind==6 then
+            local radius=4*size*(sx+sy)/2
+            if radius>=0.5 then
+                g.setLineWidth(math.max(2,math.floor(radius/3+0.5)))
+                g.circle("line",x,y,radius,24)
+                g.setLineWidth(1)
+            end
+        elseif kind==8 then
+            local arm=6*size
+            seg(-arm*sx,0,arm*sx,0)
+            seg(0,-arm*sy,0,arm*sy)
+            g.circle("fill",x,y,math.max(1,2*size*(sx+sy)/2),12)
+        elseif kind==9 then
+            local arm=3*size
+            seg(-arm*sx,0,arm*sx,0)
+            seg(0,-arm*sy,0,arm*sy)
+        elseif kind==13 then
+            local arm=3*size
+            for i=0,2 do
+                local a=i*math.pi/3
+                local dx,dy=math.cos(a)*arm,math.sin(a)*arm
+                seg(-dx*sx,-dy*sy,dx*sx,dy*sy)
+            end
+        end
+    end
+    local function particleSprite(index,sub,x,y,sx,sy,angle,tint,alpha)
+        -- The shared sprite() helper would remap Clover poses to Frisk and log
+        -- every flake; particles need neither, so this draws quietly instead.
+        local s=R.assets.sprites[index]
+        if not s then
+            if index>=0 then R:warn("sprite:"..tostring(index),"Unresolved sprite ID "..tostring(index).."; see conversion-report.json.") end
+            return
+        end
+        if #s.frames==0 then return end
+        local file=s.frames[math.floor(sub)%#s.frames+1]
+        if not g then return end
+        local img=image(file)
+        if not img then return end
+        color(tint,alpha)
+        g.draw(img,x,y,-math.rad(angle or 0),sx,sy,s.xorig,s.yorigin)
+    end
+    local function drawParticles(sys,view,depth)
+        local list=sys.particles
+        local total=#list
+        if total==0 then return end
+        local drawn=0
+        local prevMode,prevAlpha=nil,nil
+        if g and g.getBlendMode then prevMode,prevAlpha=g.getBlendMode() end
+        local blendAdditive=nil
+        local first,last,step=1,total,1
+        if sys.oldtonew==false then first,last,step=total,1,-1 end
+        for i=first,last,step do
+            local p=list[i]
+            local x,y,tint,alpha,size,angle,sprite,frame,shape,sx,sy,additive=R:particleAppearance(sys,p)
+            if size>0 and alpha>0
+                and x>view.x-64 and x<view.x+view.w+64
+                and y>view.y-64 and y<view.y+view.h+64 then
+                drawn=drawn+1
+                if g then
+                    if additive~=blendAdditive then
+                        blendAdditive=additive
+                        if additive then g.setBlendMode("add","premultiplied")
+                        else g.setBlendMode("alpha","alphamultiply") end
+                    end
+                    if sprite~=nil and sprite>=0 then
+                        particleSprite(sprite,frame,x,y,size*sx,size*sy,angle,tint,alpha)
+                    elseif shape~=nil and shape>=0 then
+                        particleShape(shape,x,y,size,sx,sy,angle,tint,alpha)
+                    end
+                end
+            end
+        end
+        if g and blendAdditive~=nil and prevMode then g.setBlendMode(prevMode,prevAlpha) end
+        if drawn>0 then log("particles",sys.id,drawn,depth) end
+    end
+    -- Manual draw for part_system_drawit: the system draws at the point the
+    -- Draw event calls it, outside depth order, exactly as GameMaker does.
+    function R:drawParticlesNow(id)
+        local sys=self.particles and self.particles.systems[math.floor(id or -1)]
+        if not sys or #sys.particles==0 then return end
+        if not self:particleLayerVisible(sys) then return end
+        local views=self:views()
+        local view=views[1]
+        for _,v in ipairs(views) do
+            if v.index==self.vars.view_current then view=v break end
+        end
+        drawParticles(sys,view,self:particleDepth(sys))
+    end
     B.draw_self=function(E)
         -- Studio 2's draw_self is exactly what this renderer does for an
         -- instance whose object has no Draw event of its own.
@@ -467,6 +610,15 @@ function Graphics.install(R)
                 list[#list+1]={depth=(layer and layer.depth) or inst.v.depth,order=1000000+i,instance=inst,layer=layer}
             end
         end
+        -- Particle systems draw at their own depth among the instances and
+        -- tiles. Undertale owns no systems, so its draw list is unchanged.
+        if self.particles then
+            for id,sys in pairs(self.particles.systems) do
+                if sys.autoDraw and #sys.particles>0 and self:particleLayerVisible(sys) then
+                    list[#list+1]={depth=self:particleDepth(sys),order=2000000+id,particles=sys}
+                end
+            end
+        end
         table.sort(list,function(a,b) if a.depth==b.depth then return a.order<b.order end;return a.depth>b.depth end)
         -- GameMaker runs a whole Draw Begin pass over the instances, then Draw,
         -- then Draw End, and skips all of them for an invisible instance. A
@@ -521,11 +673,15 @@ function Graphics.install(R)
                     end
                 else
                     local inst=item.instance
-                    if inst.alive and inst.active and self.truth(inst.v.visible) and drawable(item) then
-                        local drawn=self:event(inst,8,0)
-                        if not drawn and inst.v.sprite_index>=0 then
-                            local v=inst.v;sprite(self:scope(inst),v.sprite_index,v.image_index,v.x,v.y,v.image_xscale,v.image_yscale,v.image_angle,v.image_blend,v.image_alpha)
+                    if inst then
+                        if inst.alive and inst.active and self.truth(inst.v.visible) and drawable(item) then
+                            local drawn=self:event(inst,8,0)
+                            if not drawn and inst.v.sprite_index>=0 then
+                                local v=inst.v;sprite(self:scope(inst),v.sprite_index,v.image_index,v.x,v.y,v.image_xscale,v.image_yscale,v.image_angle,v.image_blend,v.image_alpha)
+                            end
                         end
+                    elseif item.particles then
+                        drawParticles(item.particles,view,item.depth)
                     end
                 end
             end
