@@ -80,11 +80,19 @@ vibration, reset and a control test screen. Settings are saved as validated plai
 text in `touch-settings-v1.txt` in the app's save directory. No executable Lua is
 loaded from settings/saves. Vibration is off by default.
 
-A seventh PAUSE row, **COLLISION: ON/OFF**, exposes the game's own `phasing`
-debug toggle (the keyboard equivalent lives on `obj_mainchara`): OFF walks
-through walls. It is a testing aid rather than a setting, so it defaults to ON,
-is never written to `touch-settings-v1.txt`, and is re-applied after an in-game
-restart.
+The seventh PAUSE row holds two toggles. **COLLISION: ON/OFF** exposes the
+game's own `phasing` debug toggle (the keyboard equivalent lives on
+`obj_mainchara`): OFF walks through walls. It is a testing aid rather than a
+setting, so it defaults to ON, is never written to `touch-settings-v1.txt`, and
+is re-applied after an in-game restart.
+
+Beside it, the merged build's **AUTO RUN: ON/OFF** drives Undertale Yellow's own
+option of that name (`option_autorun`): with it on, moving in Yellow's world runs
+and the run button (**X**) walks instead, exactly as Yellow's own
+`scr_normal_state` decides it. Unlike COLLISION it *is* a setting — off by
+default, saved with the others in `touch-settings-v1.txt`, applied on launch and
+re-applied on every crossing, because Yellow's initialiser resets its options on
+the way in.
 
 Extra-key panels temporarily cover the game picture; they are not intended to
 replace the large D-pad/Z/X/C controls during normal battles. Very small windows

@@ -4,6 +4,53 @@ This prerelease makes the current `.love` package downloadable from GitHub. It
 contains the converted Lua and the assets supplied for both merged games. **It
 is not a completed or native-device-verified game, and it is not an APK.**
 
+## v1.2.1 — both travel services open from the start (branch build, not yet published)
+
+The owner's second round of feedback: *"make sure that the River Person and
+UGPS are always available to use"* and *"I can fast travel to all of their old
+and new locations"*. Neither service is locked behind story progress any more,
+and both can be used in the first minutes of a run.
+
+- **The River Person is at every dock from the first frame.** The boat's own
+  Create event deletes itself while `global.plot` is under 122 — the value
+  Undyne's Waterfall chase writes — which is why no dock had a boat before
+  Hotland. That single guard is lifted for that single event and `global.plot`
+  is restored immediately afterwards; the boat, the River Person, the
+  destination choice and both rides (dock to dock, and the room-316 crossing)
+  stay the game's own code.
+- **The UGPS offers every stop it can fly to.** `global.player_can_travel` is
+  the whale's own "this whale will fly you" switch; the port sets the same
+  switch when Yellow's world is initialized, then registers the three
+  Undertale docks and Yellow's own seven stops through Yellow's own
+  `scr_fasttravel_add` — ten stops, whether or not the player has walked past
+  them, listed by Yellow's own menu in Yellow's own order.
+- **Yellow's stop numbers are read through the merged ID space.** Yellow's menu
+  writes the room numbers of Yellow's own project (56 = its Snowdin forest,
+  137 = Wild East). In a merged build those have to resolve to `1000000 + 56`,
+  or the whale flies the player into Undertale's room of the same number; the
+  bridge fills `fast_travel_newroom` with the merged room of the highlighted
+  label.
+- **A UGPS whale's approach now finishes.** Every whale ends its fly-in by
+  comparing `fly_speed` to exactly zero, and its own `fly_speed -= 0.2` from 2
+  cannot reach zero in binary floating point (the tenth step lands on about
+  2.8e-16). The whale hovered, and the Mail/Travel dialogue — the only way into
+  the fast-travel menu — never started. The port reads that last step as the
+  landing the game's own next line expects, and reports it at startup.
+- **Mail-station bells no longer stop the runtime.** A station asks for
+  `view_camera[0]` to place its whale; that table had never been created, so
+  ringing a bell stopped the frame with *"Camera 0 does not exist"*. Every
+  visible viewport's camera now exists from room load.
+- **One known gap, reported rather than hidden:** the Yellow stop
+  *"Snowdin - Forest"* (and Undertale's Snowdin boat crossing, which lands in
+  the same room) stops in `rm_snowdin_11_yellow`, because that room's
+  `part_snow` needs GameMaker's particle system, which this runtime does not
+  implement yet. It is a named compatibility stop, never a silent stub. The
+  other six Yellow stops and all three docks travel and land.
+- **294 automated tests** pass on this branch (three new ones: the boat present
+  at all three docks at `global.plot` 10, the full bell → Mail/Travel → menu →
+  Yellow-stop flight landing in the merged room, and a check of every offered
+  stop against the pinned Yellow source).
+
 ## v1.2.0 — the Undertale ⊕ Undertale Yellow fusion build
 
 One `.love` archive carries **both games as a single traversable world**: the

@@ -57,6 +57,9 @@ local function boot()
     -- The touch collision toggle is runtime-only, so a restart must re-apply it:
     -- the walk-through-walls debug state lives in the game's global.phasing.
     if game and touch.collision == false then game.global.phasing = 1 end
+    -- AUTO RUN is persisted, so it is re-applied on every boot and after every
+    -- crossing into Yellow's world (scr_initialize resets its globals there).
+    if game and game.setAutorun then game:setAutorun(touch.settings.autorun) end
 end
 local function setTester(value)
     tester=value;input:cancelAll();recent={};accumulator=0
@@ -87,6 +90,12 @@ function love.load(args)
         -- collision ON keeps global.phasing = 0, OFF walks through walls (1).
         if game then game.global.phasing = enabled and 0 or 1 end
     end
+    touch.onAutorun=function(enabled)
+        -- AUTO RUN drives Undertale Yellow's own option of that name (see
+        -- port/travel.lua): moving runs, and the run button walks.
+        if game and game.setAutorun then game:setAutorun(enabled) end
+    end
+    touch.version="v"..Version.number..(Version.experimental and " experiment" or "")
     resize()
     for _,a in ipairs(args or {}) do if a=="--touch" then touch.visible=true;resize() elseif a=="--input-test" then tester=true end end
     if smokeMode then

@@ -297,6 +297,53 @@ Two documented deviations are reported on every run instead of being silent:
   Yellow conversion reached its rooms stage with no compile errors, and never
   regenerates Yellow itself.
 
+### Piece 5, round 2: both travel services open (v1.2.1)
+
+The owner reported that the River Person could not be used before Hotland and
+asked for both services to be available from the start, reaching all of their
+old and new stops. Four port-side rules do that; each one is reported on
+startup under its own warning key.
+
+- **`travel-river-service` — the boat's plot gate.** `obj_dogboat_thing`'s own
+  Create event destroys the instance while `global.plot < 122` (set by the six
+  `obj_undyne*` resources). `Travel:openRiverService()` wraps that one event:
+  while it runs, `global.plot` reads 122; afterwards it is restored to whatever
+  it was. Nothing else about the event changes, and no recovered script or
+  object is edited.
+- **`travel-ugps` — the whale's own unlock.** `global.player_can_travel` is
+  Yellow's switch for "this whale will carry you" (normally set by the
+  Dunes-42 delivery scene). `Travel:openWhaleService()` sets the same switch
+  after every Yellow-world initialization and re-asserts it each step, because
+  `scr_initialize` resets it.
+- **`travel-ugps` — the ten stops.** `Travel:offerWhaleDestinations()` adds the
+  three Undertale docks and Yellow's seven own labels with Yellow's own
+  `scr_fasttravel_add` (so de-duplication and Yellow's descending sort are
+  Yellow's), memoized on the list handle and its size.
+- **The merged ID space.** Yellow's menu writes its own project's room numbers
+  (56, 81, 137, 175, 202, 211, 276). `Travel:beforeStep()` rewrites
+  `global.fast_travel_newroom` for the highlighted or confirmed label to the
+  merged room (`yellow_names.rooms`), because Undertale's room 56 is a
+  different room from Yellow's. Dock labels keep the port's own landing read
+  from the dock room's boat or player instance.
+- **`travel-ugps-landing` — a whale's approach.** Every whale's fly-in ends
+  when `fly_speed` compares equal to exactly zero; `fly_speed = 2` decremented
+  by 0.2 never reaches zero in binary floating point (the tenth step is about
+  2.8e-16, the eleventh is negative), so the whale hovered and the Mail/Travel
+  dialogue never started. `Travel:landWhales()` reads that last step as the
+  landing the next line expects — scene 1, still descending, speed below the
+  decrement — and changes nothing else about the animation.
+- **`view_camera` in the runtime.** `port/runtime.lua` now gives every viewport
+  a camera and creates it when a room loads, because Yellow's code reads
+  `view_camera[0]` directly (a mail station places its whale at
+  `camera_get_view_y(view_camera[0]) - 40`). Before this, ringing any bell
+  stopped the frame with *"Camera 0 does not exist"*.
+- **Known gap:** the stop *"Snowdin - Forest"* lands in
+  `rm_snowdin_11_yellow`, whose `part_snow` needs the particle system (30+
+  `part_*` builtins) this runtime does not implement; the room is a named
+  compatibility stop. All 20 of Yellow's Snowdin rooms place `part_snow`, so
+  Yellow's Snowdin region is behind that piece — as is Undertale's Snowdin boat
+  crossing, which targets the same room.
+
 ### Piece 5: what shipped
 
 - **Frisk-only rendering.** `port/frisk.lua` installs a draw-time sprite remap

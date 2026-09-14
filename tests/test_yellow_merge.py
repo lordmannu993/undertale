@@ -6,6 +6,7 @@ in the right rooms with exactly one player, and the merged save layer is
 versioned. They do NOT certify native rendering or a played-through crossing.
 """
 import json
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -183,7 +184,11 @@ def test_ugps_whale_entries_use_yellows_own_travel_globals(vm):
         R.global.fast_travel_list=R.builtins.ds_list_create(nil,"Snowdin - Forest")
         tick(1)
         local size=R.builtins.ds_list_size(nil,R.global.fast_travel_list)
-        if size~=4 then return "whale list has "..tostring(size).." entries, expected Yellow's one plus three docks" end
+        -- The seeded entry plus every stop the merged build offers: Yellow's
+        -- own seven labels and the three Undertale docks ("Snowdin - Forest"
+        -- is one list, not two).
+        if size~=10 then return "whale list has "..tostring(size).." entries, expected ten stops" end
+        if not R.truth(R.global.player_can_travel) then return "the UGPS switch is still closed" end
         R.global.fast_travel_point="Waterfall - Dock"
         tick(1)
         if R.global.fast_travel_newroom~=125 then
@@ -213,6 +218,172 @@ def test_ugps_whale_entries_use_yellows_own_travel_globals(vm):
         return "ok"
     ''')
     assert result == "ok", result
+
+
+@live
+def test_river_person_boat_and_riverman_exist_below_the_plot_gate(vm):
+    """The owner's ask: the River Person is there before the game's own plot gate.
+
+    obj_dogboat_thing deletes itself in its own Create event while global.plot is
+    under 122, so every dock is empty until Undyne's chase is over. The port
+    lifts that guard for the one event. global.plot itself must be untouched
+    afterwards: the rest of the game reads it.
+    """
+    assert vm.execute("local ok,err=pcall(function() R:start() end) return ok and 'ok' or tostring(err)") == "ok"
+    result = vm.execute('''
+        R.global.plot=10
+        local boat=R.manifest.names["obj_dogboat_thing"]
+        local riverman=R.manifest.names["obj_riverman"]
+        if not boat or not riverman then return "the merged manifest is missing the River Person's own resources" end
+        for _,room in ipairs({70,125,140}) do
+            crossTo(room)
+            local boats=countInstances(boat)
+            if boats~=1 then return "room "..room.." placed "..tostring(boats).." boats at plot 10" end
+            local men=countInstances(riverman)
+            if men~=1 then return "room "..room.." has "..tostring(men).." River Person instances at plot 10" end
+            if R.global.plot~=10 then return "room "..room.." left global.plot at "..tostring(R.global.plot) end
+        end
+        return "ok"
+    ''')
+    assert result == "ok", result
+
+
+@live
+def test_ugps_whale_lands_and_flies_a_yellow_stop_to_its_merged_room(vm):
+    """Ring a bell, take Travel, and land in the far world's own room.
+
+    Proves the three UGPS pieces together: the whale's approach reaches its own
+    landing frame, Yellow's Mail/Travel choicer opens its fast-travel menu, and
+    a Yellow stop travels to the merged ID of that room - not to Undertale's
+    room of the same number, which is what the menu's own room numbers mean
+    without the merge's ID space.
+    """
+    assert vm.execute("local ok,err=pcall(function() R:start() end) return ok and 'ok' or tostring(err)") == "ok"
+    result = vm.execute('''
+        local objs=R.manifest.yellow_names.objects
+        local here=R.manifest.yellow_names.rooms["rm_hotland_02"]
+        crossTo(here)
+        if not R.truth(R.global.player_can_travel) then return "the UGPS switch is still closed" end
+        local pl
+        for _,inst in ipairs(R.instances) do
+            if inst.alive and inst.v.object_index==playerOf("yellow") then pl=inst end
+        end
+        R:create(objs["obj_mail_station_hotland"], pl.v.x+20, pl.v.y)
+        tick(5)
+        press(90)                        -- Z on the bell
+        local whale
+        local landing=R.frame+1200
+        while R.frame<landing do
+            whale=R:select(objs["obj_mail_whale"])[1]
+            if whale and whale.v.scene==2 then break end
+            tick(2)
+        end
+        if not whale or whale.v.scene~=2 then
+            return "the whale never landed: scene="..tostring(whale and whale.v.scene)
+                .." fly_speed="..tostring(whale and whale.v.fly_speed)
+        end
+        if whale.v.fly_speed~=0 then return "the landed whale is still moving" end
+        -- Yellow's own choicer: advance until the Mail/Travel choice is up,
+        -- move to Travel (p=2), then confirm with Yellow's confirm key.
+        local choiceSeen=nil
+        for i=1,60 do
+            press(90)
+            tick(4)
+            local dialogue
+            for _,inst in ipairs(R.instances) do
+                if inst.alive and inst.v.object_index==objs["obj_dialogue"] then dialogue=inst end
+            end
+            if dialogue and R.truth(dialogue.v.choice) then
+                tick(20)
+                for _=1,12 do
+                    press(39)
+                    tick(3)
+                    if dialogue.v.p==2 then break end
+                end
+                if dialogue.v.p~=2 then return "the Mail/Travel choice never reached Travel" end
+                press(90)
+                tick(10)
+                choiceSeen=i
+                break
+            end
+        end
+        if not choiceSeen then return "the Mail/Travel choice never appeared" end
+        local opening=R.frame+900
+        local menu
+        while R.frame<opening do
+            menu=R:select(objs["obj_fast_travel_menu"])[1]
+            if menu then break end
+            -- "Where in the world would you like to fly?" still has to be read
+            -- through Yellow's own message advance.
+            press(90)
+            tick(6)
+        end
+        if not menu then return "Travel did not open the fast-travel menu" end
+        local target="Dunes - West Mines"
+        for _=1,20 do
+            if menu.v.point_selected==target then break end
+            R.global.down_keyp=1
+            if menu.alive then R:event(menu,3,0) end
+            R.global.down_keyp=0
+            tick(2)
+        end
+        if menu.v.point_selected~=target then
+            return "the menu never highlighted "..target..", it stopped on "..tostring(menu.v.point_selected)
+        end
+        press(90)
+        tick(10)
+        if R.global.fast_travel_point~=target then
+            return "the menu confirmed "..tostring(R.global.fast_travel_point)
+        end
+        local wanted=R.manifest.yellow_names.rooms["rm_dunes_05"]
+        local leaving=R.vars.room
+        local flight=R.frame+4000
+        while R.frame<flight and R.vars.room==leaving do press(90); tick(10) end
+        if R.vars.room~=wanted then
+            return "flew to room "..tostring(R.vars.room).." instead of the merged "..tostring(wanted)
+        end
+        if R.travel.world~="yellow" then return "world="..tostring(R.travel.world) end
+        if countInstances(playerOf("yellow"))~=1 then return "expected exactly one player after the flight" end
+        if countInstances(playerOf("undertale"))~=0 then return "Frisk survived the whale flight" end
+        return "ok"
+    ''')
+    assert result == "ok", result
+
+
+@live
+def test_yellow_travel_points_are_the_pinned_sources_own_stops():
+    """Every offered Yellow stop is read back out of the pinned source.
+
+    The four labels the Dunes-42 whale registers, the three the room creation
+    codes register, and the room each one flies to - straight from
+    obj_fast_travel_menu's own switch, with the room ID the merge rebases.
+    """
+    import json
+
+    from tools.yellow.registry import Registry
+
+    source = ROOT / "yellow_src"
+    provenance = json.loads((ROOT / "port" / "yellow_source.json").read_text())
+    registry = Registry(source, provenance)
+    rooms = {number: name for name, number in registry.sections["rooms"].items()}
+
+    registered = set()
+    dunes = (source / "objects/obj_mail_whale_dunes_42/Create_0.gml").read_text()
+    registered.update(re.findall(r'scr_fasttravel_add\("([^"]+)"\)', dunes))
+    for room in ("rm_hotland_02", "rm_steamworks_24", "rm_steamworks_32"):
+        code = (source / "rooms" / room / "RoomCreationCode.gml").read_text()
+        registered.update(re.findall(r'scr_fasttravel_add\("([^"]+)"\)', code))
+    assert len(registered) == 7, registered
+
+    menu = (source / "objects/obj_fast_travel_menu/Step_0.gml").read_text()
+    expected = {}
+    for block in re.finditer(r'case "([^"]+)":\s*global\.fast_travel_newroom = (\d+);', menu):
+        expected[block.group(1)] = rooms[int(block.group(2))]
+    assert set(expected) == registered, (sorted(expected), sorted(registered))
+    # The file under test offers exactly that list, in its own order.
+    offered = dict(re.findall(r'\{label = "([^"]+)", room = "([^"]+)"\}',
+                              (ROOT / "port" / "travel.lua").read_text()))
+    assert offered == expected, offered
 
 
 @live
@@ -352,7 +523,7 @@ def test_x_button_runs_with_clovers_run_sprites(vm):
             return moved,sprite,sprinting
         end
         local runDistance,runSprite,sprinting=probe(true)
-        if not sprinting then return "holding X did not sprint" end
+        if not R.truth(sprinting) then return "holding X did not sprint" end
         if runSprite~=R.manifest.yellow_names.sprites["spr_pl_run_down"] then
             return "sprint sprite is "..tostring(runSprite)..", not Clover's run cycle"
         end
@@ -492,3 +663,247 @@ def test_merged_packaging_stops_when_a_referenced_asset_is_absent(tmp_path, monk
     monkeypatch.setattr(packaging, "ROOT", tmp_path)
     with pytest.raises(ValueError, match="absent"):
         packaging.merged_files(generated)
+
+
+def walk_poses_in_source() -> set[str]:
+    """Yellow's walk-cycle poses, read from the pinned source's own folders.
+
+    The remap table claims to be the complete walk family - the four base
+    directions plus every recolour the pinned conversion carries. This derives
+    that family from the folders themselves so the claim cannot quietly rot.
+    """
+    import re
+    pattern = re.compile(r"^spr_pl_(up|down|left|right)(_(geno|water|water_geno|snowdin|snowdin_geno|roof|roof_geno))?$")
+    return {p.name for p in (ROOT / "yellow_src/sprites").iterdir()
+            if p.is_dir() and pattern.match(p.name)}
+
+
+def run_poses_in_source() -> set[str]:
+    return {p.name for p in (ROOT / "yellow_src/sprites").iterdir()
+            if p.is_dir() and p.name.startswith("spr_pl_run_")}
+
+
+def frisk_name_lists() -> tuple[set[str], set[str]]:
+    """The two name lists port/frisk.lua checks, read straight from the module."""
+    import re
+    text = (ROOT / "port/frisk.lua").read_text()
+    def listed(constant: str) -> set[str]:
+        body = text.split(f"Frisk.{constant} = ", 1)[1].split("}", 1)[0]
+        return set(re.findall(r'"(spr_pl_[a-z_]+)"', body))
+    return listed("BODY_SPRITES"), listed("RUN_SPRITES")
+
+
+@live
+def test_the_walk_remap_is_the_whole_walk_family_and_no_run_pose_enters_it():
+    """The two lists are checked against the pinned source, not against memory."""
+    walks, runs = frisk_name_lists()
+    assert walks == walk_poses_in_source(), \
+        f"walk remap differs from the pinned source: {walks ^ walk_poses_in_source()}"
+    assert runs == run_poses_in_source(), \
+        f"run list differs from the pinned source: {runs ^ run_poses_in_source()}"
+    assert not (walks & runs), "a run pose is listed as a walk pose"
+    assert len(runs) == 24, f"expected 24 run poses, listed {len(runs)}"
+
+
+@live
+def test_the_frisk_report_counts_the_remap_and_promises_the_run_swap(vm):
+    """The startup report must state both halves: walking is Frisk, running is Clover.
+
+    It used to count the remap with #remap on a table keyed by Yellow's
+    1,000,000-band IDs, which has no array part - so it reported "0 of
+    Yellow's player body sprites" on every launch, however well the rendering
+    worked.
+    """
+    result = vm.execute('''
+        local report
+        for _,line in ipairs(R.warningList) do
+            if line:find("Frisk-only rendering",1,true) then report=line end
+        end
+        if not report then return "no Frisk remap report at startup" end
+        local mapped=tonumber(report:match("(%d+) of Yellow's"))
+        if mapped ~= R.friskRemap.walk or mapped ~= 28 then
+            return "the report says "..tostring(mapped).." of "..tostring(R.friskRemap.walk).." walk poses"
+        end
+        if not report:find("running swaps to Clover",1,true) then
+            return "the report does not mention the run swap: "..report
+        end
+        -- Both halves of the contract, as the renderer will apply them.
+        local Frisk=require("port.frisk")
+        local sprites=R.manifest.yellow_names.sprites
+        for _,name in ipairs(Frisk.RUN_SPRITES) do
+            local id=sprites[name]
+            if not id then return "run pose "..name.." is missing from the merged manifest" end
+            if R.spriteForDraw(id)~=id then return "run pose "..name.." was remapped to Frisk" end
+        end
+        for _,name in ipairs(Frisk.BODY_SPRITES) do
+            local id=sprites[name]
+            if not id then return "walk pose "..name.." is missing from the merged manifest" end
+            if R.spriteForDraw(id)==id then return "walk pose "..name.." was not remapped to Frisk" end
+        end
+        return "ok"
+    ''')
+    assert result == "ok", result
+
+
+@live
+def test_every_run_family_the_game_selects_stays_clover(vm):
+    """Sprinting selects Clover's run sprite in every family the source can pick.
+
+    scr_determine_player_sprites is the game's own selector: it is called here
+    directly, so route (base/genocide) and global.player_sprites (the water
+    recolours) are both covered without needing a room that happens to be
+    water or a genocide save.
+    """
+    assert vm.execute("local ok,err=pcall(function() R:start() end) return ok and 'ok' or tostring(err)") == "ok"
+    crossToYellow(vm)
+    result = vm.execute('''
+        local sprites=R.manifest.yellow_names.sprites
+        local pl
+        for _,inst in ipairs(R.instances) do
+            if inst.alive and inst.v.object_index==R.manifest.yellow_names.objects["obj_pl"] then pl=inst end
+        end
+        if not pl then return "no player instance in Yellow's world" end
+        local function determine()
+            R:script("scr_determine_player_sprites", R:scope(pl))
+            return {right=pl.v.rsprite,up=pl.v.usprite,left=pl.v.lsprite,down=pl.v.dsprite}
+        end
+        local function check(label, route, playerSprites, walk, run)
+            local routeBefore,spritesBefore=R.global.route,R.global.player_sprites
+            R.global.route,R.global.player_sprites=route,playerSprites
+            -- GML's true/false are the numbers 1/0 here, exactly as the game's
+            -- own scr_normal_state writes them; a Lua boolean would not match
+            -- the script's own "is_sprinting == true" test.
+            pl.v.is_sprinting=0
+            local walked=determine()
+            pl.v.is_sprinting=1
+            local ran=determine()
+            R.global.route,R.global.player_sprites=routeBefore,spritesBefore
+            for direction,name in pairs(walk) do
+                if walked[direction]~=sprites[name] then
+                    return label.." walk "..direction.." selected "..tostring(walked[direction])..", expected "..name
+                end
+                if R.spriteForDraw(sprites[name])==sprites[name] then
+                    return label.." walk pose "..name.." was not drawn as Frisk"
+                end
+            end
+            for direction,name in pairs(run) do
+                if ran[direction]~=sprites[name] then
+                    return label.." run "..direction.." selected "..tostring(ran[direction])..", expected "..name
+                end
+                if R.spriteForDraw(sprites[name])~=sprites[name] then
+                    return label.." run pose "..name.." was remapped to Frisk"
+                end
+            end
+            return nil
+        end
+        local base={right="spr_pl_right",up="spr_pl_up",left="spr_pl_left",down="spr_pl_down"}
+        local baseRun={right="spr_pl_run_right",up="spr_pl_run_up",left="spr_pl_run_left",down="spr_pl_run_down"}
+        local geno={right="spr_pl_right_geno",up="spr_pl_up",left="spr_pl_left_geno",down="spr_pl_down_geno"}
+        local genoRun={right="spr_pl_run_right_geno",up="spr_pl_run_up_geno",
+                       left="spr_pl_run_left_geno",down="spr_pl_run_down_geno"}
+        local water={right="spr_pl_right_water",up="spr_pl_up_water",left="spr_pl_left_water",down="spr_pl_down_water"}
+        local waterRun={right="spr_pl_run_right_water",up="spr_pl_run_up_water",
+                        left="spr_pl_run_left_water",down="spr_pl_run_down_water"}
+        local waterGeno={right="spr_pl_right_water_geno",up="spr_pl_up_water",
+                         left="spr_pl_left_water_geno",down="spr_pl_down_water_geno"}
+        local waterGenoRun={right="spr_pl_run_right_water_geno",up="spr_pl_run_up_water_geno",
+                            left="spr_pl_run_left_water_geno",down="spr_pl_run_down_water_geno"}
+        local cases={
+            {"base",check("base",2,"normal",base,baseRun)},
+            {"genocide",check("genocide",3,"normal",geno,genoRun)},
+            {"water",check("water",2,"water",water,waterRun)},
+            {"water+genocide",check("water+genocide",3,"water",waterGeno,waterGenoRun)},
+        }
+        for _,case in ipairs(cases) do if case[2] then return case[2] end end
+        -- And a real sprint in the room, so the selector is not the only proof.
+        pl.v.x,pl.v.y=170,120
+        input:setSource("test",{39,88}); tick(3)
+        if pl.v.sprite_index~=sprites["spr_pl_run_right"] then
+            return "a real right-hand sprint drew "..tostring(pl.v.sprite_index)
+        end
+        input:setSource("test",{})
+        return "ok"
+    ''')
+    assert result == "ok", result
+
+
+@live
+def test_autorun_runs_while_walking_and_x_walks_instead(vm):
+    """AUTO RUN is Yellow's own option, driven from the port's pause menu.
+
+    With it on, moving runs - which is also the fastest way to see Clover's run
+    animation - and the run cluster becomes the walk key, exactly as Yellow's
+    own scr_normal_state decides it. It has to survive a crossing, because
+    scr_initialize resets Yellow's globals on the way in.
+    """
+    assert vm.execute("local ok,err=pcall(function() R:start() end) return ok and 'ok' or tostring(err)") == "ok"
+    crossToYellow(vm)
+    result = vm.execute('''
+        local sprites=R.manifest.yellow_names.sprites
+        local pl
+        -- Crossing destroys the other world's persistent instances, so the
+        -- player is looked up again after every crossing instead of kept.
+        local function player()
+            for _,inst in ipairs(R.instances) do
+                if inst.alive and inst.v.object_index==R.manifest.yellow_names.objects["obj_pl"] then pl=inst end
+            end
+            assert(pl and pl.alive, "no live player instance in Yellow's world")
+            return pl
+        end
+        player()
+        local function probe(keys)
+            player()
+            pl.v.x,pl.v.y=170,120
+            local y0=pl.v.y
+            input:setSource("test",keys); tick(4)
+            local moved=pl.v.y-y0
+            local sprite,sprinting=pl.v.sprite_index,pl.v.is_sprinting
+            input:setSource("test",{}); tick(1)
+            return moved,sprite,sprinting
+        end
+        if R.global.option_autorun~=0 then return "AUTO RUN must start off" end
+        R:setAutorun(true)
+        if R.global.option_autorun~=1 then
+            return "AUTO RUN did not reach Yellow's own option: "..tostring(R.global.option_autorun)
+        end
+        local runDistance,runSprite,sprinting=probe({40})
+        if not R.truth(sprinting) or runSprite~=sprites["spr_pl_run_down"] then
+            return "AUTO RUN did not run while walking: sprite "..tostring(runSprite)
+                ..", is_sprinting "..tostring(sprinting)
+        end
+        local walkDistance,walkSprite,walkSprinting=probe({40,88})
+        if R.truth(walkSprinting) or walkSprite~=sprites["spr_pl_down"] then
+            return "holding the run button must walk with AUTO RUN on: sprite "..tostring(walkSprite)
+                ..", is_sprinting "..tostring(walkSprinting)
+        end
+        if runDistance<=walkDistance then
+            return "AUTO RUN run distance "..runDistance.." is not faster than walking "..walkDistance
+        end
+        -- The port's setting is written where the game itself keeps it.
+        local B=R.builtins
+        B.ini_open(nil,"Controls.sav")
+        local saved=B.ini_read_real(nil,"Controls","autorun",0)
+        B.ini_close()
+        if saved~=1 then return "Controls.sav autorun is "..tostring(saved) end
+        -- ...and it survives leaving and re-entering Yellow's world.
+        R:gotoRoom(70); R:applyTransitions(); tick(2)
+        R.global.plot=122
+        R:gotoRoom(140); R:applyTransitions(); tick(3)
+        input:setSource("test",{88}); tick(2); input:setSource("test",{})
+        R:gotoRoom(140); R:applyTransitions(); tick(10)
+        if R.global.option_autorun~=1 then
+            return "AUTO RUN was lost across a crossing: "..tostring(R.global.option_autorun)
+        end
+        player()
+        R:setAutorun(false)
+        local offDistance,offSprite,offSprinting=probe({40})
+        if R.truth(offSprinting) or offSprite~=sprites["spr_pl_down"] then
+            return "AUTO RUN off must walk again: sprite "..tostring(offSprite)
+        end
+        local xDistance,xSprite,xSprinting=probe({40,88})
+        if not R.truth(xSprinting) or xSprite~=sprites["spr_pl_run_down"] then
+            return "with AUTO RUN off the run button must run again: sprite "..tostring(xSprite)
+        end
+        return "ok"
+    ''')
+    assert result == "ok", result

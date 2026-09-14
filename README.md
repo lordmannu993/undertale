@@ -48,7 +48,9 @@ below.
   Undertale Yellow instead: Snowdin's dock → the Snowdin forest, Waterfall's
   dock → the Dunes, Hotland's dock → Yellow's Hotland. Yellow's UGPS mail
   whale lists the three Undertale docks and runs its own travel code to bring
-  you back beside the dock's boat.
+  you back beside the dock's boat. **Both services are open from the start of
+  a run**: the River Person's boat waits at every dock before Hotland, and the
+  UGPS lists every stop it can fly to, visited or not.
 - **Frisk everywhere.** Yellow's player keeps its own mechanics but is drawn
   as Frisk; holding **X** while walking runs at Yellow's run speed with
   Clover's `spr_pl_run_*` animation — the pose family Frisk's set doesn't
@@ -319,6 +321,9 @@ It has not been executed as part of this change.
 - **PAUSE** provides size/opacity adjustment, left-handed layout, optional
   vibration, reset, a control tester, and (from v0.1.7) a runtime-only
   **COLLISION** toggle for testing.
+- **AUTO RUN** (merged build): PAUSE also shows **AUTO RUN: ON/OFF**, saved with
+  the other settings. It drives Undertale Yellow's own option of that name —
+  moving runs, and the run button (**X**) walks instead.
 - Android **Back** pauses. Desktop **F2** opens the same pause screen.
 - Simultaneous fingers, gamepads, and physical keys have independent ownership;
   lifting one source does not cancel another. Short taps survive between ticks.

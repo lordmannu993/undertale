@@ -82,6 +82,11 @@ function Runtime.new(manifest,input,options)
         self.vars[name]=defaults(0)
     end
     for i=0,7 do self.vars.view_object[i]=-1;self.vars.view_hspeed[i]=-1;self.vars.view_vspeed[i]=-1 end
+    -- Studio 2 gives each viewport a camera. Yellow's own code reads
+    -- view_camera[...] directly (obj_mail_station_base, for one), so the table
+    -- has to exist and hold real camera ids rather than the 0 an unset global
+    -- would read as; port/yellow_studio.lua creates them on demand.
+    self.vars.view_camera=defaults(-1)
     self.vars.background_width=setmetatable({}, {__index=function(_,i) local b=self.assets.backgrounds[self.vars.background_index[i]];return b and b.width or 0 end})
     self.vars.background_height=setmetatable({}, {__index=function(_,i) local b=self.assets.backgrounds[self.vars.background_index[i]];return b and b.height or 0 end})
     local now=os.date("*t")
@@ -474,6 +479,11 @@ function Runtime:loadRoom(index,first)
         self.vars.view_hborder[i-1]=view.hborder or 32;self.vars.view_vborder[i-1]=view.vborder or 32
         self.vars.view_hspeed[i-1]=view.hspeed or -1;self.vars.view_vspeed[i-1]=view.vspeed or -1
         self.vars.view_angle[i-1]=0
+        -- The room's own view values are what a viewport's camera is seeded
+        -- from, so it is bound here, once the fields above are in place.
+        if Runtime.truth(self.vars.view_visible[i-1]) and self.builtins.view_get_camera then
+            self.builtins.view_get_camera(nil, i-1)
+        end
     end
     for i,b in ipairs(room.backgrounds) do
         local background=copy(b);self.roomState.backgrounds[i]=background

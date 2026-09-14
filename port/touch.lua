@@ -4,7 +4,7 @@ local Touch = {}
 Touch.__index = Touch
 local function clamp(x,a,b) return math.max(a,math.min(b,x)) end
 local function inside(r,x,y) return x>=r.x and y>=r.y and x<r.x+r.w and y<r.y+r.h end
-local defaults = {scale=1, opacity=0.75, southpaw=false, haptics=false, pixels=false}
+local defaults = {scale=1, opacity=0.75, southpaw=false, haptics=false, pixels=false, autorun=false}
 local settingsPath = "touch-settings-v1.txt"
 local pages = {
     {name="Actions", keys={{"Enter",13},{"Shift",16},{"Ctrl",17},{"Space",32},{"Esc",27},
@@ -29,7 +29,7 @@ function Touch.new(input, mobile)
             for key,val in data:gmatch("([a-z]+)=([^\n]+)") do
                 if key=="scale" then self.settings.scale=clamp(tonumber(val) or 1,0.8,1.25)
                 elseif key=="opacity" then self.settings.opacity=clamp(tonumber(val) or 0.75,0.3,1)
-                elseif key=="southpaw" or key=="haptics" or key=="pixels" then self.settings[key]=val=="true" end
+                elseif key=="southpaw" or key=="haptics" or key=="pixels" or key=="autorun" then self.settings[key]=val=="true" end
             end
         end
     end
@@ -40,7 +40,7 @@ end
 function Touch:save()
     if not (love and love.filesystem) then return end
     local lines={}
-    for _,key in ipairs({"scale","opacity","southpaw","haptics","pixels"}) do lines[#lines+1]=key.."="..tostring(self.settings[key]) end
+    for _,key in ipairs({"scale","opacity","southpaw","haptics","pixels","autorun"}) do lines[#lines+1]=key.."="..tostring(self.settings[key]) end
     love.filesystem.write(settingsPath,table.concat(lines,"\n"))
 end
 
@@ -131,8 +131,9 @@ function Touch:layoutMenu()
     local height=math.min(sh-20,390)
     self.menu={x=sx+(sw-width)/2,y=sy+(sh-height)/2,w=width,h=height}
     local m=self.menu
-    -- Seven rows now; the collision toggle is a testing aid, not a setting,
-    -- so it is not persisted with the rest (it resets to ON every launch).
+    -- Seven rows; the collision toggle is a testing aid, not a setting, so it
+    -- is not persisted with the rest (it resets to ON every launch). AUTO RUN
+    -- shares its row: it is a setting, and the merge's own option backs it.
     local row=math.min(44,(height-76)/7)
     self.menuButtons={}
     local function b(label,action,column,line)
@@ -147,6 +148,7 @@ function Touch:layoutMenu()
     b("CONTROL TEST","test",0,5)
     b(self.settings.pixels and "SCALE: INTEGER" or "SCALE: FIT","pixels",1,5)
     b(self.collision and "COLLISION: ON" or "COLLISION: OFF","collision",0,6)
+    b(self.settings.autorun and "AUTO RUN: ON" or "AUTO RUN: OFF","autorun",1,6)
 end
 
 function Touch:setPaused(value)
@@ -192,8 +194,12 @@ function Touch:action(button)
     elseif a=="collision" then
         self.collision=not self.collision
         if self.onCollision then self.onCollision(self.collision) end
+    elseif a=="autorun" then self.settings.autorun=not self.settings.autorun
     elseif a=="reset" then for k,v in pairs(defaults) do self.settings[k]=v end end
     self:save()
+    -- AUTO RUN is a real setting, so the game is told about it on every menu
+    -- action - including RESET CONTROLS, which turns it back off.
+    if self.onAutorun then self.onAutorun(self.settings.autorun) end
     self:resize(self.w,self.h,self.safe)
 end
 
@@ -332,6 +338,12 @@ function Touch:draw()
         local m=self.menu
         g.setColor(0.055,0.065,0.085,1);g.rectangle("fill",m.x,m.y,m.w,m.h,12)
         g.setColor(1,1,1,1);g.setFont(self.largeFont);g.printf("PAUSED",m.x,m.y+15,m.w,"center")
+        -- Which build this is: the fastest way to tell a stale download from a
+        -- freshly published one, without reading the game's own version screen.
+        if self.version then
+            g.setFont(self.captionFont);g.setColor(0.67,0.7,0.74,1)
+            g.printf(self.version,m.x,m.y+20,m.w-14,"right")
+        end
         for _,b in ipairs(self.menuButtons) do button(b) end
     end
     g.pop()
