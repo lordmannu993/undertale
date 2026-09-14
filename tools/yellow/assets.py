@@ -47,6 +47,17 @@ def relative(source: Path, root: Path, path: Path) -> str:
     return path.resolve().relative_to(root.resolve()).as_posix()
 
 
+def image_speed(playback_speed, speed_type, game_speed: int) -> float:
+    """GameMaker 1.4 ``image_speed`` for a Studio 2 playback speed.
+
+    ``playbackSpeedType`` 0 counts *frames per second*, which GameMaker 1.4 has
+    no word for; Yellow's own game speed (``options_main.yy``, 30) converts it.
+    Type 1 already counts frames per game step, which is 1.4's own unit.
+    """
+    speed = float(playback_speed if playback_speed is not None else 1) or 0.0
+    return speed if int(speed_type or 0) == 1 else speed / max(1, int(game_speed or 30))
+
+
 class AssetConverter:
     def __init__(self, registry: Registry, root: Path, provenance: dict):
         self.registry = registry
@@ -140,7 +151,7 @@ class AssetConverter:
                 "playback_speed": speed,
                 "playback_speed_type": speed_type,
                 # GameMaker 1.4 image_speed, derived from Yellow's own numbers.
-                "image_speed": speed if speed_type == 1 else speed / self.game_speed,
+                "image_speed": image_speed(speed, speed_type, self.game_speed),
                 "length": float(sequence.get("length", len(frames)) or len(frames)),
                 "playback": int(sequence.get("playback", 1) or 0),
                 "nine_slice": bool(nine),
@@ -288,6 +299,15 @@ class AssetConverter:
             return None
         width, height = png_size(texture)
         animation = data.get("tileAnimation") or {}
+        frame_count = int(animation.get("SerialiseFrameCount", 1) or 1)
+        frame_data = animation.get("FrameData") or []
+        tile_count = int(data.get("tile_count", 0) or 0)
+        if frame_count > 1 and len(frame_data) != tile_count * frame_count:
+            # FrameData is one row of `frame_count` tile indices per tile, so a
+            # short or long table means the pinned record cannot be read as
+            # authored animation. Never pad, truncate or guess it.
+            raise GMS2Error(f"tilesets/{name}: tileAnimation.FrameData has {len(frame_data)} entries, "
+                            f"expected tile_count {tile_count} x SerialiseFrameCount {frame_count}")
         return {
             "name": name,
             "width": width, "height": height,
@@ -297,7 +317,7 @@ class AssetConverter:
                 "texture_sprite": texture_sprite,
                 "tile_width": int(data.get("tileWidth", 0) or 0),
                 "tile_height": int(data.get("tileHeight", 0) or 0),
-                "tile_count": int(data.get("tile_count", 0) or 0),
+                "tile_count": tile_count,
                 "out_columns": int(data.get("out_columns", 0) or 0),
                 "tile_x_offset": int(data.get("tilexoff", 0) or 0),
                 "tile_y_offset": int(data.get("tileyoff", 0) or 0),
@@ -305,7 +325,10 @@ class AssetConverter:
                 "tile_v_separation": int(data.get("tilevsep", 0) or 0),
                 "output_h_border": int(data.get("out_tilehborder", 0) or 0),
                 "output_v_border": int(data.get("out_tilevborder", 0) or 0),
-                "animation_frames": animation.get("FrameData") or [],
+                "animation_frames": frame_data,
+                "animation_frame_count": frame_count,
+                # Studio 2 tileset animation speed is authored in FPS (the tile
+                # set editor's "FPS" field), unlike a sprite's playback speed.
                 "animation_speed": data.get("tileAnimationSpeed"),
                 "auto_tile_sets": len(data.get("autoTileSets") or []),
             },

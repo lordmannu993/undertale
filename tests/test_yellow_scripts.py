@@ -66,10 +66,12 @@ def test_yellow_runtime_namespace_and_builtin_adapter_do_not_rebind_undertale_na
         assert(yellow.builtins.array_length_1d~=nil)
         assert(yellow.builtins.is_undefined~=nil)
         assert(yellow.builtins.keyboard_multicheck_pressed==nil)
+        -- layer_create is a real layer now; a facility this port genuinely
+        -- lacks (cross-room layer editing) still stops with its own name.
         local ok, error_message=pcall(function()
-            yellow:call("layer_create", yellow:scope(nil))
+            yellow:call("layer_set_target_room", yellow:scope(nil))
         end)
-        assert(not ok and string.find(error_message, "Compatibility stop: layer_create", 1, true))
+        assert(not ok and string.find(error_message, "Compatibility stop: layer_set_target_room", 1, true))
     """)
 
 
