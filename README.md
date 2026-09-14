@@ -48,7 +48,9 @@ below.
   Undertale Yellow instead: Snowdin's dock → the Snowdin forest, Waterfall's
   dock → the Dunes, Hotland's dock → Yellow's Hotland. Yellow's UGPS mail
   whale lists the three Undertale docks and runs its own travel code to bring
-  you back beside the dock's boat.
+  you back beside the dock's boat. **Both services are open from the start of
+  a run**: the River Person's boat waits at every dock before Hotland, and the
+  UGPS lists every stop it can fly to, visited or not.
 - **Frisk everywhere.** Yellow's player keeps its own mechanics but is drawn
   as Frisk; holding **X** while walking runs at Yellow's run speed with
   Clover's `spr_pl_run_*` animation — the pose family Frisk's set doesn't

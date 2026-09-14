@@ -16,6 +16,13 @@
 -- data: the docks are obj_dogboat_thing's three room_goto targets, and the
 -- Yellow spots are the room/x/y triples in obj_fast_travel_menu's switch.
 -- Undertale dock landings are read from the dock room's own boat instance.
+--
+-- Both services are open from the first frame, because the owner asked for
+-- exactly that: the River Person is there before Hotland (the shipped boat
+-- deletes itself below global.plot 122 - see openRiverService) and the UGPS
+-- whale flies to every stop its own menu can hold, not only the ones the
+-- player has walked past (see openWhaleService). Neither service invents a
+-- destination: the stops and their landings stay the games' own data.
 local Travel = {}
 Travel.VERSION = 1
 Travel.SAVE_FILE = "merge.sav"
@@ -43,6 +50,54 @@ local X_BUTTONS = {88, 16}
 -- checks compare it against GML's true/false (1/0).
 local AUTORUN_ON, AUTORUN_OFF = 1, 0
 
+-- The River Person's boat removes itself in its own Create event while
+-- global.plot is under 122, which is the value Undyne's Waterfall chase writes
+-- (obj_undyne_ex, obj_undynea_chaser, obj_undyneboss, obj_undynefall and the
+-- two undynetrigger objects). Until then no dock has a boat at all - the
+-- owner's report that the River Person cannot be used before Hotland. The
+-- port lifts that single guard for the duration of that single event: every
+-- other line of the Create event, which is where the boat builds itself,
+-- runs exactly as the game wrote it.
+local RIVER_PLOT = 122
+
+-- Undertale Yellow registers its fast-travel stops as the player finds them:
+-- four in the Dunes-42 whale scene (obj_mail_whale_dunes_42/Create_0.gml) and
+-- one per room whose creation code calls scr_fasttravel_add (rm_hotland_02,
+-- rm_steamworks_24, rm_steamworks_32). These are those seven labels, verbatim,
+-- with the room each one flies to - the room numbers are the ones Yellow's own
+-- obj_fast_travel_menu switch hands the whale, read through the merged ID
+-- space, because Yellow's room 56 and the merged build's room 56 are two
+-- different rooms. A test asserts both halves against the pinned source so a
+-- typo cannot silently move a stop.
+local YELLOW_TRAVEL_POINTS = {
+    {label = "Dunes - Oasis Valley", room = "rm_dunes_30"},
+    {label = "Dunes - West Mines", room = "rm_dunes_05"},
+    {label = "Hotland - Crossroads", room = "rm_hotland_02"},
+    {label = "Snowdin - Forest", room = "rm_snowdin_11_yellow"},
+    {label = "Steamw. - C. Station", room = "rm_steamworks_32"},
+    {label = "Steamw. - Commons", room = "rm_steamworks_24"},
+    {label = "Wild East - Farm", room = "rm_dunes_42"},
+}
+-- Exposed for the merge tests, which pin every label and every room against
+-- the pinned Yellow source rather than against this file.
+Travel.YELLOW_TRAVEL_POINTS = YELLOW_TRAVEL_POINTS
+
+-- Every UGPS whale ends its fly-in when fly_speed reaches exactly zero, and
+-- the approach decrements it by 0.2 from 2 - a subtraction no binary float
+-- lands on zero with (from 2.0 the tenth step is about 2.8e-16, the eleventh
+-- is negative). The game's own next line, scene 2, is the Mail/Travel
+-- dialogue; without it the whale hovers and the UGPS cannot be used at all.
+-- The port reads that last step as the landing the game wrote it to be.
+local WHALE_APPROACH_SCENE = 1
+local WHALE_LANDING_SPEED = 0.2
+local WHALE_OBJECTS = {
+    "obj_mail_whale",
+    "obj_mail_whale_arrive",
+    "obj_mail_whale_dunes_42",
+    "obj_mail_whale_snowdin_11",
+    "obj_mail_whale_steamworks_32",
+}
+
 function Travel.install(R)
     if R.manifest.game ~= "merged" then return nil end
     local base = R.manifest.yellow_base or 1000000
@@ -67,10 +122,18 @@ function Travel.install(R)
         },
         riverDestinations = RIVER_DESTINATIONS,
         whaleDestinations = WHALE_DESTINATIONS,
+        whaleObjects = {},
     }, {__index = Travel})
+    for _, name in ipairs(WHALE_OBJECTS) do
+        local id = yellowNames.objects and yellowNames.objects[name]
+        if id then travel.whaleObjects[id] = name end
+    end
     R.travel = travel
     travel:loadSave()
     travel.world = travel:worldOf(R.manifest.room_order and R.manifest.room_order[1] or 0)
+    -- The boat's own gate is patched before any room can place one, and the
+    -- UGPS switch is left alone until Yellow's world exists to hold it.
+    travel:openRiverService()
 
     local gotoRoom = R.gotoRoom
     function R:gotoRoom(index)
@@ -175,6 +238,8 @@ function Travel:beginCrossing(world, room)
         self:applyEquipment(scope)
         -- ...and it resets Yellow's own options with them, AUTO RUN included.
         self:applyAutorun()
+        -- ...and it resets the UGPS switch and its list with them too.
+        self:openWhaleService()
     end
     if world == "yellow" and self.pendingCoordinates then
         -- Yellow's rooms spawn their own player from these globals while the
@@ -345,23 +410,37 @@ function Travel:beforeStep()
     -- Steamworks vents recreate it), which would silently drop AUTO RUN; the
     -- pause menu is this build's menu for that option, so it is asserted here.
     self:applyAutorun()
-    self:offerWhaleDestinations()
+    self:openWhaleService()
+    self:landWhales()
     -- The whale menu only knows its own seven entries; fill the travel globals
-    -- for ours so Yellow's own whale code carries out the trip.
-    local labels = {}
-    for _, destination in ipairs(WHALE_DESTINATIONS) do labels[destination.label] = destination.room end
-    local selected = nil
+    -- for ours so Yellow's own whale code carries out the trip. Yellow's menu
+    -- writes the room numbers of Yellow's own ID space for its own stops, and
+    -- a merged build has to read those through the merged space: the menu's
+    -- room 56 is Yellow's Snowdin forest, not Undertale's room 56.
+    local docks, yellowStops = {}, {}
+    for _, destination in ipairs(WHALE_DESTINATIONS) do docks[destination.label] = destination.room end
+    local yellowRooms = R.manifest.yellow_names and R.manifest.yellow_names.rooms or {}
+    for _, destination in ipairs(YELLOW_TRAVEL_POINTS) do
+        local room = yellowRooms[destination.room]
+        if room then yellowStops[destination.label] = room end
+    end
+    local selected, confirmed = nil, R.global.fast_travel_point
     for _, instance in ipairs(R.instances) do
         if instance.alive and instance.v.object_index == self.ids.yellow.whaleMenu then
             selected = instance.v.point_selected
         end
     end
-    local chosen = labels[selected] or labels[R.global.fast_travel_point]
+    local chosen = docks[selected] or docks[confirmed]
+    local yellowStop = yellowStops[selected] or yellowStops[confirmed]
     if chosen then
         local x, y = self:landingSpot("undertale", chosen)
         R.global.fast_travel_newroom = chosen
         R.global.fast_travel_newx = x
         R.global.fast_travel_newy = y
+    elseif yellowStop then
+        -- A Yellow stop keeps the x/y Yellow's own menu wrote for it; only the
+        -- ID space of the room changes.
+        R.global.fast_travel_newroom = yellowStop
     end
 end
 
@@ -369,12 +448,92 @@ function Travel:offerWhaleDestinations()
     local R = self.runtime
     local list = R.global.fast_travel_list
     if not list or type(list) ~= "number" or not R.truth(R.builtins.ds_exists(nil, list, 2)) then return end
+    -- Seeding is idempotent, but it is also pointless to repeat once the list
+    -- has not moved since the last pass; rooms and the menu only ever add.
+    local size = R.builtins.ds_list_size(nil, list)
+    if self.whaleList == list and self.whaleListSize == size then return end
+    local scope = nil
+    for _, instance in ipairs(R.instances) do
+        if instance.alive then scope = instance break end
+    end
+    -- Yellow's own registration script refuses duplicates and keeps the list
+    -- sorted, which is exactly the order its menu draws and walks.
     for _, destination in ipairs(WHALE_DESTINATIONS) do
-        if R.builtins.ds_list_find_index(nil, list, destination.label) == -1 then
-            R.builtins.ds_list_add(nil, list, destination.label)
+        R:call("scr_fasttravel_add", R:scope(scope), destination.label)
+    end
+    for _, destination in ipairs(YELLOW_TRAVEL_POINTS) do
+        R:call("scr_fasttravel_add", R:scope(scope), destination.label)
+    end
+    self.whaleList, self.whaleListSize = list, R.builtins.ds_list_size(nil, list)
+end
+
+-- The River Person, open from the first frame. The boat's own Create event is
+-- wrapped rather than rewritten: while it runs, global.plot reads as the value
+-- that lets the boat exist, and every other line of that event - the sprite
+-- choice, the riverman instance, the room-316 ride setup - is the game's own.
+function Travel:openRiverService()
+    local R = self.runtime
+    local boat = self.ids.undertale.boat
+    if not boat or self.riverOpened then return end
+    local record = R:object(boat)
+    local events = record and record.events
+    local create = events and events["0:0"]
+    if type(create) ~= "function" then
+        R:warn("travel-river-service",
+            "obj_dogboat_thing has no Create event in this build, so the River Person keeps the game's own plot gate.")
+        return
+    end
+    self.riverOpened = true
+    events["0:0"] = function(runtime, scope)
+        local plot = runtime.global.plot
+        if type(plot) == "number" and plot < RIVER_PLOT then
+            runtime.global.plot = RIVER_PLOT
+        end
+        local ok, result = pcall(create, runtime, scope)
+        runtime.global.plot = plot
+        if not ok then error(result, 0) end
+        return result
+    end
+    R:warn("travel-river-service",
+        "The River Person's boat is at every dock from the start: its own " ..
+        "global.plot < 122 guard is lifted while that one Create event runs.")
+end
+
+-- The landing step of every whale's approach (see WHALE_APPROACH_SCENE).
+-- Only scene 1 is touched, only while the whale is still descending, and only
+-- on the value the game's own decrement left behind, so every other frame of
+-- the animation - including the takeoff and the delivery - is untouched.
+function Travel:landWhales()
+    local R = self.runtime
+    for _, instance in ipairs(R.instances) do
+        local v = instance.alive and instance.v or nil
+        if v and self.whaleObjects[v.object_index]
+            and v.scene == WHALE_APPROACH_SCENE
+            and type(v.fly_speed) == "number"
+            and v.fly_speed > 0 and v.fly_speed < WHALE_LANDING_SPEED then
+            R:warn("travel-ugps-landing",
+                "A UGPS whale's approach ends when its fly_speed reaches exactly zero; the " ..
+                "game's 0.2 decrement from 2 leaves about 2.8e-16 instead, so the last step " ..
+                "is read as the landing and the Mail/Travel dialogue opens as written.")
+            v.fly_speed = 0
         end
     end
-    R.builtins.ds_list_sort(nil, list, false)
+end
+
+-- The UGPS whale, open from the first frame. global.player_can_travel is the
+-- game's own switch for "this whale will fly you" (obj_mail_whale's menu only
+-- shows Travel when it is set, and the Dunes-42 scene normally sets it), so
+-- the port sets the same switch and then offers every stop.
+function Travel:openWhaleService()
+    local R = self.runtime
+    if not self.ids.yellow.whaleMenu then return end
+    if not R.truth(R.global.player_can_travel) then
+        R.global.player_can_travel = 1
+        R:warn("travel-ugps",
+            "UGPS fast travel is open from the start: ringing any mail station's bell offers " ..
+            "Travel to all " .. tostring(#WHALE_DESTINATIONS + #YELLOW_TRAVEL_POINTS) .. " stops, visited or not.")
+    end
+    self:offerWhaleDestinations()
 end
 
 -- A merged save layer of its own. Each game keeps the save files it already
