@@ -14,6 +14,12 @@
 -- Clover's up-walk has no recolour variants; the other directions carry the
 -- route, water, Snowdin and Steamworks-roof ones). A pair that stops
 -- resolving is a broken merged manifest and fails the build.
+--
+-- The run cycle is the other half of the same contract and is asserted rather
+-- than left implicit: every run pose the pinned source carries is listed in
+-- Frisk.RUN_SPRITES, none of them may appear in the remap table, and one that
+-- goes missing stops the build by name instead of silently drawing Frisk's
+-- walk pose while the player is sprinting.
 local Frisk = {}
 
 Frisk.BODY_SPRITES = {
@@ -33,11 +39,29 @@ Frisk.DIRECTION_OF = {
     right = "spr_maincharar",
 }
 
+-- Clover's run cycle: the poses that stay Clover on purpose, because Frisk's
+-- set has no run animation at all. scr_determine_player_sprites picks one of
+-- these four families whenever is_sprinting is set - the base cycle, Yellow's
+-- genocide-route recolour, the water recolours, and the Snowdin/roof
+-- recolours that the base cycle's own name resolution reaches through
+-- global.player_sprites. All of them are listed so the swap the owner asked
+-- for is checked in both directions: none may enter the walk remap.
+Frisk.RUN_SPRITES = {
+    "spr_pl_run_up", "spr_pl_run_down", "spr_pl_run_left", "spr_pl_run_right",
+    "spr_pl_run_up_geno", "spr_pl_run_down_geno", "spr_pl_run_left_geno", "spr_pl_run_right_geno",
+    "spr_pl_run_up_water", "spr_pl_run_down_water", "spr_pl_run_left_water", "spr_pl_run_right_water",
+    "spr_pl_run_up_water_geno", "spr_pl_run_down_water_geno",
+    "spr_pl_run_left_water_geno", "spr_pl_run_right_water_geno",
+    "spr_pl_run_up_snowdin", "spr_pl_run_down_snowdin", "spr_pl_run_left_snowdin",
+    "spr_pl_run_right_snowdin",
+    "spr_pl_run_up_snowdin_geno", "spr_pl_run_down_snowdin_geno",
+    "spr_pl_run_left_snowdin_geno", "spr_pl_run_right_snowdin_geno",
+}
+
 -- Poses that deliberately stay Clover because Frisk's set has no equivalent:
--- the run cycle the owner wants on the X button, the revolver poses, the
--- Steamworks goggles, the dance and the lying-down poses.
-Frisk.KEPT_CLOVER = { "spr_pl_run_up", "spr_pl_run_down", "spr_pl_run_left",
-                      "spr_pl_run_right", "spr_pl_dance", "spr_pl_lying",
+-- the revolver poses, the Steamworks goggles, the dance and the lying-down
+-- poses. (The run cycle has its own list above.)
+Frisk.KEPT_CLOVER = { "spr_pl_dance", "spr_pl_lying",
                       "spr_pl_goggles_up", "spr_pl_goggles_down",
                       "spr_pl_goggles_left", "spr_pl_goggles_right",
                       "spr_pl_goggles_hit", "spr_pl_goggles_shoot",
@@ -51,6 +75,10 @@ function Frisk.install(R)
     local yellowSprites = (R.manifest.yellow_names or {}).sprites or {}
 
     local remap, missing = {}, {}
+    -- Counted, not taken with #remap: the table is keyed by Yellow's sprite
+    -- IDs (1000000 + the pinned Asset_Order ID), so it has no array part and
+    -- #remap is 0 however many poses are actually remapped.
+    local mapped = 0
     for _, cloverName in ipairs(Frisk.BODY_SPRITES) do
         local direction = cloverName:match("^spr_pl_(%a+)")
         local friskName = Frisk.DIRECTION_OF[direction]
@@ -59,12 +87,27 @@ function Frisk.install(R)
             missing[#missing + 1] = cloverId and friskName or cloverName
         else
             remap[cloverId] = friskId
+            mapped = mapped + 1
         end
     end
     if #missing > 0 then
         table.sort(missing)
         error(("frisk: player sprite(s) missing from the merged manifest: %s")
             :format(table.concat(missing, ", ")))
+    end
+
+    -- Running must show Clover. Each run pose has to be present (a missing one
+    -- would draw Frisk's walk pose instead) and outside the walk remap.
+    for _, name in ipairs(Frisk.RUN_SPRITES) do
+        local id = yellowSprites[name]
+        if not id then
+            error(("frisk: Yellow's run pose %s is missing from the merged manifest; "
+                .. "running would draw Frisk's walk pose instead of Clover's"):format(name))
+        end
+        if remap[id] then
+            error(("frisk: Yellow's run pose %s is remapped to Frisk; "
+                .. "Clover's run cycle must stay Clover's"):format(name))
+        end
     end
 
     local kept = {}
@@ -80,8 +123,10 @@ function Frisk.install(R)
     end
     table.sort(kept)
     R:warn("frisk-remap",
-        ("Frisk-only rendering: %d of Yellow's player body sprites draw Undertale's Frisk; these stay Clover: %s.")
-            :format(#remap, table.concat(kept, ", ")))
+        ("Frisk-only rendering: %d of Yellow's %d walk poses draw Undertale's Frisk; "
+            .. "running swaps to Clover (%d run poses, none remapped). %d poses stay Clover "
+            .. "for lack of a Frisk equivalent: %s.")
+            :format(mapped, #Frisk.BODY_SPRITES, #Frisk.RUN_SPRITES, #kept, table.concat(kept, ", ")))
 
     -- Draw-time hook consumed by port/graphics.lua. Sprite records, masks,
     -- image_number and every gameplay lookup keep resolving to Clover; only
@@ -90,6 +135,7 @@ function Frisk.install(R)
     function R.spriteForDraw(index)
         return remap[index] or index
     end
+    R.friskRemap = { remap = remap, walk = mapped, run = #Frisk.RUN_SPRITES }
     return remap
 end
 

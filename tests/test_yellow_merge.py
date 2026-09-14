@@ -352,7 +352,7 @@ def test_x_button_runs_with_clovers_run_sprites(vm):
             return moved,sprite,sprinting
         end
         local runDistance,runSprite,sprinting=probe(true)
-        if not sprinting then return "holding X did not sprint" end
+        if not R.truth(sprinting) then return "holding X did not sprint" end
         if runSprite~=R.manifest.yellow_names.sprites["spr_pl_run_down"] then
             return "sprint sprite is "..tostring(runSprite)..", not Clover's run cycle"
         end
@@ -492,3 +492,165 @@ def test_merged_packaging_stops_when_a_referenced_asset_is_absent(tmp_path, monk
     monkeypatch.setattr(packaging, "ROOT", tmp_path)
     with pytest.raises(ValueError, match="absent"):
         packaging.merged_files(generated)
+
+
+def walk_poses_in_source() -> set[str]:
+    """Yellow's walk-cycle poses, read from the pinned source's own folders.
+
+    The remap table claims to be the complete walk family - the four base
+    directions plus every recolour the pinned conversion carries. This derives
+    that family from the folders themselves so the claim cannot quietly rot.
+    """
+    import re
+    pattern = re.compile(r"^spr_pl_(up|down|left|right)(_(geno|water|water_geno|snowdin|snowdin_geno|roof|roof_geno))?$")
+    return {p.name for p in (ROOT / "yellow_src/sprites").iterdir()
+            if p.is_dir() and pattern.match(p.name)}
+
+
+def run_poses_in_source() -> set[str]:
+    return {p.name for p in (ROOT / "yellow_src/sprites").iterdir()
+            if p.is_dir() and p.name.startswith("spr_pl_run_")}
+
+
+def frisk_name_lists() -> tuple[set[str], set[str]]:
+    """The two name lists port/frisk.lua checks, read straight from the module."""
+    import re
+    text = (ROOT / "port/frisk.lua").read_text()
+    def listed(constant: str) -> set[str]:
+        body = text.split(f"Frisk.{constant} = ", 1)[1].split("}", 1)[0]
+        return set(re.findall(r'"(spr_pl_[a-z_]+)"', body))
+    return listed("BODY_SPRITES"), listed("RUN_SPRITES")
+
+
+@live
+def test_the_walk_remap_is_the_whole_walk_family_and_no_run_pose_enters_it():
+    """The two lists are checked against the pinned source, not against memory."""
+    walks, runs = frisk_name_lists()
+    assert walks == walk_poses_in_source(), \
+        f"walk remap differs from the pinned source: {walks ^ walk_poses_in_source()}"
+    assert runs == run_poses_in_source(), \
+        f"run list differs from the pinned source: {runs ^ run_poses_in_source()}"
+    assert not (walks & runs), "a run pose is listed as a walk pose"
+    assert len(runs) == 24, f"expected 24 run poses, listed {len(runs)}"
+
+
+@live
+def test_the_frisk_report_counts_the_remap_and_promises_the_run_swap(vm):
+    """The startup report must state both halves: walking is Frisk, running is Clover.
+
+    It used to count the remap with #remap on a table keyed by Yellow's
+    1,000,000-band IDs, which has no array part - so it reported "0 of
+    Yellow's player body sprites" on every launch, however well the rendering
+    worked.
+    """
+    result = vm.execute('''
+        local report
+        for _,line in ipairs(R.warningList) do
+            if line:find("Frisk-only rendering",1,true) then report=line end
+        end
+        if not report then return "no Frisk remap report at startup" end
+        local mapped=tonumber(report:match("(%d+) of Yellow's"))
+        if mapped ~= R.friskRemap.walk or mapped ~= 28 then
+            return "the report says "..tostring(mapped).." of "..tostring(R.friskRemap.walk).." walk poses"
+        end
+        if not report:find("running swaps to Clover",1,true) then
+            return "the report does not mention the run swap: "..report
+        end
+        -- Both halves of the contract, as the renderer will apply them.
+        local Frisk=require("port.frisk")
+        local sprites=R.manifest.yellow_names.sprites
+        for _,name in ipairs(Frisk.RUN_SPRITES) do
+            local id=sprites[name]
+            if not id then return "run pose "..name.." is missing from the merged manifest" end
+            if R.spriteForDraw(id)~=id then return "run pose "..name.." was remapped to Frisk" end
+        end
+        for _,name in ipairs(Frisk.BODY_SPRITES) do
+            local id=sprites[name]
+            if not id then return "walk pose "..name.." is missing from the merged manifest" end
+            if R.spriteForDraw(id)==id then return "walk pose "..name.." was not remapped to Frisk" end
+        end
+        return "ok"
+    ''')
+    assert result == "ok", result
+
+
+@live
+def test_every_run_family_the_game_selects_stays_clover(vm):
+    """Sprinting selects Clover's run sprite in every family the source can pick.
+
+    scr_determine_player_sprites is the game's own selector: it is called here
+    directly, so route (base/genocide) and global.player_sprites (the water
+    recolours) are both covered without needing a room that happens to be
+    water or a genocide save.
+    """
+    assert vm.execute("local ok,err=pcall(function() R:start() end) return ok and 'ok' or tostring(err)") == "ok"
+    crossToYellow(vm)
+    result = vm.execute('''
+        local sprites=R.manifest.yellow_names.sprites
+        local pl
+        for _,inst in ipairs(R.instances) do
+            if inst.alive and inst.v.object_index==R.manifest.yellow_names.objects["obj_pl"] then pl=inst end
+        end
+        if not pl then return "no player instance in Yellow's world" end
+        local function determine()
+            R:script("scr_determine_player_sprites", R:scope(pl))
+            return {right=pl.v.rsprite,up=pl.v.usprite,left=pl.v.lsprite,down=pl.v.dsprite}
+        end
+        local function check(label, route, playerSprites, walk, run)
+            local routeBefore,spritesBefore=R.global.route,R.global.player_sprites
+            R.global.route,R.global.player_sprites=route,playerSprites
+            -- GML's true/false are the numbers 1/0 here, exactly as the game's
+            -- own scr_normal_state writes them; a Lua boolean would not match
+            -- the script's own "is_sprinting == true" test.
+            pl.v.is_sprinting=0
+            local walked=determine()
+            pl.v.is_sprinting=1
+            local ran=determine()
+            R.global.route,R.global.player_sprites=routeBefore,spritesBefore
+            for direction,name in pairs(walk) do
+                if walked[direction]~=sprites[name] then
+                    return label.." walk "..direction.." selected "..tostring(walked[direction])..", expected "..name
+                end
+                if R.spriteForDraw(sprites[name])==sprites[name] then
+                    return label.." walk pose "..name.." was not drawn as Frisk"
+                end
+            end
+            for direction,name in pairs(run) do
+                if ran[direction]~=sprites[name] then
+                    return label.." run "..direction.." selected "..tostring(ran[direction])..", expected "..name
+                end
+                if R.spriteForDraw(sprites[name])~=sprites[name] then
+                    return label.." run pose "..name.." was remapped to Frisk"
+                end
+            end
+            return nil
+        end
+        local base={right="spr_pl_right",up="spr_pl_up",left="spr_pl_left",down="spr_pl_down"}
+        local baseRun={right="spr_pl_run_right",up="spr_pl_run_up",left="spr_pl_run_left",down="spr_pl_run_down"}
+        local geno={right="spr_pl_right_geno",up="spr_pl_up",left="spr_pl_left_geno",down="spr_pl_down_geno"}
+        local genoRun={right="spr_pl_run_right_geno",up="spr_pl_run_up_geno",
+                       left="spr_pl_run_left_geno",down="spr_pl_run_down_geno"}
+        local water={right="spr_pl_right_water",up="spr_pl_up_water",left="spr_pl_left_water",down="spr_pl_down_water"}
+        local waterRun={right="spr_pl_run_right_water",up="spr_pl_run_up_water",
+                        left="spr_pl_run_left_water",down="spr_pl_run_down_water"}
+        local waterGeno={right="spr_pl_right_water_geno",up="spr_pl_up_water",
+                         left="spr_pl_left_water_geno",down="spr_pl_down_water_geno"}
+        local waterGenoRun={right="spr_pl_run_right_water_geno",up="spr_pl_run_up_water_geno",
+                            left="spr_pl_run_left_water_geno",down="spr_pl_run_down_water_geno"}
+        local cases={
+            {"base",check("base",2,"normal",base,baseRun)},
+            {"genocide",check("genocide",3,"normal",geno,genoRun)},
+            {"water",check("water",2,"water",water,waterRun)},
+            {"water+genocide",check("water+genocide",3,"water",waterGeno,waterGenoRun)},
+        }
+        for _,case in ipairs(cases) do if case[2] then return case[2] end end
+        -- And a real sprint in the room, so the selector is not the only proof.
+        pl.v.x,pl.v.y=170,120
+        input:setSource("test",{39,88}); tick(3)
+        if pl.v.sprite_index~=sprites["spr_pl_run_right"] then
+            return "a real right-hand sprint drew "..tostring(pl.v.sprite_index)
+        end
+        input:setSource("test",{})
+        return "ok"
+    ''')
+    assert result == "ok", result
