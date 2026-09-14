@@ -33,8 +33,8 @@ objects → rooms → merged world. Each piece is one PR, merged before the next
 | 1 | Pinned source pipeline + merged asset registry + every sprite, sound, font and tileset texture converted | **complete** |
 | 2 | GMS2 GML: language support in the compiler, all 1 155 Yellow scripts converted, name→ID rewriting, GMS2 builtins in the runtime | **complete** |
 | 3 | All 3 224 Yellow objects and their events, with parents, masks and collision-event targets | **complete** |
-| 4 | All 287 Yellow rooms: instances, creation code, tile layers from tilesets, backgrounds, views; plus the 68 paths | **in progress** — complete source conversion, partial static rendering; animation/transform parity remains |
-| 5 | One world: River Person + UGPS cross-game destinations, Frisk as the only player (Clover's run sprites on X), Frisk's weapons/armours plus Clover's ammo/accessories, saves, packaging, release | not started |
+| 4 | All 287 Yellow rooms: instances, creation code, tile layers from tilesets, backgrounds, views; plus the 68 paths | **complete** — conversion, animation, tile transforms, layers and layer elements; 25 rooms whose layer effects or physics worlds have no equivalent stay named stops |
+| 5 | One world: River Person + UGPS cross-game destinations, Frisk as the only player (Clover's run sprites on X), Frisk's weapons/armours plus Clover's ammo/accessories, saves, packaging, release | **in progress** — merged manifest, both travel hubs, world initialization and versioned merged saves are done and tested headlessly; Frisk-only rendering, the X-run, ammo/accessory slots, native gates and the release remain |
 
 ## Rules this merge follows (same as the rest of the port)
 
@@ -195,59 +195,123 @@ python3 tools/yellow_convert.py --stage objects # convert assets, scripts and al
 Live gates skip (never pass silently) when `yellow_src/` is absent, and CI fetches it, so
 the full-asset conversion is proven on every pull request.
 
-## Pieces 4–5 work in progress (2026-09-13)
+## Pieces 4–5 status (2026-09-14)
 
-**This is not completion of the requested combined chunks. Do not merge or release
-it as a connected game.** Piece 5 has not been implemented. Existing Undertale
-packaging and release links remain unchanged, and do not include Yellow.
+Piece 4 is complete. Piece 5 is **partly** implemented: the merged world, its two
+travel hubs and its save layer are done and tested headlessly, while Frisk-only
+rendering, the equipment slots, native gates and the release are not. **No merged
+release has been published**, because this document gates publication on native
+travel and save tests that do not exist yet.
 
-Implemented so far:
+### Piece 4: rooms, animation, transforms and layers
 
-- `tools/yellow_convert.py --stage rooms` builds the earlier stages plus all
-  **287 rooms**, **68 paths**, **7,637 placed instances**, **1,340 room/instance
-  creation-code files**, and **199,258 static/animated drawable records**.
-- `tools/yellow/rooms.py` validates tile RLE cardinality, resolves references
-  through the pinned registry, uses `RoomOrderNodes` for traversal order and
-  `instanceCreationOrder` for creation order, and retains original layer records.
-  Path coordinates/speeds/kind/closure/precision are copied, not inferred.
-- Editor instance IDs are explicitly **port handles**, reversibly encoded as
-  `2**32 + hexadecimal inst_ suffix`. They are not claimed to be recovered numeric
-  GameMaker runtime instance IDs. The band does not overlap runtime-created or
-  Undertale editor instances.
-- Room layer depth, instance transform/colour/alpha/image fields and numeric view
-  target IDs reach the runtime. Static sprite asset layers and static sprite
-  backgrounds can render without rebinding Undertale's asset names.
-- Unsupported room features stop **before** the old room receives Room End or
-  Clean Up. The generated report enumerates **506 feature findings across 107
-  rooms**: animated tiles/sprite assets, tile transform flags, moving backgrounds,
-  depth-sorted colour layers, effects and physics. Some findings refer to hidden
-  layers; these are conservatively blocked rather than silently losing features
-  when game scripts later enable them.
-- Fixed `fetch_yellow.py` deleting its non-cached tarball *before* extraction.
-  Both cached and temporary download paths have regression tests.
+- `tools/yellow/rooms.py` converts all **287 rooms** and **68 paths**: 7 637 placed
+  instances, 1 340 creation-code files, **199 454 drawables** across **3 006
+  layers**, with tile RLE cardinality validated and every reference resolved
+  through the pinned registry.
+- Tile transform bits are decoded, not guessed: bits 0–18 are the tile index,
+  bit 28 mirror, bit 29 flip, bit 30 a 90° clockwise rotation, and any other bit
+  set is a conversion error. Mirror and flip are applied before rotation, which is
+  the order GameMaker documents.
+- `ts_steamworks_tileset` is the one animated tileset. Its `FrameData` rows are
+  per-tile-index cycles driven by a single global tile clock, at the 5 FPS the
+  texture page records, and a placed tile animates from its own index onwards.
+- Sprite asset layers honour `GMRSpriteGraphic.animationSpeed` as a multiplier on
+  sprite playback speed and `headPosition` as the starting frame; background layer
+  animation converts `animationFPS` at the game's own 30 FPS.
+- `port/yellow_layers.lua` implements the `layer_*` and `layer_background_*`
+  families plus `layer_tilemap_get_id`, and `R:buildLayerElements()` gives scripts
+  the element model they query (`layerelementtype_*`: background 1, instance 2,
+  sprite 3, tilemap 4). Yellow's GameMaker 1.4 tile helpers compare
+  `layer_get_element_type == 7`, which never matches a Studio 2 tilemap, so they
+  stay faithful no-ops here exactly as they are in the shipped game.
+- Tile, background and sprite drawable positions are **layer-relative**; the
+  renderer adds the layer's own offset.
+- 40 named room-feature stops remain, covering **38 layer effects** (`Effect_1`,
+  sepia, pixelate, distort, twirl, flashback and similar) and **2 physics worlds**.
+  The 25 rooms that need them are blocked rather than rendered without them.
 
-Validation: the full local headless suite passed **272 tests**, including the
-**15-test** focused room suite. The live gates compile every generated room and its manifest in
-Lua 5.1 and LuaJIT, assert the pinned counts, and compare all 68 paths directly
-against their `.yy` source. These tests do **not** establish native Yellow pixels,
-working Yellow gameplay, or cross-game travel.
+### Yellow now starts
 
-Concrete startup blocker: starting the generated Yellow manifest headlessly reaches
-`obj_controller [Create] in rm_intro`, then stops at **`display_set_gui_size`**.
-No GUI-size handler has been silently stubbed. Getting past this one call would
-not prove the remaining game works.
+The startup blocker recorded earlier in this document is gone. Headlessly, the
+converted Yellow manifest runs `rm_intro` (90 s of intro), takes a key press into
+`rm_logos`, another into `rm_mmfirst`, and reaches **`rm_ruins00` with 24
+instances**; 9 000 frames pass with no compatibility stop, and holding a direction
+moves `obj_pl` 120 px in three seconds until geometry stops it. Getting there took
+real implementations, not stubs:
 
-Remaining before completing pieces 4–5:
+- `display_set_gui_size`, the GUI/application-surface path and `draw_self`.
+- **GMLive**: the pinned source is a shipped build whose GMLive is already inert
+  (`live_call()` returns false, `live_init`/`live_update`/`live_room_start` are
+  empty), so those 21 scripts now convert literally and behave as they do on a
+  real device. Only the live-editing entry point itself, which uses Studio
+  constructors this compiler cannot express, stays a named stop. Every Yellow
+  event begins with `if (live_call()) return global.live_result;`, so this was the
+  difference between a game that runs and one that stops in `obj_gmlive`.
+- `port/yellow_studio.lua`: data structures (`ds_list`, `ds_map`, `ds_grid`),
+  GPU blend modes, the extra drawing calls, primitives, cameras and viewports,
+  gamepads, and the object/sprite/collision helpers.
 
-1. Implement and verify animation timing, transformed tile drawing, layer
-   visibility/mutation and colour-depth behavior; add native Yellow render gates.
-   Check Studio instance image-speed multipliers against sprite playback speed.
-2. Resolve the startup and reachable-room runtime builtin gaps, preserving named
-   stops for explicitly unsupported effects/physics instead of claiming parity.
-3. Implement and test River Person ↔ UGPS routing and game initialization at both
-   ends, with no duplicate persistent controller/player instances.
-4. Add Frisk-only rendering plus X-run, ammo/accessory equipment integration, and
-   versioned shared saves with old-save migration and round-trip tests.
-5. Add an opt-in merged manifest/package with collision-safe script/asset
-   namespaces, build gates and native travel/save tests. Only then publish a new
-   immutable experimental release and update download links.
+Two documented deviations are reported on every run instead of being silent:
+
+- **Texture groups do not exist here.** Assets are single files loaded on demand,
+  so `texture_prefetch`/`texture_flush` have nothing to do, and the pinned
+  decompilation carries no tag records for `asset_get_tags` to return.
+- **Shaders are not converted.** `sh_palette_swap` and the other 16 shaders have
+  no LÖVE equivalent, so a shader that would be set is reported and skipped and the
+  scene keeps its original colours. `sprite_get_texture`/`texture_get_uvs` still
+  return real values, because each sprite frame really is its own texture.
+
+### Piece 5: what is implemented
+
+- **One manifest, two worlds.** `tools/merge.py` writes
+  `generated/merged/manifest.lua`, which `port/merge.lua` builds from the two
+  conversions. Undertale keeps its recovered IDs below `YELLOW_BASE` (1 000 000)
+  and Yellow keeps its band above it, and the merge *checks* that invariant rather
+  than assuming it: Yellow's own numeric room references (`room_goto(56)`) only
+  work because room IDs are `YELLOW_BASE + the project's own index`. Undertale's
+  `names` stay authoritative; Yellow's names sit beside them in `yellow_names`,
+  with the 4 colliding names resolved in Undertale's favour and listed in the
+  report.
+- **River Person → Yellow.** The boat already ends in `obj_dogboat_thing`
+  travelling to one of three docks (70 Snowdin, 125 Waterfall, 140 Hotland).
+  Holding **X** — the cancel button, on screen for touch — during the ride sends
+  the same choice to the matching Yellow landing spot from Yellow's own fast-travel
+  table: Snowdin dock → `rm_snowdin_11_yellow` (200, 100), Waterfall dock →
+  `rm_dunes_05` (510, 170), Hotland dock → `rm_hotland_02` (170, 120). No
+  recovered script or object was edited to do this.
+- **UGPS whale → Undertale.** `obj_fast_travel_menu` lists `global.fast_travel_list`
+  and writes `global.fast_travel_newroom/newx/newy` for the highlighted entry, so
+  the bridge adds three dock entries to that list with `ds_list_add` and fills the
+  same three globals; Yellow's own whale code performs the trip. Frisk lands beside
+  the dock room's own boat or player instance.
+- **Initialization at both ends.** Crossing into Yellow runs Yellow's own
+  `scr_initialize()` before the room loads (its room creation code registers fast
+  travel points, which needs the globals it creates), then makes sure exactly one
+  `obj_controller` and one `obj_pl` exist. Persistent instances of the world being
+  left are destroyed, so there is never a second player. Undertale needs no
+  equivalent: the merged build boots through Undertale's own title flow.
+- **Versioned merged saves.** `merge.sav` carries `version`, `crossings`,
+  `last_room` and `world`. It is additive: each game keeps the save files it
+  already writes, so a single-game save is never rewritten. A file with an unknown
+  version is a named stop, not a guess.
+- **Packaging gate.** `tools/package.py --merged` refuses to build unless the
+  Yellow conversion reached its rooms stage with no compile errors, and never
+  regenerates Yellow itself.
+
+### Piece 5: what is not implemented
+
+1. **Frisk-only rendering.** Yellow's player still draws Clover; Clover's run
+   sprites are not bound to X.
+2. **Equipment.** Frisk's weapons/armours are untouched and Clover's ammunition
+   (weapon modifier) and accessories (armour modifier) are not extra slots yet.
+3. **Native gates.** The travel and save tests are headless. No LÖVE/xvfb or
+   Android run has crossed between worlds, and merged rendering has never been
+   looked at on a device. The merged archive would also be large: Yellow's
+   recovered assets ship inside it.
+4. **No release.** `port/version.lua` reads 0.1.11 for the working tree, but
+   nothing is tagged or published until the native gates above exist.
+
+Both games also share one `global` namespace in a merged build. Names used by both
+games refer to the same variable; crossing re-runs Yellow's own initializer, which
+is what keeps its side consistent.
