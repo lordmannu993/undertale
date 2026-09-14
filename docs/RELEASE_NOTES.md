@@ -4,6 +4,39 @@ This prerelease makes the current `.love` package downloadable from GitHub. It
 contains the converted Lua and the assets supplied in this repository. **It is
 not a completed or native-device-verified game, and it is not an APK.**
 
+## v0.1.11 (working tree — not published)
+
+Nothing is tagged or downloadable for this version yet: `docs/YELLOW.md` gates a
+merged release on native travel and save tests that do not exist. The working tree
+carries:
+
+- **Undertale Yellow piece 4 finished.** All 287 rooms, 68 paths, 199 454
+  drawables and 3 006 layers convert, with tile mirror/flip/rotate bits decoded,
+  the one animated tileset (`ts_steamworks_tileset`) running on a global tile
+  clock, sprite and background layer animation honoured, and the `layer_*`
+  families implemented. 25 rooms whose layer effects or physics worlds have no
+  equivalent here stay blocked with their own named stops.
+- **Yellow starts.** The recorded startup blocker is gone: headlessly the game
+  runs the intro, the logos, the first-time menu and into `rm_ruins00`, and the
+  player walks. GMLive's 21 inert shipped scripts now convert literally instead
+  of stopping, which is what every Yellow object event's opening
+  `if (live_call())` needed.
+- **A merged build exists.** `tools/merge.py` writes one manifest for both games,
+  `port/merge.lua` checks the ID bands, and `tools/package.py --merged` refuses to
+  build unless the Yellow conversion is complete.
+- **Two doors between the worlds.** Hold X during a River Person boat ride and the
+  destination you chose lands in Undertale Yellow instead (Snowdin dock →
+  `rm_snowdin_11_yellow`, Waterfall dock → `rm_dunes_05`, Hotland dock →
+  `rm_hotland_02`); Yellow's UGPS mail whale lists the three Undertale docks and
+  uses its own travel globals to bring Frisk back beside the dock's boat.
+- **A versioned merged save layer.** `merge.sav` records version, crossings, last
+  room and world. It is additive: each game keeps the save files it already
+  writes, so an existing single-game save is never rewritten, and an unknown
+  version stops with its own name.
+- Still open for piece 5: Frisk-only rendering (Clover's run sprites on X),
+  Clover's ammunition and accessories as extra equipment slots, native
+  (LÖVE/xvfb and Android) travel and save gates.
+
 ## v0.1.10 features
 
 - **Glyde encounters are 20× faster.** `obj_encounterer_glyde`'s `scr_steps`

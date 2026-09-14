@@ -229,8 +229,14 @@ def test_script_stage_is_complete_but_later_stages_still_refuse_partial_games():
     report = json.loads((ROOT / "generated/yellow/conversion-report.json").read_text())
     assert report["stage"] == "scripts"
     assert report["scripts"]["converted"] == 1155
-    assert report["scripts"]["functions"] == 1137
-    assert len(report["scripts"]["unsupported"]) == 22
+    assert report["scripts"]["functions"] == 1178
+    # The shipped build's own GMLive source is inert (live_call() returns false,
+    # live_init/live_update/live_room_start are empty), so those scripts convert
+    # literally instead of stopping; only the live-editing entry point itself,
+    # which uses GMS2 constructors this port cannot compile, stays a named stop.
+    assert len(report["scripts"]["gmlive_release_stubs"]) == 21
+    assert len(report["scripts"]["unsupported"]) == 1
+    assert report["scripts"]["unsupported"][0]["script"] == "GMLive"
     assert len(list((ROOT / "generated/yellow/scripts").glob("*.lua"))) == 1155
     manifest = (ROOT / "generated/yellow/manifest.lua").read_text()
     assert '"keyboard_multicheck_pressed"' in manifest

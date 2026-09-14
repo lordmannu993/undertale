@@ -46,8 +46,11 @@ local function boot()
         fail("The converted game is not built yet.\n\nRun from the repository:\npython3 tools/convert.py\nlove .\n\nOr build the Android-loadable archive with:\npython3 tools/package.py")
         return
     end
+    -- A merged build ships one manifest holding both games; see tools/merge.py.
+    local manifestModule="generated.manifest"
+    if love.filesystem.getInfo("generated/merged/manifest.lua","file") then manifestModule="generated.merged.manifest" end
     local ok,err=pcall(function()
-        game=Runtime.new(require("generated.manifest"),input,{trace=smokeMode,memorySaves=smokeMode,seed=smokeMode and 42 or nil})
+        game=Runtime.new(require(manifestModule),input,{trace=smokeMode,memorySaves=smokeMode,seed=smokeMode and 42 or nil})
         game:start()
     end)
     if not ok then fail(err) end

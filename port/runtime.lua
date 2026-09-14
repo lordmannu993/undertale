@@ -75,7 +75,7 @@ function Runtime.new(manifest,input,options)
     self.vars.os_type=(love and love.system and love.system.getOS()=="Android") and 5 or 0
     self.vars.room_speed=30; self.vars.view_current=0; self.vars.current_time=0
     self.vars.room=-1;self.vars.room_width=640;self.vars.room_height=480
-    self.vars.application_surface=-1;self.vars.transition_kind=0
+    self.vars.application_surface=0;self.vars.transition_kind=0
     for _,name in ipairs({"view_xview","view_yview","view_wview","view_hview","view_xport","view_yport","view_wport","view_hport","view_visible","view_object","view_hborder","view_vborder","view_hspeed","view_vspeed","view_angle",
         "background_index","background_visible","background_foreground","background_x","background_y","background_hspeed","background_vspeed",
         "background_htiled","background_vtiled","background_xscale","background_yscale","background_alpha","background_blend"}) do
@@ -92,7 +92,14 @@ function Runtime.new(manifest,input,options)
     require("port.audio")(self)
     require("port.graphics").install(self)
     require("port.collision").install(self)
+    -- The Studio 2 facilities install before the compatibility adapter: a real
+    -- implementation must win over the named stop port/yellow_builtins.lua
+    -- would otherwise register for the same builtin.
+    require("port.yellow_studio")(self)
+    require("port.yellow_layers")(self)
     require("port.yellow_builtins")(self)
+    -- Only a merged manifest has two worlds to travel between.
+    require("port.travel").install(self)
     return self
 end
 
@@ -369,6 +376,10 @@ function Runtime:create(objectIndex,x,y,spec,defer)
         instance.v.image_speed=spec.imageSpeed
         instance.v.image_alpha=math.floor(spec.colour/16777216)/255
         if spec.layerVisible==false then instance.v.visible=false end
+        -- Studio 2 instances live on a layer; the layer's own depth and
+        -- visibility decide how they draw. Kept off `v` so no GML variable
+        -- named `layer` can collide with it.
+        instance.layer=spec.layer
     end
     self.instances[#self.instances+1]=instance;self.byId[id]=instance
     if not defer then self:event(instance,0,0) end
@@ -424,7 +435,8 @@ function Runtime:loadRoom(index,first)
         end
         savedVars.room_speed=self.vars.room_speed
         self.storedRooms[self.vars.room]={instances=stored,tiles=self.roomState.tiles,backgrounds=self.roomState.backgrounds,
-            tileOffsets=self.roomState.tileOffsets,hiddenLayers=self.roomState.hiddenLayers,vars=savedVars}
+            tileOffsets=self.roomState.tileOffsets,hiddenLayers=self.roomState.hiddenLayers,vars=savedVars,
+            layers=self.roomState.layers,tileTime=self.roomState.tileTime}
     elseif self.roomState then
         self.storedRooms[self.vars.room]=nil
     end
@@ -441,7 +453,12 @@ function Runtime:loadRoom(index,first)
     for _,i in ipairs(self.instances) do if i.alive and Runtime.truth(i.v.persistent) then persistent[#persistent+1]=i end end
     self.instances=persistent;self.byId={}
     for _,i in ipairs(persistent) do self.byId[i.id]=i end
-    self.roomState={name=room.name,backdrop=room.port_backdrop,tiles={},backgrounds={},tileOffsets={},hiddenLayers={}}
+    self.roomState={name=room.name,backdrop=room.port_backdrop,tiles={},backgrounds={},tileOffsets={},hiddenLayers={},
+        layers={},animated={},tileTime=0}
+    -- Studio 2 layers are mutable at runtime (layer_set_visible, layer_depth,
+    -- layer_x, layer_hspeed ...), so the room's authored records are copied and
+    -- every drawable keeps the index of the layer it belongs to.
+    for i,layer in ipairs(room.layers or {}) do self.roomState.layers[i]=copy(layer) end
     self.vars.room=index;self.vars.room_width=room.width;self.vars.room_height=room.height
     self.vars.room_speed=room.speed;self.vars.room_persistent=self.roomPersistence[index]~=nil and self.roomPersistence[index] or room.persistent
     self.vars.background_color=room.colour;self.vars.background_showcolor=room.showcolour
@@ -470,6 +487,8 @@ function Runtime:loadRoom(index,first)
         for _,i in ipairs(stored.instances) do if not self.byId[i.id] then self.instances[#self.instances+1]=i;self.byId[i.id]=i end end
         self.roomState.tiles=stored.tiles;self.roomState.backgrounds=stored.backgrounds
         self.roomState.tileOffsets=stored.tileOffsets;self.roomState.hiddenLayers=stored.hiddenLayers
+        if stored.layers then self.roomState.layers=stored.layers end
+        self.roomState.tileTime=stored.tileTime or 0
         for name,v in pairs(stored.vars) do self.vars[name]=deepCopy(v) end
     else
         -- Make every editor instance addressable before any Create code runs.
@@ -482,6 +501,8 @@ function Runtime:loadRoom(index,first)
             if inst.alive and spec.create then spec.create(self,self:scope(inst)) end
         end
     end
+    self:indexAnimated()
+    if self.buildLayerElements then self:buildLayerElements() end
     if first then for _,i in ipairs(copy(self.instances)) do if i.alive then self:event(i,7,2) end end end
     if not stored and room.create then room.create(self,self:scope(nil)) end
     for _,i in ipairs(copy(self.instances)) do if i.alive then self:event(i,7,4) end end
@@ -489,6 +510,20 @@ function Runtime:loadRoom(index,first)
     if self.trimGraphicsCache then self:trimGraphicsCache() end
     if self.trimAudioCache then self:trimAudioCache() end
     if self.onRoom then self.onRoom(room) end
+end
+function Runtime:indexAnimated()
+    -- Only the room drawables that actually animate are visited per frame; a
+    -- Studio 2 room can carry tens of thousands of static tiles.
+    local animated={}
+    for _,tile in ipairs(self.roomState.tiles) do
+        if tile.speed and tile.speed~=0 then
+            local sprite=self.assets.sprites[tile.sprite]
+            tile._frames=sprite and #sprite.frames or 0
+            tile.frame=tile.frame or 0
+            animated[#animated+1]=tile
+        end
+    end
+    self.roomState.animated=animated
 end
 function Runtime:start()
     self.budget=0
@@ -622,6 +657,20 @@ function Runtime:finishFrame()
                     v.image_index=v.image_index%#sprite.frames;self:event(i,7,7)
                 end
             end
+        end
+    end
+    local state=self.roomState
+    if state then
+        -- Studio 2 animates every tile of a tileset from one shared tick, so a
+        -- whole animated tileset stays in step instead of drifting per tile.
+        state.tileTime=state.tileTime+1
+        for _,tile in ipairs(state.animated) do
+            tile.frame=tile.frame+tile.speed
+            if tile._frames>0 then tile.frame=tile.frame%tile._frames end
+        end
+        for _,layer in ipairs(state.layers) do
+            if layer.hspeed and layer.hspeed~=0 then layer.x=(layer.x or 0)+layer.hspeed end
+            if layer.vspeed and layer.vspeed~=0 then layer.y=(layer.y or 0)+layer.vspeed end
         end
     end
     for i=0,7 do

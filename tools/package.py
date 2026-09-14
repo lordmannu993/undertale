@@ -10,6 +10,7 @@ import argparse
 import hashlib
 import json
 from pathlib import Path
+import subprocess
 import sys
 import zipfile
 
@@ -17,7 +18,35 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from convert import Converter, ROOT
 
 
-def package(output: Path, regenerate=True):
+def merged_files(generated: Path) -> list[Path]:
+    """Everything a build with both games needs beyond the Undertale package.
+
+    The Yellow conversion is never regenerated here: it needs the pinned source
+    fetched by tools/fetch_yellow.py, and a merged archive must not ship a
+    half-converted game. A partial or failed Yellow conversion stops the build.
+    """
+    yellow = generated / "yellow"
+    report_path = yellow / "conversion-report.json"
+    if not report_path.is_file():
+        raise ValueError(
+            "Merged packaging needs a complete Yellow conversion first: "
+            "python3 tools/fetch_yellow.py && python3 tools/yellow_convert.py --stage rooms"
+        )
+    report = json.loads(report_path.read_text())
+    if report.get("stage") != "rooms":
+        raise ValueError(f"Yellow conversion stopped at stage {report.get('stage')!r}; a merged build needs the rooms stage.")
+    for section in ("scripts", "objects", "rooms"):
+        errors = (report.get(section) or {}).get("compile_errors") or []
+        if errors:
+            raise ValueError(f"Yellow {section} conversion has {len(errors)} compile errors; refusing to package a merged build.")
+    subprocess.run([sys.executable, str(ROOT / "tools/merge.py")], cwd=ROOT, check=True)
+    files = [generated / "merged" / "manifest.lua"]
+    files += sorted(path for path in yellow.rglob("*")
+                    if path.is_file() and not any(part.startswith(".") for part in path.relative_to(ROOT).parts))
+    return files
+
+
+def package(output: Path, regenerate=True, merged=False):
     generated = ROOT / "generated"
     if regenerate:
         report = Converter(ROOT, generated).run()
@@ -40,6 +69,8 @@ def package(output: Path, regenerate=True):
     if recovered_rooms.is_dir():
         files += sorted(recovered_rooms.iterdir())
     files += [generated / name for name in report["generated_files"]]
+    if merged:
+        files += merged_files(generated)
     for directory, extension in [("sprites/images", ".png"), ("background/images", ".png"), ("fonts", ".png")]:
         files += sorted((ROOT / directory).glob("*" + extension))
     files += sorted(p for p in (ROOT / "sound/audio").iterdir() if p.suffix.lower() in (".wav", ".ogg", ".mp3"))
@@ -82,11 +113,15 @@ def package(output: Path, regenerate=True):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--output", type=Path, default=ROOT / "artifacts/undertale-love-experimental.love")
+    parser.add_argument("--output", type=Path, default=None)
     parser.add_argument("--no-convert", action="store_true", help="Reuse an already validated generated/ tree")
+    parser.add_argument("--merged", action="store_true",
+                        help="Package both games: Undertale plus a complete Undertale Yellow conversion and the travel bridge")
     args = parser.parse_args()
+    default = "undertale-merged-love-experimental.love" if args.merged else "undertale-love-experimental.love"
+    output = (args.output or (ROOT / "artifacts" / default)).resolve()
     try:
-        package(args.output.resolve(), regenerate=not args.no_convert)
+        package(output, regenerate=not args.no_convert, merged=args.merged)
     except (ValueError, OSError) as exc:
         print(f"Packaging failed: {exc}", file=sys.stderr)
         return 1

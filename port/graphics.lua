@@ -17,6 +17,11 @@ function Graphics.install(R)
     if R.options.headless then g=nil end
     local state={color=16777215,alpha=1,font=-1,halign=0,valign=0,precision=32,images={},quads={},surfaces={},nextSurface=1,nextSprite=40000}
     R.graphicsState=state
+    -- GameMaker Studio 2 draws its GUI layer in its own coordinate space, sized
+    -- by display_set_gui_size and stretched over the presented image. 0 means
+    -- "follow the display", which is Studio 2's own default.
+    R.gui={width=0,height=0}
+    R.applicationSurfaceDraw=true
     R.drawLog={}
     local function log(kind,...)
         if R.options.trace and #R.drawLog<20000 then R.drawLog[#R.drawLog+1]={kind,...} end
@@ -36,15 +41,32 @@ function Graphics.install(R)
         if not state.quads[key] then state.quads[key]=g.newQuad(x,y,w,h,iw,ih) end
         return state.quads[key]
     end
-    local function part(file,left,top,width,height,x,y,sx,sy,tint,alpha)
-        if width<=0 or height<=0 or sx==0 or sy==0 then return end
-        local img=image(file);if not img then return end
+    local function partImage(img,key,left,top,width,height,x,y,sx,sy,tint,alpha,transform)
+        if not img or width<=0 or height<=0 or sx==0 or sy==0 then return end
         local iw,ih=img:getDimensions()
         local l,t=math.max(0,left),math.max(0,top)
         local r,b=math.min(iw,left+width),math.min(ih,top+height)
         if r<=l or b<=t then return end
+        local q=key and quad(key,l,t,r-l,b-t,iw,ih) or (g and g.newQuad(l,t,r-l,b-t,iw,ih))
+        if not q then return end
         color(tint,alpha)
-        g.draw(img,quad(file,l,t,r-l,b-t,iw,ih),x+(l-left)*sx,y+(t-top)*sy,0,sx,sy)
+        if transform and (transform.mirror or transform.flip or transform.rotate) then
+            -- GameMaker's tile transform: mirror (horizontal) and flip
+            -- (vertical) about the cell centre, then a 90 degree clockwise
+            -- rotation, which swaps the drawn box of a non-square tile.
+            local w,h=(r-l)*math.abs(sx),(b-t)*math.abs(sy)
+            if transform.rotate then w,h=h,w end
+            g.draw(img,q,x+w/2,y+h/2,transform.rotate and math.rad(90) or 0,
+                transform.mirror and -math.abs(sx) or math.abs(sx),
+                transform.flip and -math.abs(sy) or math.abs(sy),(r-l)/2,(b-t)/2)
+        else
+            g.draw(img,q,x+(l-left)*sx,y+(t-top)*sy,0,sx,sy)
+        end
+        if not key and q.release then q:release() end
+    end
+    local function part(file,left,top,width,height,x,y,sx,sy,tint,alpha,transform)
+        if width<=0 or height<=0 or sx==0 or sy==0 then return end
+        partImage(image(file),file,left,top,width,height,x,y,sx,sy,tint,alpha,transform)
     end
     local function sprite(E,index,sub,x,y,sx,sy,angle,tint,alpha,crop)
         local s=R.assets.sprites[index]
@@ -63,7 +85,115 @@ function Graphics.install(R)
             color(tint,alpha);g.draw(img,x,y,-math.rad(angle),sx,sy,s.xorig,s.yorigin)
         end
     end
-    local yellowDrawable=require("port.yellow_graphics").install(R,sprite)
+    local function backgroundPart(asset,left,top,width,height,x,y,sx,sy,tint,alpha,transform)
+        if not asset then return end
+        log("background",asset.name,x,y)
+        part(asset.file,left,top,width,height,x,y,sx,sy,tint,alpha,transform)
+    end
+    function R:fillRectangle(x1,y1,x2,y2,tint,alpha)
+        log("rectangle",x1,y1,x2,y2,0,tint,alpha)
+        if not g then return end
+        color(tint,alpha)
+        g.rectangle("fill",math.min(x1,x2),math.min(y1,y2),math.abs(x2-x1)+1,math.abs(y2-y1)+1)
+    end
+    local yellowDrawable=require("port.yellow_graphics").install(R,sprite,backgroundPart)
+    B.draw_self=function(E)
+        -- Studio 2's draw_self is exactly what this renderer does for an
+        -- instance whose object has no Draw event of its own.
+        local inst=E and E._self
+        if not inst then return end
+        local v=inst.v
+        sprite(E,v.sprite_index,v.image_index,v.x,v.y,v.image_xscale,v.image_yscale,
+            v.image_angle,v.image_blend,v.image_alpha)
+    end
+    -- Display, window and GUI size. Studio 2 keeps a GUI layer of its own size
+    -- and stretches it over the presented image, so display_set_gui_size(320,240)
+    -- on a 1920x1440 surface draws GUI coordinates at 320x240 and scales them.
+    local function displaySize()
+        if g then return g.getDimensions() end
+        return R.displayWidth or 0,R.displayHeight or 0
+    end
+    function R:guiSize(displayWidth,displayHeight)
+        if self.gui.width>0 and self.gui.height>0 then return self.gui.width,self.gui.height end
+        return displayWidth or self.displayWidth or 0,displayHeight or self.displayHeight or 0
+    end
+    B.display_get_width=function() return (displaySize()) end
+    B.display_get_height=function() return select(2,displaySize()) end
+    B.window_get_width=B.display_get_width
+    B.window_get_height=B.display_get_height
+    B.display_get_gui_width=function() return (R:guiSize(displaySize())) end
+    B.display_get_gui_height=function() return select(2,R:guiSize(displaySize())) end
+    B.display_set_gui_size=function(_,w,h)
+        w,h=math.floor(w or 0),math.floor(h or 0)
+        -- A non-positive size is Studio 2's "back to the display size".
+        if w<=0 or h<=0 then R.gui.width,R.gui.height=0,0 else R.gui.width,R.gui.height=w,h end
+    end
+    B.display_set_gui_maximize=function(_,scale)
+        local width,height=displaySize()
+        scale=(type(scale)=="number" and scale>0) and scale or 1
+        R.gui.width,R.gui.height=width/scale,height/scale
+    end
+    local function surfaceCanvas(id)
+        if id==0 or id==R.vars.application_surface then return state.surfaces[0] end
+        return state.surfaces[id]
+    end
+    B.surface_exists=function(_,id)
+        if id==0 or id==R.vars.application_surface then return R.num(R.applicationSurfaceDraw or surfaceCanvas(0)~=nil) end
+        return R.num(surfaceCanvas(id)~=nil)
+    end
+    B.surface_get_width=function(_,id)
+        local canvas=surfaceCanvas(id)
+        if canvas and canvas.getWidth then return canvas:getWidth() end
+        if id==0 or id==R.vars.application_surface then return R.displayWidth or 0 end
+        return 0
+    end
+    B.surface_get_height=function(_,id)
+        local canvas=surfaceCanvas(id)
+        if canvas and canvas.getHeight then return canvas:getHeight() end
+        if id==0 or id==R.vars.application_surface then return R.displayHeight or 0 end
+        return 0
+    end
+    B.surface_resize=function(_,id,w,h)
+        w,h=math.max(1,math.floor(w or 1)),math.max(1,math.floor(h or 1))
+        if id==0 or id==R.vars.application_surface then
+            -- This port presents the room's viewport union fitted to the window,
+            -- so a larger application surface would only supersample the same
+            -- image. The request is recorded and reported, never silently dropped.
+            R.applicationSurfaceSize={width=w,height=h}
+            R:warn("application-surface-resize","surface_resize(application_surface, "..w..", "..h..
+                ") is recorded; this port scales the room's viewport union to the window instead.")
+            return
+        end
+        local canvas=surfaceCanvas(id)
+        if canvas and canvas.resize then canvas:resize(w,h) end
+    end
+    B.surface_free=function(_,id)
+        if id==0 or id==R.vars.application_surface then
+            R:warn("application-surface-free","The application surface belongs to the port's renderer and is not freed.")
+            return
+        end
+        local canvas=state.surfaces[id]
+        if canvas and canvas.release then canvas:release() end
+        state.surfaces[id]=nil
+    end
+    B.surface_set_target=function(_,id) local canvas=surfaceCanvas(id);if g and canvas then g.setCanvas(canvas) end end
+    B.surface_reset_target=function() if g then g.setCanvas(state.surfaces[0] or nil) end end
+    B.application_surface_draw_enable=function(_,enable) R.applicationSurfaceDraw=R.truth(enable) end
+    B.application_surface_is_enabled=function() return R.num(R.applicationSurfaceDraw) end
+    B.draw_surface=function(_,id,x,y) partImage(surfaceCanvas(id),"__surface_"..tostring(id),0,0,
+        B.surface_get_width(nil,id),B.surface_get_height(nil,id),x,y,1,1,16777215,state.alpha) end
+    B.draw_surface_ext=function(_,id,x,y,sx,sy,angle,tint,alpha)
+        local canvas=surfaceCanvas(id)
+        if not canvas then return end
+        log("surface",tostring(id),x,y,sx,sy)
+        if not g then return end
+        color(tint,alpha);g.draw(canvas,x,y,-math.rad(angle or 0),sx,sy)
+    end
+    B.draw_surface_part=function(_,id,l,t,w,h,x,y) partImage(surfaceCanvas(id),"__surface_"..tostring(id),l,t,w,h,x,y,1,1,16777215,state.alpha) end
+    B.draw_surface_part_ext=function(_,id,l,t,w,h,x,y,sx,sy,tint,alpha)
+        log("surface",tostring(id),x,y,sx,sy)
+        partImage(surfaceCanvas(id),"__surface_"..tostring(id),l,t,w,h,x,y,sx,sy,tint,alpha)
+    end
     B.draw_sprite=function(E,index,sub,x,y) sprite(E,index,sub,x,y,1,1,0,16777215,state.alpha) end
     B.draw_sprite_ext=function(E,index,sub,x,y,sx,sy,angle,tint,alpha) sprite(E,index,sub,x,y,sx,sy,angle,tint,alpha) end
     B.draw_sprite_part=function(E,index,sub,l,t,w,h,x,y) sprite(E,index,sub,x,y,1,1,0,16777215,state.alpha,{l,t,w,h}) end
@@ -323,17 +453,33 @@ function Graphics.install(R)
             g.push("all");g.setCanvas(self.canvas);g.origin();g.setBlendMode("alpha");g.clear(rgba(self.vars.background_color,1))
         end
         local list={}
-        for i,tile in ipairs(self.roomState.tiles) do list[#list+1]={depth=tile.depth,order=i,tile=tile} end
-        for i,inst in ipairs(self.instances) do if inst.alive and inst.active then list[#list+1]={depth=inst.v.depth,order=1000000+i,instance=inst} end end
+        local layers=self.roomState.layers
+        for i,tile in ipairs(self.roomState.tiles) do
+            local layer=tile.layer and layers[tile.layer]
+            list[#list+1]={depth=(layer and layer.depth) or tile.depth,order=i,tile=tile,layer=layer}
+        end
+        for i,inst in ipairs(self.instances) do
+            if inst.alive and inst.active then
+                local layer=inst.layer and layers[inst.layer]
+                list[#list+1]={depth=(layer and layer.depth) or inst.v.depth,order=1000000+i,instance=inst,layer=layer}
+            end
+        end
         table.sort(list,function(a,b) if a.depth==b.depth then return a.order<b.order end;return a.depth>b.depth end)
         -- GameMaker runs a whole Draw Begin pass over the instances, then Draw,
-        -- then Draw End, and skips all of them for an invisible instance. Tiles
-        -- keep their own interleaved pass: that is the order Undertale's draw
-        -- calls are verified against, and Yellow's tile layers arrive in piece 4.
-        local function drawPass(kind,number)
+        -- then Draw End, and skips all of them for an invisible instance. A
+        -- Studio 2 layer hidden with layer_set_visible hides its instances too:
+        -- the draw pass never reaches them, while their Step events still run.
+        local function drawable(item)
+            local layer=item.layer
+            return not (layer and layer.visible==false)
+        end
+        local function drawPass(kind,number,ignoreLayers)
             for _,item in ipairs(list) do
                 local inst=item.instance
-                if inst and inst.alive and inst.active and self.truth(inst.v.visible) then self:event(inst,kind,number) end
+                if inst and inst.alive and inst.active and self.truth(inst.v.visible)
+                   and (ignoreLayers or drawable(item)) then
+                    self:event(inst,kind,number)
+                end
             end
         end
         drawPass(8,76) -- Pre Draw: before this frame's own drawing starts
@@ -355,8 +501,14 @@ function Graphics.install(R)
             for _,item in ipairs(list) do
                 if item.tile then
                     local t=item.tile
-                    if t.sprite then
-                        if not self.roomState.hiddenLayers[t.depth] then yellowDrawable(t,view) end
+                    if t.yellow then
+                        -- Studio 2 drawable: tile map cell, asset-layer sprite or
+                        -- texture region, scrolling/animated background layer, or
+                        -- a colour-only background layer. Its layer owns depth,
+                        -- visibility and position offsets.
+                        if drawable(item) and not self.roomState.hiddenLayers[item.depth] then
+                            yellowDrawable(t,view,item.layer)
+                        end
                     elseif t.visible~=false and not self.roomState.hiddenLayers[t.depth] then
                         local shift=self.roomState.tileOffsets[t.depth] or {0,0}
                         local x,y=t.x+shift[1],t.y+shift[2]
@@ -366,7 +518,7 @@ function Graphics.install(R)
                     end
                 else
                     local inst=item.instance
-                    if inst.alive and inst.active and self.truth(inst.v.visible) then
+                    if inst.alive and inst.active and self.truth(inst.v.visible) and drawable(item) then
                         local drawn=self:event(inst,8,0)
                         if not drawn and inst.v.sprite_index>=0 then
                             local v=inst.v;sprite(self:scope(inst),v.sprite_index,v.image_index,v.x,v.y,v.image_xscale,v.image_yscale,v.image_angle,v.image_blend,v.image_alpha)
@@ -382,10 +534,20 @@ function Graphics.install(R)
         -- Draw GUI is display space: no view transform, no viewport scissor.
         -- The canvas this draws into is what love.draw presents, so GUI events
         -- land on screen exactly where they say, unscaled by any view.
-        if g then g.setScissor();g.origin() end
-        drawPass(8,74) -- Draw GUI Begin
-        drawPass(8,64) -- Draw GUI
-        drawPass(8,75) -- Draw GUI End
+        -- Studio 2 additionally gives the GUI layer its own size, which the
+        -- display stretches: display_set_gui_size(320,240) on a 640x480 image
+        -- draws GUI coordinates at half scale.
+        local guiWidth,guiHeight=self:guiSize(width,height)
+        self.guiScaleX=(guiWidth>0 and width/guiWidth) or 1
+        self.guiScaleY=(guiHeight>0 and height/guiHeight) or 1
+        if g then
+            g.setScissor();g.origin()
+            if self.guiScaleX~=1 or self.guiScaleY~=1 then g.scale(self.guiScaleX,self.guiScaleY) end
+        end
+        -- GUI drawing is not bound to a room layer's visibility.
+        drawPass(8,74,true) -- Draw GUI Begin
+        drawPass(8,64,true) -- Draw GUI
+        drawPass(8,75,true) -- Draw GUI End
         if g then g.setScissor();g.setCanvas();g.pop() end
         self.vars.view_current=0
     end

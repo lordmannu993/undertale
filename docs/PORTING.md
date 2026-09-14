@@ -122,6 +122,26 @@ script manifest uses names rather than inventing a numeric GMS2 script index, an
 keeps Yellow names under `yellow_names` so a collision cannot rebind an Undertale
 name.
 
+`port/yellow_studio.lua` implements the Studio 2 facilities Yellow's converted code
+calls for real: `ds_list`/`ds_map`/`ds_grid`, GPU blend modes, primitives and the
+extra drawing calls, cameras and viewports (GameMaker gives every viewport a
+camera, which is how Yellow's 1.4 compatibility shim reads `view_xview`), and a
+gamepad family that reports "not connected" because this port feeds touch and
+keyboard through the same key events. `port/yellow_layers.lua` implements the
+`layer_*` families and the element model rooms are built from.
+
+Two deviations are reported on every run rather than hidden: texture groups do not
+exist here (assets are single files loaded on demand, and the pinned
+decompilation carries no tag records), and Yellow's 17 shaders are not converted,
+so a shader that would be set is reported and skipped and the scene keeps its
+original colours.
+
+A merged build adds `port/merge.lua`, which builds one manifest out of both
+conversions and checks the ID bands instead of assuming them, and `port/travel.lua`,
+which connects Undertale's River Person boat and Yellow's UGPS mail whale,
+initialises each world with its own scripts, and keeps a versioned `merge.sav`
+beside the save files each game already writes. See `docs/YELLOW.md`.
+
 Piece 3 adds `tools/yellow/objects.py`, which writes each Yellow object in the same
 module shape `tools/convert.py` uses for Undertale (metadata plus
 `object.events["kind:number"]`), and `compile_gml2_event`, which compiles an event

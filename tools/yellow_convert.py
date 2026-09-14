@@ -189,6 +189,9 @@ class ScriptConverter:
         self.calls: dict[str, int] = {}
         self.rewrites: dict[str, int] = {}
         self.unsupported: list[dict] = []
+        #: GMLive resources whose pinned source is the shipped build's own inert
+        #: stub API, converted literally instead of being replaced by a stop.
+        self.gmlive_converted: list[dict] = []
         self.compile_errors: list[dict] = []
         self.total_lines = 0
         self.function_count = 0
@@ -219,20 +222,19 @@ class ScriptConverter:
         module = f"scripts/{name}"
         # GMLive is deliberately not emulated.  It is a Studio extension and
         # docs/YELLOW.md requires its use to stop visibly rather than becoming
-        # a no-op.  Keep every named export addressable for a precise stop.
-        if name.startswith("GMLive"):
-            import re
-            functions = re.findall(r"(?m)^\s*function\s+([A-Za-z_]\w*)\s*\(", source)
-            exports = functions or [name]
-            text = self._unsupported_module("GMLive", "GMLive/Steam live editing is not supported", exports)
-            writer.write(module + ".lua", text)
-            self.records[name] = {"module": self.prefix + "." + module.replace("/", "."),
-                                  "exports": exports, "status": "explicit-stop"}
-            self.unsupported.append({"script": name, "feature": "GMLive", "exports": exports,
-                                     "reason": "Studio live editing has no GameMaker 1.4 runtime equivalent"})
-            return
+        # a no-op.  The pinned decompilation is a *shipped* build, so GMLive's
+        # own public API is already compiled down to inert stubs there:
+        # live_call() returns false, live_init/live_update/live_async_http do
+        # nothing, and every object's first line (`if (live_call()) return
+        # global.live_result;`) therefore falls through to the game's own code.
+        # Converting those stubs literally reproduces the shipped behaviour, so
+        # a GMLive resource is compiled like any other script and only falls
+        # back to an explicit stop if its source does not convert.
+        gmlive = name.startswith("GMLive")
         try:
             records, meta = compile_gml2_functions(source, str(path), self.resolver)
+            if not records:
+                raise CompileError(f"{path}: script resource declares no function, so there is nothing to call")
             self.function_count += len(records)
             for _, _, ast in records:
                 self._note_calls(ast)
@@ -246,8 +248,24 @@ class ScriptConverter:
             writer.write(module + ".lua", text)
             self.records[name] = {"module": self.prefix + "." + module.replace("/", "."),
                                   "exports": [function for function, _ in expressions],
-                                  "enums": sorted(meta.get("enums", {})), "status": "converted"}
+                                  "enums": sorted(meta.get("enums", {})),
+                                  "status": "converted-release-stub" if gmlive else "converted"}
+            if gmlive:
+                self.gmlive_converted.append({"script": name, "exports": [function for function, _ in expressions],
+                                              "reason": "the shipped build's own GMLive source is already inert"})
         except (CompileError, RecursionError) as exc:
+            if gmlive:
+                import re
+                functions = re.findall(r"(?m)^\s*function\s+([A-Za-z_]\w*)\s*\(", source)
+                exports = functions or [name]
+                writer.write(module + ".lua",
+                             self._unsupported_module("GMLive", "GMLive/Steam live editing is not supported", exports))
+                self.records[name] = {"module": self.prefix + "." + module.replace("/", "."),
+                                      "exports": exports, "status": "explicit-stop"}
+                self.unsupported.append({"script": name, "feature": "GMLive", "exports": exports,
+                                         "reason": "Studio live editing has no GameMaker 1.4 runtime equivalent",
+                                         "conversion_error": str(exc)})
+                return
             self.compile_errors.append({"script": name, "source": str(path), "error": str(exc)})
 
     def run(self, writer: Writer) -> dict:
@@ -279,7 +297,7 @@ class ScriptConverter:
         return {
             "converted": len(self.records), "functions": self.function_count,
             "source_lines": self.total_lines, "compile_errors": self.compile_errors,
-            "unsupported": self.unsupported,
+            "unsupported": self.unsupported, "gmlive_release_stubs": self.gmlive_converted,
             "calls": dict(sorted(self.calls.items())),
             "builtin_calls": {name: self.calls[name] for name in sorted(self.calls) if name not in modules},
             "name_rewrites": dict(sorted(self.rewrites.items())),
