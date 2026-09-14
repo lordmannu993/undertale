@@ -4,7 +4,7 @@ This prerelease makes the current `.love` package downloadable from GitHub. It
 contains the converted Lua and the assets supplied for both merged games. **It
 is not a completed or native-device-verified game, and it is not an APK.**
 
-## v1.2.1 — every stop travels (branch build, not yet published)
+## v1.2.1 — every stop travels
 
 Two rounds of owner feedback. First: *"make sure that the River Person and
 UGPS are always available to use"* and *"I can fast travel to all of their old
