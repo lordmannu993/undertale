@@ -3,9 +3,9 @@ name: Experimental LOVE download
 on:
   # Bootstrap publication from this unmerged branch without changing master.
   # Ordinary source pushes do not republish the immutable prerelease.
-  # This workflow file is touched for the v0.1.10 bootstrap after its draft exists.
+  # This workflow file is touched for the v1.2.0 fusion bootstrap after its draft exists.
   push:
-    branches: [arena/01a08f74-undertale]
+    branches: [arena/01a09ffd-undertale]
     paths: [.github/workflows/love-prerelease.yml]
   workflow_dispatch:
 
@@ -13,18 +13,20 @@ permissions:
   contents: read
 
 concurrency:
-  group: love-v0.1.10-experimental-publication
+  group: love-v1.2.0-fusion-experimental-publication
   cancel-in-progress: false
 
 env:
-  RELEASE_TAG: love-v0.1.10-experimental
-  ASSET_BASE: undertale-love-v0.1.10-experimental
+  RELEASE_TAG: love-v1.2.0-fusion-experimental
+  ASSET_BASE: undertale-yellow-fusion-v1.2.0-experimental
 
 jobs:
   publish:
-    if: github.ref == 'refs/heads/arena/01a08f74-undertale'
+    if: github.ref == 'refs/heads/arena/01a09ffd-undertale'
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # The merged archive carries ~19,400 pinned Yellow asset files on top of
+    # Undertale's, and the native gate plays both worlds; keep the headroom.
+    timeout-minutes: 45
     permissions:
       contents: write
     steps:
@@ -61,34 +63,56 @@ jobs:
       - name: Install test dependencies
         if: steps.release.outputs.publish == 'true'
         run: python -m pip install -r requirements-dev.txt
+      - name: Cache the pinned Undertale Yellow tarball
+        if: steps.release.outputs.publish == 'true'
+        uses: actions/cache@v4
+        with:
+          path: .yellow-cache
+          key: yellow-${{ hashFiles('port/yellow_source.json') }}
+      - name: Fetch the pinned Undertale Yellow decompilation
+        if: steps.release.outputs.publish == 'true'
+        run: python tools/fetch_yellow.py --tarball-cache .yellow-cache
+      - name: Convert Yellow assets, scripts, objects, rooms and paths
+        if: steps.release.outputs.publish == 'true'
+        run: python tools/yellow_convert.py --stage rooms
       - name: Run all headless and packaging tests
         if: steps.release.outputs.publish == 'true'
+        env:
+          PORT_REQUIRE_YELLOW: '1'
         run: python -m pytest -q --junitxml=port-test-output/release-tests.xml
       - name: Build the experimental archive and release notes
         if: steps.release.outputs.publish == 'true'
         run: |
-          python tools/package.py --no-convert --output "artifacts/$ASSET_BASE.love"
+          # Yellow's own test fixtures re-run earlier stages against the shared
+          # output, leaving the report at the last stage they ran; packaging
+          # gates on the rooms stage, so restore it deterministically first.
+          python tools/yellow_convert.py --stage rooms
+          python tools/package.py --no-convert --merged --output "artifacts/$ASSET_BASE.love"
           python - <<'PY'
-          import json, os, xml.etree.ElementTree as ET
+          import json, os, shutil, xml.etree.ElementTree as ET
           from pathlib import Path
           base = os.environ['ASSET_BASE']
           report = json.loads((Path('artifacts') / (base+'.conversion-report.json')).read_text())
+          yellow = json.loads(Path('generated/yellow/conversion-report.json').read_text())
           suites = list(ET.parse('port-test-output/release-tests.xml').getroot().iter('testsuite'))
-          assert suites and not report['compile_errors']
+          for section in ('scripts', 'objects', 'rooms'):
+              assert not (yellow.get(section) or {}).get('compile_errors'), 'Yellow ' + section + ' compile errors'
+          assert not report['compile_errors']
           assert sum(int(s.get('failures', '0')) + int(s.get('errors', '0')) for s in suites) == 0
           count = sum(int(s.get('tests', '0')) - int(s.get('skipped', '0')) for s in suites)
           checksum = (Path('artifacts') / (base+'.love.sha256')).read_text().strip()
           notes = Path('docs/RELEASE_NOTES.md').read_text()
           notes += '\n## Build record\n\n'
-          notes += f'- Source commit: `{os.environ["GITHUB_SHA"]}` on `{os.environ["GITHUB_REF_NAME"]}` (v0.1.10, Glyde 20x encounters + 709 EXP button).\n'
-          notes += f'- **{count} automated tests passed** on GitHub Actions.\n'
-          notes += f'- **{report["converted_code_units"]:,} source units** translated without parse failures.\n'
-          notes += f'- **{len(report["missing_paths"])} missing movement paths**, **{len(report["unresolved_numeric_references"])} unresolved static numeric asset references**, and **{len(report["missing_external_files"])} missing literal external file paths** remain.\n'
-          notes += f'- **{len(report.get("missing_rooms", []))} original room is missing**; its ID is preserved rather than compacted.\n'
-          notes += '- Native Linux LOVE smoke: packaged archive, touch callbacks, opening backdrop colours, exact SOUL text, glyph bounds and Flowey/border/SOUL pixels, and six screenshots including the recovered-path gate that Toriel is drawn where the path walked her. Android device validation remains outstanding.\n'
+          notes += f'- Source commit: `{os.environ["GITHUB_SHA"]}` on `{os.environ["GITHUB_REF_NAME"]}` (v1.2.0, Undertale + Undertale Yellow fusion).\n'
+          notes += f'- **{count} automated tests passed** on GitHub Actions, the Yellow live gates included.\n'
+          notes += f'- Undertale: **{report["converted_code_units"]:,} source units** translated without parse failures; **{len(report["missing_paths"])} missing movement paths**, **{len(report["unresolved_numeric_references"])} unresolved static numeric asset references**, **{len(report["missing_external_files"])} missing literal external file paths** and **{len(report.get("missing_rooms", []))} missing original room** remain.\n'
+          notes += f'- Undertale Yellow: **{yellow["rooms"]["converted"]} rooms** and **{yellow["rooms"]["paths"]} paths** with **{yellow["rooms"]["counts"]["drawables"]:,} layer drawables** convert without compile errors; **{len(yellow["rooms"]["unsupported"])} named room-feature stops** (layer effects and physics worlds with no GameMaker 1.4 equivalent) stay blocked rather than rendered without them.\n'
+          notes += '- Native Linux LOVE smoke on the merged archive: the Undertale opening (touch navigation, SOUL dialogue, borders, Toriel\'s recovered-path walk) and then the fused-world gates - the X-held boat ride landing one player in rm_hotland_02 drawn as Frisk, the UGPS whale returning one Frisk to the Waterfall dock, and a versioned merge.sav recording both crossings and the equipment slots. Android device validation remains outstanding.\n'
           notes += '\n## SHA-256\n\n```text\n' + checksum + '\n```\n'
           Path('build').mkdir(exist_ok=True)
           Path('build/release-notes.md').write_text(notes)
+          shutil.copyfile('generated/yellow/conversion-report.json',
+                          Path('artifacts') / (base + '.yellow-conversion-report.json'))
           PY
       - name: Install native LOVE for the rendering release gate
         if: steps.release.outputs.publish == 'true'
@@ -104,12 +128,13 @@ jobs:
         run: |
           gh release edit "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" \
             --target "$GITHUB_SHA" --prerelease --latest=false \
-            --title 'LOVE v0.1.10 — Glyde 20x encounters + 709 EXP button (experimental)' \
+            --title 'LOVE v1.2.0 — Undertale + Undertale Yellow fusion (experimental)' \
             --notes-file build/release-notes.md
           gh release upload "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --clobber \
-            "artifacts/$ASSET_BASE.love#LOVE v0.1.10 (experimental)" \
+            "artifacts/$ASSET_BASE.love#LOVE v1.2.0 fusion (experimental)" \
             "artifacts/$ASSET_BASE.love.sha256#SHA-256 checksum" \
-            "artifacts/$ASSET_BASE.conversion-report.json#Conversion report and missing resources"
+            "artifacts/$ASSET_BASE.conversion-report.json#Undertale conversion report and missing resources" \
+            "artifacts/$ASSET_BASE.yellow-conversion-report.json#Undertale Yellow conversion report and named stops"
           gh api "repos/$GITHUB_REPOSITORY/releases/$RELEASE_ID" > build/release-assets.json
           python - <<'PY'
           import hashlib, json, os
@@ -118,7 +143,8 @@ jobs:
           assert release['draft'] and release['prerelease']
           assets = {a['name']: a for a in release['assets']}
           base = os.environ['ASSET_BASE']
-          expected = [base+'.love', base+'.love.sha256', base+'.conversion-report.json']
+          expected = [base+'.love', base+'.love.sha256', base+'.conversion-report.json',
+                      base+'.yellow-conversion-report.json']
           assert set(assets) == set(expected), 'Unexpected or missing release assets'
           for name in expected:
               path, asset = Path('artifacts') / name, assets[name]

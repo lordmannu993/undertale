@@ -34,7 +34,7 @@ objects → rooms → merged world. Each piece is one PR, merged before the next
 | 2 | GMS2 GML: language support in the compiler, all 1 155 Yellow scripts converted, name→ID rewriting, GMS2 builtins in the runtime | **complete** |
 | 3 | All 3 224 Yellow objects and their events, with parents, masks and collision-event targets | **complete** |
 | 4 | All 287 Yellow rooms: instances, creation code, tile layers from tilesets, backgrounds, views; plus the 68 paths | **complete** — conversion, animation, tile transforms, layers and layer elements; 25 rooms whose layer effects or physics worlds have no equivalent stay named stops |
-| 5 | One world: River Person + UGPS cross-game destinations, Frisk as the only player (Clover's run sprites on X), Frisk's weapons/armours plus Clover's ammo/accessories, saves, packaging, release | **in progress** — merged manifest, both travel hubs, world initialization and versioned merged saves are done and tested headlessly; Frisk-only rendering, the X-run, ammo/accessory slots, native gates and the release remain |
+| 5 | One world: River Person + UGPS cross-game destinations, Frisk as the only player (Clover's run sprites on X), Frisk's weapons/armours plus Clover's ammo/accessories, saves, packaging, release | **complete** — published as `love-v1.2.0-fusion-experimental`; see the piece 5 section below |
 
 ## Rules this merge follows (same as the rest of the port)
 
@@ -197,11 +197,9 @@ the full-asset conversion is proven on every pull request.
 
 ## Pieces 4–5 status (2026-09-14)
 
-Piece 4 is complete. Piece 5 is **partly** implemented: the merged world, its two
-travel hubs and its save layer are done and tested headlessly, while Frisk-only
-rendering, the equipment slots, native gates and the release are not. **No merged
-release has been published**, because this document gates publication on native
-travel and save tests that do not exist yet.
+Piece 4 is complete. Piece 5 is **complete** and was published as
+`love-v1.2.0-fusion-experimental`, gated on the native fused-world tests below
+exactly as this document required.
 
 ### Piece 4: rooms, animation, transforms and layers
 
@@ -299,18 +297,68 @@ Two documented deviations are reported on every run instead of being silent:
   Yellow conversion reached its rooms stage with no compile errors, and never
   regenerates Yellow itself.
 
-### Piece 5: what is not implemented
+### Piece 5: what shipped
 
-1. **Frisk-only rendering.** Yellow's player still draws Clover; Clover's run
-   sprites are not bound to X.
-2. **Equipment.** Frisk's weapons/armours are untouched and Clover's ammunition
-   (weapon modifier) and accessories (armour modifier) are not extra slots yet.
-3. **Native gates.** The travel and save tests are headless. No LÖVE/xvfb or
-   Android run has crossed between worlds, and merged rendering has never been
-   looked at on a device. The merged archive would also be large: Yellow's
-   recovered assets ship inside it.
-4. **No release.** `port/version.lua` reads 0.1.11 for the working tree, but
-   nothing is tagged or published until the native gates above exist.
+- **Frisk-only rendering.** `port/frisk.lua` installs a draw-time sprite remap
+  for merged manifests: 28 of Clover's walk-cycle poses (the four base
+  directions plus Yellow's route, water, Snowdin and Steamworks-roof variants —
+  Clover's up-walk has no recolours, which the pinned name list confirms) draw
+  Undertale's `spr_maincharau/d/l/r`. The remap is pixels-only: sprite records,
+  masks, `image_number` and every gameplay lookup keep resolving to Clover, so
+  no room geometry or battle math changes, and Undertale's own sprite IDs are
+  never in the table. Poses Frisk's set does not have stay Clover and are
+  reported by name at startup (see below).
+- **The X-run.** Yellow's own `scr_normal_state` already sprints while its
+  `keyboard_multicheck(1)` cluster — X or Shift — is held; `scr_initialize`
+  sets `global.player_can_run`, and `scr_determine_player_sprites` selects
+  Clover's `spr_pl_run_*` cycle. No runtime change was needed: the merged build
+  only had to prove it (speed 5 px/step against 3 walking, run sprites selected
+  while held) and keep those run poses out of the remap, which is what the
+  owner asked for.
+- **Clover's ammunition and accessories as two extra slots.** Frisk's
+  `global.weapon`/`global.armor` are untouched; Yellow's own pause menu equips
+  its ammunition (weapon modifier) and accessories (armour modifier) through
+  `scr_item_use`, swapping with `global.item_slot` and re-running Yellow's own
+  determine scripts — the merged runtime adds nothing to that flow.
+  `port/travel.lua` carries the loadout in `merge.sav` (`ammo`, `accessory`)
+  and re-applies it after every crossing, because `scr_initialize` resets both
+  slots to new-game state; the derived `player_weapon_modifier_attack` /
+  `player_armor_modifier_defense` are recomputed through Yellow's own scripts,
+  the same assignment `scr_initialize` itself makes.
+- **Native fused-world gates.** `port/smoke.lua` now ends the LÖVE/xvfb gate
+  with a fused section (merged archives only; a single-game archive stops by
+  design and still passes): the placed dock boat with `global.plot=122` (the
+  boat's own Create gate), X held through the ride, `gotoRoom(140)` — the call
+  `obj_dogboat_thing` itself makes — landing exactly one `obj_pl` at Yellow's
+  own 170,120 in `rm_hotland_02`, Frisk proven in the renderer's draw log and
+  Clover's four walk sprites proven absent, then the whale's own travel globals
+  bringing back exactly one `obj_mainchara` to the Waterfall dock, and
+  `merge.sav` asserting version 1, both crossings and the equipment record.
+  `tools/native_smoke.sh` requires the two new screenshots and refuses a merged
+  gate that never ran the fused section.
+- **Packaging.** `tools/package.py --merged` derives, from the converted
+  records themselves, every pinned `yellow_src/` file the archive must carry
+  (~19 400 asset files, ~280 MB) and stops the build if any is absent — a
+  merged archive without them would draw nothing and play no sound.
+- **The release.** `love-v1.2.0-fusion-experimental` publishes through the same
+  draft-then-flip workflow as every earlier release, packaging with `--merged`
+  and attaching both games' conversion reports.
+
+### Piece 5: what stays Clover, and what is still unclaimed
+
+1. **Poses without a Frisk equivalent** stay Clover: the `spr_pl_run_*` cycle
+   (deliberately — it is the X-run the owner asked for), the revolver
+   (`*_geno_shoot`, `goggleless_shoot`), the Steamworks goggles, the dance and
+   the lying poses. Each is listed in the startup warning.
+2. **Yellow's battles, shops, mail and story systems are unclaimed.** The
+   travel hubs, one player per world and the equipment flow are proven
+   headlessly and natively; fighting Yellow's enemies is not.
+3. **Shaders stay reported-and-skipped** (the scene keeps its original
+   colours), and the 25 rooms needing layer effects or physics worlds still
+   stop with their own names.
+4. **No Android-device certification.** The native gate is Linux LÖVE/xvfb
+   with software GL and null audio; device GPU/audio/touch behaviour remains
+   outstanding, for both worlds.
 
 Both games also share one `global` namespace in a merged build. Names used by both
 games refer to the same variable; crossing re-runs Yellow's own initializer, which

@@ -1,7 +1,9 @@
-# UNDERTALE — experimental LÖVE / Android port
+# UNDERTALE ⊕ UNDERTALE YELLOW — experimental LÖVE / Android port
 
 This checkout now includes a **GML-to-Lua converter, a LÖVE compatibility runtime,
-and multi-touch controls**. The original GameMaker files are preserved.
+and multi-touch controls**. The original GameMaker files are preserved. Since
+v1.2.0 it also merges **the whole of Undertale Yellow** into the same runtime as
+one traversable world — see [docs/YELLOW.md](docs/YELLOW.md).
 
 **This is not a finished, full-game Android port.** Every source unit translates,
 but the decompiled checkout is incomplete: the 38 referenced movement paths had
@@ -18,19 +20,51 @@ workspace. See [port status](docs/PORTING.md) and [validation](docs/VALIDATION.m
 
 ## Download the experimental `.love` file
 
-[**Download `undertale-love-v0.1.10-experimental.love` (~124 MB)**](https://github.com/lordmannu993/undertale/releases/download/love-v0.1.10-experimental/undertale-love-v0.1.10-experimental.love)
+[**Download `undertale-yellow-fusion-v1.2.0-experimental.love` (~390 MB)**](https://github.com/lordmannu993/undertale/releases/download/love-v1.2.0-fusion-experimental/undertale-yellow-fusion-v1.2.0-experimental.love)
 
-[Release notes, SHA-256 checksum, and conversion report](https://github.com/lordmannu993/undertale/releases/tag/love-v0.1.10-experimental)
+[Release notes, SHA-256 checksum, and both conversion reports](https://github.com/lordmannu993/undertale/releases/tag/love-v1.2.0-fusion-experimental)
 
 Download the **`.love` asset**, not GitHub's automatic “Source code” ZIP. It
-contains the generated Lua and supplied assets; you do not need Python or
-GameMaker to use it. Open it with **LÖVE 11.5** on desktop or Android. It is not an
-APK and requires the LÖVE runtime.
+contains the generated Lua and supplied assets for **both games**; you do not
+need Python or GameMaker to use it. Open it with **LÖVE 11.5** on desktop or
+Android. It is not an APK and requires the LÖVE runtime.
 
 **This is an experimental prerelease, not a fully functional game port.** The
-missing resources and native-testing limitations described above still apply.
-The large archive is hosted as a GitHub Release asset rather than committed to
-Git. To regenerate it yourself, follow the build instructions below.
+missing resources and native-testing limitations described above still apply —
+to Undertale, and to Yellow's unclaimed battle and story systems (see the
+release notes). The large archive is hosted as a GitHub Release asset rather
+than committed to Git. To regenerate it yourself, follow the build instructions
+below.
+
+### Added in v1.2.0 — the Undertale ⊕ Undertale Yellow fusion
+
+- **Both games in one world.** The whole of the pinned Undertale Yellow v1.2.1
+  decompilation — 287 rooms, 3,224 objects, 1,155 scripts, 3,796 sprites,
+  673 sounds — converts into this port's runtime alongside Undertale, in a
+  disjoint ID band so no Undertale ID moves. One boot, one save layer, one
+  playthrough.
+- **The River Person sails to Yellow.** Hold **X** (the on-screen cancel
+  button) during a River Person boat ride and your destination lands in
+  Undertale Yellow instead: Snowdin's dock → the Snowdin forest, Waterfall's
+  dock → the Dunes, Hotland's dock → Yellow's Hotland. Yellow's UGPS mail
+  whale lists the three Undertale docks and runs its own travel code to bring
+  you back beside the dock's boat.
+- **Frisk everywhere.** Yellow's player keeps its own mechanics but is drawn
+  as Frisk; holding **X** while walking runs at Yellow's run speed with
+  Clover's `spr_pl_run_*` animation — the pose family Frisk's set doesn't
+  have. Gun poses, goggles and dance poses stay Clover, reported by name.
+- **Clover's ammunition and accessories join Frisk's equipment.** Frisk keeps
+  Undertale's weapons and armours; Yellow's own pause menu equips Clover's
+  ammo (weapon modifier) and accessories (armour modifier) into two extra
+  slots that feed Yellow's attack/defense math, and the loadout persists in
+  the versioned merged save (`merge.sav`) across crossings.
+- **Native fused-world gate.** The release's LÖVE/xvfb gate plays the Undertale
+  opening, then crosses into Yellow and back natively: one player per world,
+  Frisk rendered in Yellow, and `merge.sav` recording both crossings.
+- **285 automated tests** passed for this release (was 255 at the last validation), including the
+  Frisk remap, the X-run, menu-driven equips, save restore across crossings,
+  and packaging gates that refuse to ship a merged archive missing any of the
+  ~19,400 referenced pinned asset files.
 
 ### Added in v0.1.10
 
@@ -197,20 +231,20 @@ other rooms are not replaced by a generic background. Movement path point data
 is recovered and played back from v0.1.4 (docs/PATHS.md); frame-level fidelity
 against the original engine is not yet certified.
 
-## Undertale Yellow merge — in progress
+## Undertale Yellow merge — complete
 
-A second game is being merged into this port: **Undertale Yellow v1.2.1**, from the
+A second game is merged into this port: **Undertale Yellow v1.2.1**, from the
 pinned public decompilation
 [`lordmannu993/UnderTale-Yellow`](https://github.com/lordmannu993/UnderTale-Yellow).
-The goal is **one traversable world**, not two builds side by side: Undertale's
-River Person and Yellow's UGPS mail whale each gain destinations into the other
+The result is **one traversable world**, not two builds side by side: Undertale's
+River Person and Yellow's UGPS mail whale each carry destinations into the other
 game's areas, Frisk is the only playable character (Clover's sprite set supplies
-what Frisk's does not have, including a run animation on the X button), Frisk
-keeps Undertale's weapons and armours and gains Clover's ammunition and
-accessories.
+what Frisk's does not have, including a run animation on the X button), and Frisk
+keeps Undertale's weapons and armours beside Clover's ammunition and accessory
+slots.
 
-Yellow is a GameMaker **Studio 2** project, so it needs its own front end before
-any of it can run. That work is split into five pieces, tracked in
+Yellow is a GameMaker **Studio 2** project, so it needed its own front end before
+any of it could run. That work was split into five pieces, tracked in
 [docs/YELLOW.md](docs/YELLOW.md), each landed as its own pull request.
 
 | piece | what it delivers | state |
@@ -218,15 +252,16 @@ any of it can run. That work is split into five pieces, tracked in
 | 1 | Pinned source pipeline; every Yellow sprite, sound, font and tileset converted into the port's asset records, with Yellow's own numeric IDs recovered from two records inside the pinned source | **complete** |
 | 2 | GameMaker Studio 2 GML in the compiler; all 1,155 Yellow scripts converted with name-resolved calls and GMS2 runtime adapters | **complete** |
 | 3 | All 3,224 Yellow objects and their 8,494 events, with parents, masks and collision-event targets, plus the event dispatches they need (Clean Up, Draw Begin/End, Draw GUI, per-instance mouse) | **complete** |
-| 4 | All 287 Yellow rooms, tile layers and paths | not started |
-| 5 | The connected world: cross-game travel, one Frisk, one inventory | not started |
+| 4 | All 287 Yellow rooms, tile layers and paths, with tile transforms, animation and the `layer_*` families | **complete** |
+| 5 | The connected world: cross-game travel through both hubs, Frisk-only rendering with Clover's X-run, Clover's ammo/accessory slots, versioned merged saves, packaging and the fused native release gate | **complete** (v1.2.0) |
 
-**Nothing of Yellow is playable yet.** Pieces 1-3 convert the pinned assets, all
-1,155 GMS2 script resources and all 3,224 objects with their 8,494 events, but the
-rooms are still piece 4, so no converted Yellow object is ever placed and the
-published `.love` builds below still contain Undertale only. Yellow's ~580 MB of
-assets are fetched from the pinned commit at build time
-(`python3 tools/fetch_yellow.py`) and are never committed to this repository.
+Yellow's ~580 MB of assets are fetched from the pinned commit at build time
+(`python3 tools/fetch_yellow.py`) and are never committed to this repository;
+the v1.2.0 `.love` carries every referenced file inside the archive. What stays
+unclaimed is documented in the release notes: Yellow's battle system, palette
+shaders (reported and skipped), the 25 rooms whose layer effects or physics
+worlds have no GameMaker 1.4 equivalent (they stop with their own names), and
+any Android-device certification.
 
 ## Run with LÖVE
 

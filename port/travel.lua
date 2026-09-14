@@ -157,6 +157,11 @@ function Travel:beginCrossing(world, room)
     -- Before the room loads: Yellow's own room creation code registers fast
     -- travel points, which needs the globals scr_initialize creates.
     self:initialize(world, scope)
+    if world == "yellow" then
+        -- scr_initialize leaves the modifier slots at new-game state; a merged
+        -- save carries what the player actually equipped (see applyEquipment).
+        self:applyEquipment(scope)
+    end
     if world == "yellow" and self.pendingCoordinates then
         -- Yellow's rooms spawn their own player from these globals while the
         -- room loads, and scr_initialize has just reset them to its defaults,
@@ -192,6 +197,45 @@ function Travel:initialize(world, scope)
         scope.v.x, scope.v.y, scope.v.object_index = 0, 0, -1
     end
     R:script(name, R:scope(scope))
+end
+
+-- The two extra equipment slots. Frisk keeps Undertale's own weapon and
+-- armour globals untouched; Clover's ammunition (Yellow's weapon modifier)
+-- and accessories (Yellow's armour modifier) ride beside them, equipped in
+-- Yellow's world through Yellow's own pause menu, which swaps the slot with
+-- global.item_slot and re-runs its own determine script. scr_initialize
+-- resets both slots to new-game state on every crossing, so a merged save
+-- re-applies what the player actually equipped afterwards - the same job
+-- scr_loadgame's Save1 read does for Yellow alone.
+function Travel:applyEquipment(scope)
+    local R, B = self.runtime, self.runtime.builtins
+    B.ini_open(nil, Travel.SAVE_FILE)
+    local slots = {
+        {global = "player_weapon_modifier", key = "ammo", script = "scr_determine_weapon_modifier_attack",
+         derived = "player_weapon_modifier_attack"},
+        {global = "player_armor_modifier", key = "accessory", script = "scr_determine_armor_modifier_defense",
+         derived = "player_armor_modifier_defense"},
+    }
+    for _, slot in ipairs(slots) do
+        local value = B.ini_read_string(nil, "merge", slot.key, "")
+        -- An empty record means "never equipped in this save", not "a value
+        -- was invented"; leave whatever Yellow's own initializer chose.
+        if value ~= "" and R.global[slot.global] ~= value then
+            if type(R.global[slot.global]) ~= "string" then
+                R:warn("travel-equipment:" .. slot.key,
+                    "Yellow's initializer did not create global." .. slot.global .. "; the equipped " .. slot.key .. " was not restored.")
+            else
+                R.global[slot.global] = value
+                if (R.manifest.scripts or {})[slot.script] then
+                    -- Yellow's determine scripts return the stat; the merged
+                    -- globals that hold it are assigned exactly where
+                    -- scr_initialize assigns them for its own defaults.
+                    R.global[slot.derived] = R:script(slot.script, R:scope(scope))
+                end
+            end
+        end
+    end
+    B.ini_close()
 end
 
 function Travel:afterLoadRoom(roomId)
@@ -302,12 +346,18 @@ function Travel:loadSave()
 end
 
 function Travel:save()
-    local B = self.runtime.builtins
+    local R, B = self.runtime, self.runtime.builtins
     B.ini_open(nil, Travel.SAVE_FILE)
     B.ini_write_real(nil, "merge", "version", Travel.VERSION)
     B.ini_write_real(nil, "merge", "crossings", self.crossings)
     B.ini_write_real(nil, "merge", "last_room", self.runtime.vars.room)
     B.ini_write_string(nil, "merge", "world", self.world or "undertale")
+    -- The modifier slots only mean something once Yellow's world created them;
+    -- before that the record stays empty rather than inventing a default.
+    B.ini_write_string(nil, "merge", "ammo",
+        type(R.global.player_weapon_modifier) == "string" and R.global.player_weapon_modifier or "")
+    B.ini_write_string(nil, "merge", "accessory",
+        type(R.global.player_armor_modifier) == "string" and R.global.player_armor_modifier or "")
     B.ini_close()
     self.runtime:flushSaves()
 end

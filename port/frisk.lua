@@ -1,0 +1,96 @@
+-- Frisk-only rendering for the merged build.
+--
+-- The merged game's player is Frisk everywhere: Yellow's obj_pl keeps its own
+-- mechanics (movement, states, masks, collisions all stay Clover's records, so
+-- no room geometry or battle math changes), but the sprites its body is drawn
+-- with are remapped at draw time to Undertale's. Clover's sprite set supplies
+-- what Frisk's set does not have - most visibly the run animation the owner
+-- wants on the X button, which stays Clover's spr_pl_run_*.
+--
+-- This is a rendering remap only, and only for sprites that name a body walk
+-- cycle. Undertale has no equivalents for gun poses, goggles, the dance or the
+-- lying poses, so those stay Clover and are reported. The table below is the
+-- complete set of walk-cycle variants in the pinned conversion (28 sprites:
+-- Clover's up-walk has no recolour variants; the other directions carry the
+-- route, water, Snowdin and Steamworks-roof ones). A pair that stops
+-- resolving is a broken merged manifest and fails the build.
+local Frisk = {}
+
+Frisk.BODY_SPRITES = {
+    "spr_pl_up", "spr_pl_up_water", "spr_pl_up_snowdin", "spr_pl_up_roof",
+    "spr_pl_down", "spr_pl_down_geno", "spr_pl_down_water", "spr_pl_down_water_geno",
+    "spr_pl_down_snowdin", "spr_pl_down_snowdin_geno", "spr_pl_down_roof", "spr_pl_down_roof_geno",
+    "spr_pl_left", "spr_pl_left_geno", "spr_pl_left_water", "spr_pl_left_water_geno",
+    "spr_pl_left_snowdin", "spr_pl_left_snowdin_geno", "spr_pl_left_roof", "spr_pl_left_roof_geno",
+    "spr_pl_right", "spr_pl_right_geno", "spr_pl_right_water", "spr_pl_right_water_geno",
+    "spr_pl_right_snowdin", "spr_pl_right_snowdin_geno", "spr_pl_right_roof", "spr_pl_right_roof_geno",
+}
+
+Frisk.DIRECTION_OF = {
+    up = "spr_maincharau",
+    down = "spr_maincharad",
+    left = "spr_maincharal",
+    right = "spr_maincharar",
+}
+
+-- Poses that deliberately stay Clover because Frisk's set has no equivalent:
+-- the run cycle the owner wants on the X button, the revolver poses, the
+-- Steamworks goggles, the dance and the lying-down poses.
+Frisk.KEPT_CLOVER = { "spr_pl_run_up", "spr_pl_run_down", "spr_pl_run_left",
+                      "spr_pl_run_right", "spr_pl_dance", "spr_pl_lying",
+                      "spr_pl_goggles_up", "spr_pl_goggles_down",
+                      "spr_pl_goggles_left", "spr_pl_goggles_right",
+                      "spr_pl_goggles_hit", "spr_pl_goggles_shoot",
+                      "spr_pl_goggleless_hit", "spr_pl_goggleless_shoot",
+                      "spr_pl_down_geno_shoot", "spr_pl_up_geno_shoot",
+                      "spr_pl_left_geno_shoot", "spr_pl_right_geno_shoot" }
+
+function Frisk.install(R)
+    if R.manifest.game ~= "merged" then return nil end
+    local names = R.manifest.names or {}
+    local yellowSprites = (R.manifest.yellow_names or {}).sprites or {}
+
+    local remap, missing = {}, {}
+    for _, cloverName in ipairs(Frisk.BODY_SPRITES) do
+        local direction = cloverName:match("^spr_pl_(%a+)")
+        local friskName = Frisk.DIRECTION_OF[direction]
+        local cloverId, friskId = yellowSprites[cloverName], friskName and names[friskName]
+        if not cloverId or not friskId then
+            missing[#missing + 1] = cloverId and friskName or cloverName
+        else
+            remap[cloverId] = friskId
+        end
+    end
+    if #missing > 0 then
+        table.sort(missing)
+        error(("frisk: player sprite(s) missing from the merged manifest: %s")
+            :format(table.concat(missing, ", ")))
+    end
+
+    local kept = {}
+    for _, name in ipairs(Frisk.KEPT_CLOVER) do
+        local id = yellowSprites[name]
+        if not id then
+            error(("frisk: Yellow sprite %s is missing from the merged manifest"):format(name))
+        end
+        if remap[id] then
+            error(("frisk: %s is mapped both ways"):format(name))
+        end
+        kept[#kept + 1] = name
+    end
+    table.sort(kept)
+    R:warn("frisk-remap",
+        ("Frisk-only rendering: %d of Yellow's player body sprites draw Undertale's Frisk; these stay Clover: %s.")
+            :format(#remap, table.concat(kept, ", ")))
+
+    -- Draw-time hook consumed by port/graphics.lua. Sprite records, masks,
+    -- image_number and every gameplay lookup keep resolving to Clover; only
+    -- the pixels change. Undertale's own sprite IDs are never in the table,
+    -- so Undertale rooms render exactly as they always did.
+    function R.spriteForDraw(index)
+        return remap[index] or index
+    end
+    return remap
+end
+
+return Frisk

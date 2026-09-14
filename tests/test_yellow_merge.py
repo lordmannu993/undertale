@@ -23,7 +23,7 @@ BOOT = '''
     Runtime=require("port.runtime")
     input=Input.new()
     R=Runtime.new(require("generated.merged.manifest"), input,
-                  {headless=true, memorySaves=true, seed=42})
+                  {headless=true, memorySaves=true, trace=true, seed=42})
     function tick(n)
         for i=1,n do
             input:beginFrame(); R:step(); R:renderFrame(); R:finishFrame(); input:endFrame()
@@ -31,6 +31,9 @@ BOOT = '''
     end
     function hold(k,n)
         input:setSource("test",{k}); tick(n); input:setSource("test",{}); tick(1)
+    end
+    function press(k)
+        input:setSource("test",{k}); tick(1); input:setSource("test",{}); tick(1)
     end
     function dummy(id)
         R.manifest.objects[id]="tests.dummy"
@@ -48,6 +51,34 @@ BOOT = '''
     end
     function crossTo(room)
         R:gotoRoom(room); R:applyTransitions(); tick(1)
+    end
+    function dialogueOpen()
+        for _,i in ipairs(R.instances) do
+            if i.alive and i.v.object_index==R.manifest.yellow_names.objects["obj_dialogue"] then return true end
+        end
+        return false
+    end
+    function clearDialogue()
+        -- Item messages type out at their own text speed; taps advance them
+        -- only once typing has reached the end, so tap and wait.
+        for i=1,60 do
+            if not dialogueOpen() then return true end
+            press(90); tick(3)
+        end
+        return not dialogueOpen()
+    end
+    function menuOpen()
+        press(67); tick(2)   -- C, Yellow's own pause cluster
+        return R:select(R.manifest.yellow_names.objects["obj_pause_menu"])[1] ~= nil
+    end
+    function equipFromSlot(number)
+        -- Drive Yellow's own pause menu: ITEM, down to the slot, USE, USE.
+        assert(menuOpen(), "Yellow's pause menu did not open")
+        press(90); tick(2)
+        for _=2,number do press(40); tick(1) end
+        press(90); tick(1)
+        press(90); tick(3)
+        assert(clearDialogue(), "the equip message never closed")
     end
 '''
 
@@ -245,3 +276,219 @@ def test_merge_refuses_a_conversion_that_stopped_early(tmp_path, monkeypatch):
         assert "partial game" in run.stderr
     finally:
         report.write_text(original)
+
+
+def crossToYellow(vm):
+    """The native crossing path: plot 122 arms the placed dock boat, X aims
+    the River Person ride at Yellow, and room 140 is the boat's own call."""
+    vm.execute('''
+        R.global.plot=122
+        R:gotoRoom(140); R:applyTransitions(); tick(3)
+        assert(R.roomState.name=="room_fire_dock", "Hotland dock did not load: "..tostring(R.roomState.name))
+        hold(88,2)
+        assert(R.travel.riverLatch, "holding X during the ride did not arm the crossing")
+        R:gotoRoom(140); R:applyTransitions(); tick(10)
+        assert(R.travel.world=="yellow" and R.roomState.name=="rm_hotland_02",
+            "landed in "..tostring(R.roomState.name))
+    ''')
+
+
+def drawnSprites(vm):
+    table = vm.eval('''
+        (function()
+            local t={}
+            for _,entry in ipairs(R.drawLog) do
+                if entry[1]=="sprite" then t[#t+1]=entry[2] end
+            end
+            return t
+        end)()
+    ''')
+    return [str(name) for name in table.values()]
+
+
+@live
+def test_frisk_draws_the_yellow_player_and_keeps_clover_only_where_he_has_no_pose(vm):
+    assert vm.execute("local ok,err=pcall(function() R:start() end) return ok and 'ok' or tostring(err)") == "ok"
+    crossToYellow(vm)
+    assert vm.execute("R.drawLog={}; tick(2) return 'ok'") == "ok"
+    names = drawnSprites(vm)
+    assert any(name.startswith("spr_mainchara") for name in names), \
+        f"Yellow's player was not drawn as Frisk; drew {names}"
+    for name in names:
+        assert name not in ("spr_pl_up", "spr_pl_down", "spr_pl_left", "spr_pl_right"), \
+            f"Clover's walk sprite {name} leaked into the merged rendering"
+    # The remap is pixels-only: gameplay lookups still resolve to Clover, and
+    # Undertale's own sprites are never touched.
+    assert vm.execute('''
+        local sprites=R.manifest.yellow_names.sprites
+        if R.spriteForDraw(sprites["spr_pl_down"])~=R.constants.spr_maincharad then
+            return "walk sprite did not remap"
+        end
+        if R.spriteForDraw(sprites["spr_pl_run_down"])~=sprites["spr_pl_run_down"] then
+            return "the run animation must stay Clover's"
+        end
+        if R.spriteForDraw(R.constants.spr_maincharad)~=R.constants.spr_maincharad then
+            return "an Undertale sprite was remapped"
+        end
+        return "ok"
+    ''') == "ok"
+
+
+@live
+def test_x_button_runs_with_clovers_run_sprites(vm):
+    assert vm.execute("local ok,err=pcall(function() R:start() end) return ok and 'ok' or tostring(err)") == "ok"
+    crossToYellow(vm)
+    result = vm.execute('''
+        local pl
+        for _,inst in ipairs(R.instances) do
+            if inst.alive and inst.v.object_index==R.manifest.yellow_names.objects["obj_pl"] then pl=inst end
+        end
+        local function probe(withX)
+            local x0,y0=pl.v.x,pl.v.y
+            input:setSource("test",withX and {40,88} or {40}); tick(2)
+            local moved=pl.v.y-y0
+            local sprite,sprinting=pl.v.sprite_index,pl.v.is_sprinting
+            input:setSource("test",{}); tick(1)
+            return moved,sprite,sprinting
+        end
+        local runDistance,runSprite,sprinting=probe(true)
+        if not sprinting then return "holding X did not sprint" end
+        if runSprite~=R.manifest.yellow_names.sprites["spr_pl_run_down"] then
+            return "sprint sprite is "..tostring(runSprite)..", not Clover's run cycle"
+        end
+        local walkDistance,walkSprite=probe(false)
+        if walkSprite~=R.manifest.yellow_names.sprites["spr_pl_down"] then
+            return "walk sprite is "..tostring(walkSprite)
+        end
+        -- Yellow's own rule: plspd 3 walking, plspd+2 running.
+        if runDistance<=walkDistance then
+            return "run distance "..runDistance.." <= walk "..walkDistance
+        end
+        if runDistance~=10 or walkDistance~=6 then
+            return "unexpected distances: run "..runDistance..", walk "..walkDistance
+        end
+        return "ok"
+    ''')
+    assert result == "ok", result
+
+
+@live
+def test_pause_menu_equips_clovers_ammo_and_accessory_beside_frisks_gear(vm):
+    assert vm.execute("local ok,err=pcall(function() R:start() end) return ok and 'ok' or tostring(err)") == "ok"
+    crossToYellow(vm)
+    result = vm.execute('''
+        local weapon,armor=R.global.weapon,R.global.armor
+        R.global.item_slot[2]="Silver Ammo"
+        R.global.item_slot[3]="Steel Buckle"
+        equipFromSlot(2)
+        if R.global.player_weapon_modifier~="Silver Ammo" then
+            return "ammo slot is "..tostring(R.global.player_weapon_modifier)
+        end
+        -- Silver Ammo's own value from Yellow's scr_item_stats_weapon_mod.
+        if R.global.player_weapon_modifier_attack~=3 then
+            return "ammo attack is "..tostring(R.global.player_weapon_modifier_attack)
+        end
+        -- Equipping swaps: the slot now holds what was equipped before it.
+        if R.global.item_slot[2]~="Rubber Ammo" then
+            return "slot 2 holds "..tostring(R.global.item_slot[2])
+        end
+        equipFromSlot(3)
+        if R.global.player_armor_modifier~="Steel Buckle" then
+            return "accessory slot is "..tostring(R.global.player_armor_modifier)
+        end
+        if R.global.player_armor_modifier_defense~=7 then
+            return "accessory defense is "..tostring(R.global.player_armor_modifier_defense)
+        end
+        -- Frisk's own equipment is untouched by Yellow's menu.
+        if R.global.weapon~=weapon or R.global.armor~=armor then
+            return "Undertale's weapon/armor moved: "..tostring(R.global.weapon).."/"..tostring(R.global.armor)
+        end
+        return "ok"
+    ''')
+    assert result == "ok", result
+
+
+@live
+def test_equipped_slots_survive_crossings_through_the_merged_save(vm):
+    assert vm.execute("local ok,err=pcall(function() R:start() end) return ok and 'ok' or tostring(err)") == "ok"
+    crossToYellow(vm)
+    vm.execute('''
+        R.global.item_slot[2]="Silver Ammo"
+        R.global.item_slot[3]="Steel Buckle"
+        equipFromSlot(2)
+        equipFromSlot(3)
+    ''')
+    assert vm.execute('''
+        R.global.fast_travel_point="Waterfall - Dock"; tick(2)
+        R:gotoRoom(125); R:applyTransitions(); tick(5)
+        if R.travel.world~="undertale" or R.vars.room~=125 then
+            return "the whale crossing failed: world "..tostring(R.travel.world)
+        end
+        R.builtins.ini_open(nil,"merge.sav")
+        local ammo=R.builtins.ini_read_string(nil,"merge","ammo","")
+        local accessory=R.builtins.ini_read_string(nil,"merge","accessory","")
+        R.builtins.ini_close()
+        if ammo~="Silver Ammo" then return "save ammo="..tostring(ammo) end
+        if accessory~="Steel Buckle" then return "save accessory="..tostring(accessory) end
+        return "ok"
+    ''') == "ok"
+    # scr_initialize resets the slots on every crossing; the merged save must
+    # bring the loadout back, with Yellow's own stat scripts re-run.
+    assert vm.execute('''
+        hold(88,2)
+        R:gotoRoom(140); R:applyTransitions(); tick(10)
+        if R.travel.world~="yellow" then return "world="..tostring(R.travel.world) end
+        if R.global.player_weapon_modifier~="Silver Ammo" then
+            return "ammo="..tostring(R.global.player_weapon_modifier)
+        end
+        if R.global.player_weapon_modifier_attack~=3 then
+            return "ammo attack="..tostring(R.global.player_weapon_modifier_attack)
+        end
+        if R.global.player_armor_modifier~="Steel Buckle" then
+            return "accessory="..tostring(R.global.player_armor_modifier)
+        end
+        if R.global.player_armor_modifier_defense~=7 then
+            return "accessory defense="..tostring(R.global.player_armor_modifier_defense)
+        end
+        return "ok"
+    ''') == "ok"
+
+
+@live
+def test_merged_package_carries_every_referenced_yellow_asset():
+    """The records open their assets by pinned-source path; the archive must
+    carry exactly those files."""
+    sys.path.insert(0, str(ROOT / "tools"))
+    import package as packaging
+
+    files = packaging.merged_files(ROOT / "generated")
+    carried = {path.as_posix() for path in files if path.is_relative_to(ROOT / "yellow_src")}
+    assert len(carried) > 15000, f"only {len(carried)} pinned asset files carried"
+    assert all((ROOT / name).is_file() for name in carried)
+    assert any("/sprites/spr_pl_down/" in name for name in carried)
+    assert any("/sounds/" in name for name in carried)
+
+
+@live
+def test_merged_packaging_stops_when_a_referenced_asset_is_absent(tmp_path, monkeypatch):
+    """A referenced pinned file that is missing stops the build instead of
+    failing later on a phone with a blank, silent second world."""
+    sys.path.insert(0, str(ROOT / "tools"))
+    import package as packaging
+
+    generated = tmp_path / "generated"
+    (generated / "yellow/assets").mkdir(parents=True)
+    (generated / "merged").mkdir(parents=True)
+    (generated / "yellow/conversion-report.json").write_text(json.dumps(
+        {"stage": "rooms", "scripts": {"compile_errors": []}, "objects": {"compile_errors": []},
+         "rooms": {"compile_errors": []}}))
+    (generated / "yellow/assets/sprites_0.lua").write_text(
+        'return {[1000023]={["name"]="spr_missing_body",'
+        '["frames"]={"yellow_src/sprites/spr_missing_body/no_frame.png"}}}\n')
+    (generated / "merged/manifest.lua").write_text("-- test\n")
+    # tools/merge.py runs against the real tree; its result is not what this
+    # exercises, and the fake tree has no tools/ to run it from.
+    monkeypatch.setattr(packaging.subprocess, "run", lambda *args, **kwargs: None)
+    monkeypatch.setattr(packaging, "ROOT", tmp_path)
+    with pytest.raises(ValueError, match="absent"):
+        packaging.merged_files(generated)

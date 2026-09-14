@@ -15,7 +15,10 @@ explicitly **not a finished game** and every release note says so.
 Since pieces 1 and 2 of the **Undertale Yellow merge** it also carries a GameMaker
 *Studio 2* front end (`tools/yellow/`, `tools/gml2.py`, `tools/yellow_convert.py`,
 `tools/fetch_yellow.py`) that converts a second, fetched-on-demand project into the
-same runtime. That merge is the current job; its piece list is [docs/YELLOW.md](docs/YELLOW.md).
+same runtime. That merge is **complete** (all five pieces, published as
+`love-v1.2.0-fusion-experimental`); its piece list and the shipped scope are
+[docs/YELLOW.md](docs/YELLOW.md). Future work is expected to be owner-reported
+bugs and fidelity gaps, not unchecked pieces.
 
 ## Start here, in order
 
@@ -77,13 +80,13 @@ same runtime. That merge is the current job; its piece list is [docs/YELLOW.md](
 
 | item | state |
 | --- | --- |
-| `master` | PRs 1-13 merged (through `229db7a`): the LÖVE port, touch controls and Android tooling, the v0.1.1-v0.1.3 softlock/sprite/scenery fixes, path-recovery pieces 1-5, registry and room-159 evidence, the v0.1.4-v0.1.7 publications, PR #11's Ruins spike-bridge softlock, X-skip text-overlap and touch COLLISION-toggle fixes, and PR #13's monster body-part ID recovery that fixed the reported "cannot battle in Snowdin — instance_create Missing object ID 255" crash |
-| Published release | `love-v0.1.8-experimental` (prerelease, 3 assets, checksum in notes) is published by the pinned workflow and carries PR #13's fix. `love-v0.1.5/6/7-experimental` stay up, renamed with a "Superseded —" prefix. Every published release is immutable: do not re-publish over it |
-| Open PR | combined pieces 4–5: piece 4 complete, piece 5 partly implemented (merged manifest, both travel hubs, merged saves); Frisk-only rendering, equipment slots, native gates and the release are still open. See docs/YELLOW.md |
-| Yellow merge | Pieces 1–4 complete: `tools/fetch_yellow.py` pins commit `4ec23bd9` of `lordmannu993/UnderTale-Yellow`; `tools/yellow_convert.py --stage rooms` converts 3 796 sprites / 673 sounds / 11 fonts / 1 155 script resources / 3 224 objects with 8 494 events / **287 rooms, 68 paths, 199 454 drawables, 3 006 layers** into `generated/yellow/`, with 1 178 named function exports, 1 explicit GMLive stop (the shipped build's own GMLive is inert, so the other 21 convert literally) and 0 compile errors. **Yellow now starts**: headlessly it runs `rm_intro` → `rm_logos` → `rm_mmfirst` → `rm_ruins00` and 9 000 frames pass with no stop, and `obj_pl` walks. Piece 5 is partly implemented: `tools/merge.py` + `port/merge.lua` build one manifest from both games, `port/travel.lua` connects the River Person boat (hold X during the ride) and Yellow's UGPS whale, and `merge.sav` versions the merged layer. Frisk-only rendering, Clover's ammo/accessory slots, native travel/save gates and the release are **not** done; nothing is published. |
+| `master` | PRs 1-13 merged (through `229db7a`): the LÖVE port, touch controls and Android tooling, the v0.1.1-v0.1.3 softlock/sprite/scenery fixes, path-recovery pieces 1-5, registry and room-159 evidence, the v0.1.4-v0.1.7 publications, PR #11's Ruins spike-bridge softlock, X-skip text-overlap and touch COLLISION-toggle fixes, and PR #13's monster body-part ID recovery that fixed the reported "cannot battle in Snowdin — instance_create Missing object ID 255" crash. PRs #14-#17 shipped v0.1.8-v0.1.10 (part-ID recovery, one-shot alarms, Glyde 20x + 709 EXP). PRs #18-#22 landed the Undertale Yellow merge pieces 1-5 through the partial piece-5 world. PR #23 finishes piece 5 and publishes the fusion |
+| Published release | `love-v1.2.0-fusion-experimental` (prerelease, 4 assets incl. both conversion reports, checksum in notes) is the merged Undertale ⊕ Undertale Yellow build, published by the pinned workflow with the fused native gate. `love-v0.1.5`…`v0.1.10-experimental` stay up, renamed with a "Superseded —" prefix. Every published release is immutable: do not re-publish over it |
+| Open PR | none after PR #23 (piece 5 completion: Frisk-only rendering, Clover's X-run and ammo/accessory slots, merged-save loadout persistence, the native fused-world gate, `--merged` packaging that carries every referenced pinned asset file, the v1.2.0 publication, and the README/docs updates) |
+| Yellow merge | **Complete.** `tools/fetch_yellow.py` pins commit `4ec23bd9` of `lordmannu993/UnderTale-Yellow`; `tools/yellow_convert.py --stage rooms` converts 3 796 sprites / 673 sounds / 11 fonts / 1 155 script resources / 3 224 objects with 8 494 events / **287 rooms, 68 paths, 199 454 drawables, 3 006 layers** into `generated/yellow/`, with 1 178 named function exports, 1 explicit GMLive stop (the shipped build's GMLive is inert, so the other 21 convert literally) and 0 compile errors. `tools/merge.py` + `port/merge.lua` build one manifest from both games, `port/travel.lua` connects the River Person boat (hold X during the ride) and Yellow's UGPS whale, `port/frisk.lua` draws Yellow's player as Frisk (28 body poses remapped; run/gun/goggle/dance/lying poses stay Clover and are reported), Yellow's own pause menu equips Clover's ammo/accessories beside Frisk's own gear, and `merge.sav` versions the merged layer including the loadout. The native LÖVE/xvfb gate crosses between worlds and back. Still unclaimed: Yellow's battle/story systems, shaders (reported, skipped), 25 rooms with named stops, and any Android-device certification |
 | Part-ID recovery | `tools/recover_parts.py` fetches nothing by default: the checked-in `port/recovered_parts.json` is imported by `convert.py`. Regenerate with `GITHUB_TOKEN="$(gh auth token)" python3 tools/recover_parts.py` (pinned to the same `249ffa27` ref as the registry/path recoveries), re-verify offline with `--check`. IDs come from this checkout's own `partN=` literals; only names are paired from upstream; 38 annotated sites are re-validated as anchors. `tests/test_monster_parts.py` guards all of it plus every Snowdin battlegroup end-to-end |
-| Old releases | `love-v0.1.0`..`love-v0.1.7-experimental` are **kept on purpose** (owner declined deletion) and renamed with a "Superseded (…)" prefix as each is replaced. Version branches `v0.1.0`..`v0.1.3` point at each tagged build |
-| Release plumbing | `.github/workflows/love-prerelease.yml` publishes on push to one pinned branch and **refuses unless a draft release with that tag already exists** |
+| Old releases | `love-v0.1.0`..`love-v0.1.10-experimental` are **kept on purpose** (owner declined deletion) and renamed with a "Superseded (…)" prefix as each is replaced. Version branches `v0.1.0`..`v0.1.3` point at each tagged build |
+| Release plumbing | `.github/workflows/love-prerelease.yml` publishes on push to one pinned branch (`arena/01a09ffd-undertale` for the v1.2.0 fusion) and **refuses unless a draft release with that tag already exists**; `workflow_dispatch` re-runs it. The publish job fetches Yellow, converts, runs the suite with `PORT_REQUIRE_YELLOW=1`, packages `--merged`, runs the fused native gate, uploads four assets and flips `--draft=false` |
 
 ### To publish a version (only when a piece list says a release is due)
 
@@ -124,13 +127,13 @@ want licence or legality re-litigated: record provenance in `docs/PATHS.md` and 
 ## Verification commands
 
 ```bash
-.venv/bin/python -m pytest -q                                   # headless suite (255 at this validation)
+.venv/bin/python -m pytest -q                                   # headless suite (285 at this validation)
 python3 tools/fetch_yellow.py --check                           # pinned Yellow source present and intact
 python3 tools/yellow_convert.py --stage scripts                 # Yellow pieces 1-2: assets plus 1,155 GMS2 script resources
 python3 tools/yellow_convert.py --stage objects                 # Yellow pieces 1-3: plus all 3,224 objects and 8,494 events
 python3 tools/yellow_convert.py --stage rooms                   # Yellow piece 4: plus all 287 rooms, 68 paths and their drawables
 python3 tools/merge.py                                          # piece 5: write generated/merged/manifest.lua from both conversions
-python3 tools/package.py --merged --no-convert                  # piece 5: merged archive, gated on a complete Yellow rooms stage
+python3 tools/package.py --merged --no-convert                  # the fusion archive: carries every referenced pinned Yellow asset file, gated on a complete Yellow rooms stage
 python3 tools/recover_paths.py --check                          # path data still matches its pinned source
 python3 tools/package.py --output artifacts/check.love          # reproducible archive + report gates
 bash tools/native_smoke.sh artifacts/check.love                 # needs LOVE+xvfb: CI only

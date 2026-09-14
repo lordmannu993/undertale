@@ -1,41 +1,82 @@
 # Experimental LÖVE build — not a fully functional game port
 
 This prerelease makes the current `.love` package downloadable from GitHub. It
-contains the converted Lua and the assets supplied in this repository. **It is
-not a completed or native-device-verified game, and it is not an APK.**
+contains the converted Lua and the assets supplied for both merged games. **It
+is not a completed or native-device-verified game, and it is not an APK.**
 
-## v0.1.11 (working tree — not published)
+## v1.2.0 — the Undertale ⊕ Undertale Yellow fusion build
 
-Nothing is tagged or downloadable for this version yet: `docs/YELLOW.md` gates a
-merged release on native travel and save tests that do not exist. The working tree
-carries:
+One `.love` archive carries **both games as a single traversable world**: the
+whole of this repository's Undertale port and the whole of the pinned Undertale
+Yellow v1.2.1 decompilation, joined by the games' own travel hubs. You play one
+playthrough, as **Frisk in both worlds**.
 
-- **Undertale Yellow piece 4 finished.** All 287 rooms, 68 paths, 199 454
-  drawables and 3 006 layers convert, with tile mirror/flip/rotate bits decoded,
-  the one animated tileset (`ts_steamworks_tileset`) running on a global tile
-  clock, sprite and background layer animation honoured, and the `layer_*`
-  families implemented. 25 rooms whose layer effects or physics worlds have no
-  equivalent here stay blocked with their own named stops.
-- **Yellow starts.** The recorded startup blocker is gone: headlessly the game
-  runs the intro, the logos, the first-time menu and into `rm_ruins00`, and the
-  player walks. GMLive's 21 inert shipped scripts now convert literally instead
-  of stopping, which is what every Yellow object event's opening
-  `if (live_call())` needed.
-- **A merged build exists.** `tools/merge.py` writes one manifest for both games,
-  `port/merge.lua` checks the ID bands, and `tools/package.py --merged` refuses to
-  build unless the Yellow conversion is complete.
-- **Two doors between the worlds.** Hold X during a River Person boat ride and the
-  destination you chose lands in Undertale Yellow instead (Snowdin dock →
-  `rm_snowdin_11_yellow`, Waterfall dock → `rm_dunes_05`, Hotland dock →
-  `rm_hotland_02`); Yellow's UGPS mail whale lists the three Undertale docks and
-  uses its own travel globals to bring Frisk back beside the dock's boat.
-- **A versioned merged save layer.** `merge.sav` records version, crossings, last
-  room and world. It is additive: each game keeps the save files it already
-  writes, so an existing single-game save is never rewritten, and an unknown
-  version stops with its own name.
-- Still open for piece 5: Frisk-only rendering (Clover's run sprites on X),
-  Clover's ammunition and accessories as extra equipment slots, native
-  (LÖVE/xvfb and Android) travel and save gates.
+### What is new in v1.2.0
+
+- **Both games in one archive.** 287 Yellow rooms (with 199 454 layer
+  drawables), 3 224 Yellow objects with their 8 494 events, 1 155 Yellow
+  scripts, 3 796 sprites, 673 sounds and 11 fonts convert into the same runtime
+  as Undertale, in a disjoint ID band (`1000000 +` the pinned Asset_Order ID)
+  so no Undertale ID moves. The merge *checks* that invariant instead of
+  assuming it.
+- **The River Person now sails to Undertale Yellow.** Hold **X** — the cancel
+  button, on screen for touch — during a River Person boat ride, and the
+  destination you chose lands in Yellow instead: Snowdin's dock → the Snowdin
+  forest, Waterfall's dock → the Dunes, Hotland's dock → Yellow's Hotland.
+  Every destination and landing coordinate is the games' own data; no
+  recovered script or object was edited.
+- **Yellow's UGPS mail whale sails back.** Yellow's own fast-travel menu lists
+  the three Undertale docks. Choosing one runs Yellow's own whale travel code
+  and Frisk steps out beside the dock's own boat.
+- **Frisk everywhere.** Yellow's player object keeps all of its mechanics
+  (movement, states, masks, collisions — nothing about the rooms or battles
+  changes), but the body you see is drawn from Undertale's Frisk sprites:
+  28 of Clover's walk-cycle poses (including the route, water, Snowdin and
+  roof recolours) draw Frisk's matching direction.
+- **Clover's run animation on the X button.** Hold X while walking in Yellow's
+  world and you sprint at Yellow's own run speed, with Clover's
+  `spr_pl_run_*` cycle — the one pose family Frisk's set does not have, kept
+  Clover's on purpose. Gun poses, the Steamworks goggles, the dance and lying
+  poses also stay Clover and are reported by name at startup.
+- **Clover's ammunition and accessories as two extra equipment slots, beside
+  Frisk's own gear.** Frisk keeps Undertale's weapons and armours untouched.
+  In Yellow's world, its own pause menu equips Clover's ammunition (weapon
+  modifier) and accessories (armour modifier) into two additional slots that
+  feed Yellow's own attack/defense math. Equipping swaps with the inventory
+  slot exactly as Yellow does, and the loadout persists in the merged save,
+  restored after every crossing with Yellow's own stat scripts.
+- **A versioned merged save.** `merge.sav` records version, crossings, last
+  room, world and the two equipment slots. It is additive: each game keeps the
+  save files it already writes, a single-game save is never rewritten, and an
+  unknown version stops with its own name instead of being guessed at.
+- **Native fused-world release gate.** The LÖVE/xvfb gate now plays the Undertale
+  opening, then crosses into Yellow natively: the boat ride lands one player in
+  `rm_hotland_02` drawn as Frisk, the whale brings them back to exactly one
+  Frisk at the Waterfall dock, and `merge.sav` records both crossings and the
+  equipment slots. Screenshots are kept as the release run's artifacts.
+- **A larger automated suite.** 285 automated tests pass for this release (was 255 at the last validation),
+  including the Frisk remap, the X-run, the menu-driven equips, the merged
+  save restore, and packaging gates that refuse to ship a merged archive
+  missing any of the ~19 400 referenced pinned asset files.
+
+### What this release still does not claim
+
+- It is **not a finished full-game port of either game**. Undertale's known
+  gaps remain (86 unresolved static numeric asset references in recognizable
+  positions, missing external files, absent original room 159, the 38
+  recovered paths' frame-level parity uncertified). See the attached
+  conversion reports for both games.
+- **Yellow's battles and deeper systems are unclaimed.** Walking and crossing
+  are proven; fighting Yellow's enemies, its story flags, palette shaders
+  (reported and skipped — the scene keeps its original colours) and the 25
+  rooms whose layer effects or physics worlds have no equivalent here (they
+  stop with their own names) are not certified.
+- **No Android device certification or APK.** The native gate is Linux
+  LÖVE/xvfb with software GL and null audio. Android GPU behaviour, audio
+  fidelity, touch latency and lifecycle behavior remain outstanding, as do
+  full-game playthroughs of either world.
+- Clover is not a playable character; the player is Frisk in both worlds, as
+  the merge specifies.
 
 ## v0.1.10 features
 
@@ -118,191 +159,20 @@ carries:
   `tools/recover_parts.py` pairs each of this checkout's own numeric literals
   with the object name that the pinned upstream decompilation
   (`kittibyte/UndertaleDecomp` @ `249ffa27`, the same immutable commit already
-  backing the registry and movement-path recoveries) uses for the *same
-  statement* — accepting a pair only when both events assign the same `partN`
-  variables in the same order, and taking **no number from the dump**: IDs come
-  from this repository's own literals, only the names are paired. The sweep also
-  re-validates the 38 part sites that already have decompiler annotations as
-  anchors, refuses on any disagreement, and records per-site provenance in
-  `port/recovered_parts.json` (fetched by script, committed, and imported by the
-  converter). A `--check` mode re-verifies the file offline.
-- All 59 monster part-spawn sites in the game now resolve, so part-based
-  battles start and draw their monsters. This does **not** certify full battle
-  fidelity: turn logic, ACT/FIGHT behaviour and attack patterns beyond the
-  scripted regression coverage remain unverified.
-- 16 new automated tests pin the fix (the suite grows from 163 to **179**): the
-  provenance and no-invention checks, a static guard that every `partN` literal
-  passed to `instance_create` resolves to a registered object, the reported
-  crash case (ID 255 = `obj_drakebody`) explicitly, and end-to-end battle tests
-  for every Snowdin battlegroup (Doggo, Lesser Dog, Dogamy & Dogaressa, Greater
-  Dog, Papyrus, Gyftrot, Snowdrake, Ice Cap, Jerry, Glad Dummy, Glyde) plus a
-  Waterfall Shyren spot check. Each was verified to fail on the unfixed build
-  with the reported crash signature before passing after it.
+  pinned for the registry audit) shows for the same statement, after checking
+  that both of a monster's events assign the same part variables in the same
+  order. Per-site provenance and the 38 already-annotated anchor sites are
+  committed in `port/recovered_parts.json`; nothing is imported from the
+  registry dump, whose incompatible ID space stays audit-only.
+- **179 automated tests** (was 163), including 16 new regressions: per-site
+  provenance and no-invention checks, a static guard over all 59 part spawn
+  sites, and an end-to-end battle for every Snowdin battlegroup. Each was
+  verified to fail on the unfixed code with the reported crash signature
+  before passing after it.
 - Updated the GitHub download to the v0.1.8 experimental LOVE archive.
 
-## v0.1.7 fixes
+## Older versions
 
-- **Fix the Ruins spike-bridge softlock** ("Toriel and the player go missing").
-  `obj_torhandhold1` started the recovered `path_torielwalk5_2` with GameMaker's
-  *relative* path flag, but the recovered points are room-absolute coordinates
-  that zig-zag across the spike maze. Read as offsets from the walk-in position
-  near (768,110) the hand-in-hand crossing landed at (1540,210)..(1904,170) —
-  outside the `1200x240` room — so the crossing, its follow-up dialogue and the
-  hand-back of control all happened off-camera with the player invisible. All
-  three `path_start` calls in that object now pass the absolute flag, exactly as
-  sibling `obj_toroverworld6` already did for `path_torielwalk5` in the same room.
-  The scene now ends in view at (1136,60), restores `phasing` and the player's
-  visibility, creates `obj_toroverworld4`, and the farewell dialogue completes.
-  This is a **listed deviation** from the pinned upstream decompile (which passes
-  `0`); the room geometry makes relative coordinates impossible there, and the
-  evidence is recorded in `docs/PATHS.md` under "Playback semantics".
-- **Fix overlapping dialogue when skipping text.** `scr_textskip` (X/Shift) only
-  fast-forwarded the character position, so a writer that had reached a halt state
-  never ran its own confirm-key page advance or destroy event and stayed alive
-  under the next bubble's writer. The script now branches on the writer's halt
-  state the way the writer's own user event does: complete the page, advance it,
-  or hand control back and destroy the stalled writer.
-- **Add a touch COLLISION toggle for testing.** PAUSE gains a seventh row,
-  `COLLISION: ON/OFF`, mapped onto the game's own `phasing` debug global (the
-  keyboard toggle on `obj_mainchara`): OFF walks through walls. It is a testing
-  aid, not a setting — it is never written to the persisted touch settings, it
-  defaults to ON, and it is re-applied after an in-game restart.
-- Three new regressions pin these fixes (the suite grows from 160 to **163
-  automated tests**), and each was verified to fail on the unfixed code with the
-  bug's own signature before passing after it.
-- Updated the GitHub download to the v0.1.7 experimental LOVE archive, and this
-  page's "Download and try" section, which still named the v0.1.5 asset.
-- Corrected a stale limitation count: `README.md` and `docs/PORTING.md` claimed
-  **44** unresolved numeric asset IDs, but the conversion report that ships inside
-  the archive has listed **86** ever since v0.1.6 made the pinned upstream
-  registry dump audit-only (no IDs imported). `docs/CONTROLS.md` now documents the
-  new PAUSE COLLISION row.
-
-## v0.1.6 fixes
-
-- Toriel now faces the tangent while following paths, including reverse travel; stopped paths preserve the scripted facing.
-- Voided the incompatible upstream registry import and restored all 13 verified Toriel dialogue-face sprite IDs, preventing disco-ball and unrelated portraits.
-- Alarm timers now fire when they cross zero, so the first Froggit encounter starts normally.
-
-## v0.1.5 fixes
-
-- **Restore the missing Toriel/Asriel directional and talking sprite IDs.** The
-  decompiler only annotated a handful of the directional sprite IDs, so Toriel's
-  up-talking pose (`utsprite`/`usprite` = 1111) and the hand-hold down/up poses
-  (1113/1117) fell through to synthetic IDs or were absent entirely, and the
-  Toriel/Asriel overworld reveal (`obj_torinteractable7`,
-  `obj_asriel_overworldanim`) drew Asriel's side/up/talking poses blank. Restored
-  in `port/resource_overrides.json`: `spr_toriel_ut` 1111,
-  `spr_toriel_handhold_d` 1113, `spr_toriel_handhold_u` 1117, `spr_asriel_dt`
-  2418, `spr_asriel_ut` 2420, `spr_asriel_rt` 2422, `spr_asriel_l` 2424,
-  `spr_asriel_lt` 2425.
-- A new regression (`tests/test_toriel_sprites.py`) asserts every
-  directional/talking sprite ID a Toriel or Asriel overworld object assigns
-  resolves to a real, non-empty sprite, and that the restored IDs are not
-  synthetic.
-- Corrected the v0.1.4 release page, whose "Download and try" section named the
-  v0.1.3 asset and whose limitations text still described movement paths as
-  missing although that archive contains all 38 recovered paths and their
-  playback.
-- Updated the GitHub download to the v0.1.5 experimental LOVE archive.
-
-## v0.1.4 fixes
-
-- Added pinned exact-name resource-registry evidence, The upstream registry is audit-only; its conflicting candidates are retained, and the honest unresolved count remains 86.
-- Recovered the missing Hotland room 159 source from the pinned upstream dump and included its provenance in the archive. The runtime continues to stop explicitly until a tested GMS2-to-GMX adapter is available.
-- Recovered point data for all 38 referenced movement paths from one pinned upstream GameMaker project dump and played them back at GameMaker's pixels-per-step speed. Per-path provenance and the coordinate-semantics evidence are in docs/PATHS.md.
-- The release was gated on a native Linux LÖVE run asserting Toriel is actually drawn displaced along her recovered path, plus a route test that drives the real scripted fight and dialogue into room_ruins1.
-- Updated the GitHub download to the v0.1.4 experimental LOVE archive.
-
-## v0.1.3 fixes
-
-- **Fix the end-of-battle sprite glitch and permanent softlock after Flowey's
-  tutorial fight.** The damaged GameMaker export negated `obj_dialoguer`'s
-  `obj_face` cleanup guards in two events (its Destroy event and the no-face
-  branch of its Step event), so dialogue face portraits were never destroyed.
-  Flowey's face survived into and out of the tutorial battle and stacked on top
-  of Toriel's at nearly the same coordinates, and the leftover Toriel face then
-  blocked `obj_floweytrigger`'s `!instance_exists(obj_torface)` wait forever:
-  control never returned and Toriel never led you to the ruins door. Both guards
-  are restored to match the shipped game's decompilation, each behind its own
-  per-event source-hash guard, and recorded in the conversion report.
-- **Restore the verified Toriel directional sprite IDs** (`spr_toriel_dt` 1105,
-  `spr_toriel_r` 1107, `spr_toriel_l` 1108, `spr_toriel_rt` 1109,
-  `spr_toriel_lt` 1110) in `port/resource_overrides.json`, preserving the
-  existing ID anchors.
-- A new regression plays the entire tutorial fight like a player (steering the
-  SOUL into Flowey's pellets and advancing his dialogue) and then asserts that no
-  face leaks, the game returns to `room_area1_2`, Toriel appears and speaks, her
-  face is cleaned up, `obj_floweytrigger` advances past the stuck state, player
-  control returns, and Toriel starts walking toward the ruins door. A second test
-  audits the repair itself: both events are reported, the generated Lua carries the
-  restored guard, and a different source export is rejected by the hash guard.
-- **145 automated tests** now pass (was 143).
-
-## v0.1.2 fixes
-
-- Restore reference-guided opening scenery: the chamber floor, light rings,
-  corridor and doorway. Original flower tiles and collision are unchanged.
-  This is an explicit reconstruction, not a claim of recovered original tiles.
-- Correct decompiler-reversed dialogue labels: Flowey now explains the SOUL,
-  rather than showing Undyne's chair question. Repair the verified item/phone/
-  encounter/Papyrus-call tables with exact source-hash guards as well.
-- Fix font IDs for the main/damage/HUD/Sans/Papyrus/Wingdings roles and malformed
-  decimal-comma arguments that shifted text speed/sound/line spacing.
-- Require exact dialogue-content and text-bounds assertions, plus native floor,
-  light-ring and doorway pixels and five scene screenshots.
-- Retain the v0.1.1 room-ID gap, proper Flowey/battle/game-over routing and larger
-  phone Fit viewport.
-
-Close the old running LÖVE game before opening the new versioned file. The same
-save identity is retained. Flowey's alternate greetings on repeat attempts are
-normal saved-history behaviour, not scrambled dialogue. Android's rotated/dimmed
-recent-app thumbnail is not an in-game rendering setting.
-
-## Download and try
-
-1. Download **`undertale-love-v0.1.9-experimental.love`** from the assets below
-   (approximately 124 MB). Do not download GitHub's automatic “Source code” ZIP
-   if you want to try the packaged game.
-2. Install the official **LÖVE 11.5 runtime** for your platform:
-   https://github.com/love2d/love/releases/tag/11.5
-3. Open the `.love` file with LÖVE on desktop or Android. Python and GameMaker are
-   not required for the downloaded archive.
-
-Touch controls include the D-pad, Z/X/C, extra key pages, pause/settings,
-handedness, size/opacity adjustment, a control tester, and (from v0.1.7) a
-runtime-only COLLISION toggle for walking through walls while testing. Actual
-touchscreen behavior still needs device validation.
-
-## Validation and limitations
-
-The automated tests check Lua 5.1/LuaJIT syntax, the converted opening/title,
-naming, initial movement, menu/cancel, first doorway, save/load, persistence,
-input handling, and reproducible packaging. **The separate native smoke test checks Linux rendering with software OpenGL and
-null audio; neither test suite establishes Android GPU compatibility, audible
-fidelity, physical touch latency, or full-game playability. No Android APK has
-been compiled or installed as part of this prerelease.**
-
-All 38 referenced movement paths were recovered with pinned provenance
-(docs/PATHS.md) and are played back by the runtime, but frame-level parity with
-the original engine's stepping is not yet certified. Missing external
-resources, the remaining unresolved numeric asset IDs, the missing Hotland
-room's GMS2-to-GMX adapter, and remaining GameMaker compatibility work
-prevent a complete game. Some scenes will stop with a diagnostic; missing
-resources have not been fabricated or silently replaced. Some of the missing
-external files are optional/debug assets.
-
-See the bundled `docs/PORTING.md`, `docs/ANDROID.md`, and `docs/VALIDATION.md`, plus
-the attached conversion report. This release must not be presented as a finished
-game or as having “perfect” touch controls.
-
-## Rebuild and provenance
-
-Rebuild from the source commit listed below with `python3 tools/package.py`.
-The archive is a Release asset, not a Git-tracked binary. ZIP output is repeatable
-for the same source and Python/zlib toolchain; check the attached checksum for
-this particular build.
-
-The original repository describes its source as likely decompiled and does not
-grant redistribution rights. No ownership of or license to the original game is
-claimed by this port; only use or distribute material you have the right to use.
+`love-v0.1.0` through `love-v0.1.7-experimental` remain downloadable, renamed
+with a "Superseded —" prefix. Every published release is immutable; none is
+republished over.
