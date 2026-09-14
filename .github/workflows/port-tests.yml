@@ -36,8 +36,12 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y love xvfb xauth
       - name: Test the packaged game with native graphics and touch callbacks
         run: |
-          python tools/package.py --no-convert
-          bash tools/native_smoke.sh
+          # Yellow's own test fixtures re-run earlier stages against the shared
+          # output, leaving the report at the last stage they ran; packaging
+          # gates on the rooms stage, so restore it deterministically first.
+          python tools/yellow_convert.py --stage rooms
+          python tools/package.py --no-convert --merged
+          bash tools/native_smoke.sh artifacts/undertale-merged-love-experimental.love
       - uses: actions/upload-artifact@v4
         if: always()
         with:

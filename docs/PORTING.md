@@ -87,24 +87,25 @@ legacy Windows joystick poller; the old in-game joystick configuration is not
 used. All original debug keys remain available, but touch controls do **not**
 enable `global.debug`.
 
-## Undertale Yellow merge (pieces 1-3 of 5)
+## Undertale Yellow merge (all five pieces)
 
-A second GameMaker project is being merged in: **Undertale Yellow v1.2.1**, a
+A second GameMaker project is merged in: **Undertale Yellow v1.2.1**, a
 GameMaker **Studio 2 (2023.4.0.84)** decompilation fetched from one pinned commit
 (`port/yellow_source.json`) into the git-ignored `yellow_src/`. Piece list,
-architecture and the recorded deviations live in [YELLOW.md](YELLOW.md).
+architecture and the recorded deviations live in [YELLOW.md](YELLOW.md). The
+fused build ships as `love-v1.2.0-fusion-experimental`.
 
-What pieces 1-3 add to the pipeline, and what they deliberately do not claim:
+What the merge adds to the pipeline, and what it deliberately does not claim:
 
-| resource | Yellow count | treatment through piece 3 |
+| resource | Yellow count | treatment in the merged build |
 |---|---:|---|
-| Sprites | 3,799 IDs / 3,796 converted | Frame PNGs, origins, masks and animation metadata as GameMaker 1.4 records; 3 pinned IDs have no folder upstream and are listed, not substituted |
+| Sprites | 3,799 IDs / 3,796 converted | Frame PNGs, origins, masks and animation metadata as GameMaker 1.4 records; 3 pinned IDs have no folder upstream and are listed, not substituted. Yellow's 28 player walk-cycle poses draw Frisk at render time (mechanics stay Clover's records) |
 | Sounds | 673 | Original audio files, volumes, durations |
 | Fonts | 11 | Bitmap atlases and every glyph, including the default-character glyph 9647 |
-| Tilesets | 112 | Texture page as a background plus the tile grid (`tile_width`, `out_columns`, `tile_count`, animation frames) needed by piece 4 |
-| Objects | 3,224 | All converted by piece 3: metadata, parents, masks and all 8,494 events, with collision targets renumbered to merged IDs. Studio 2 has no object depth (piece 4 takes it from the room layer) and 10 physics objects stop with their own name |
-| Rooms / paths | 287 / 68 | **IDs recovered, contents not converted yet** — piece 4 |
-| Scripts | 1,155 | All resources converted by piece 2; calls remain name-resolved and the 22 GMLive resources are explicit stops |
+| Tilesets | 112 | Texture page as a background plus the tile grid (`tile_width`, `out_columns`, `tile_count`, animation frames) |
+| Objects | 3,224 | Metadata, parents, masks and all 8,494 events, with collision targets renumbered to merged IDs. Studio 2 has no object depth (room layers supply it) and 10 physics objects stop with their own name |
+| Rooms / paths | 287 / 68 | All converted: instances, creation code, tile layers with mirror/flip/rotate transforms, backgrounds, views, and the one animated tileset; 40 named room-feature stops (layer effects, physics worlds) stay blocked rather than rendered without equivalents |
+| Scripts | 1,155 | All resources converted; calls remain name-resolved and the 22 GMLive resources convert literally (the shipped build's GMLive is inert) with one explicit stop |
 | Shaders / sequences | 26 / 35 | No GameMaker 1.4 equivalent; enumerated for a visible stop, never substituted |
 
 Yellow's numeric IDs are recovered from two independent records inside the pinned
@@ -139,8 +140,14 @@ original colours.
 A merged build adds `port/merge.lua`, which builds one manifest out of both
 conversions and checks the ID bands instead of assuming them, and `port/travel.lua`,
 which connects Undertale's River Person boat and Yellow's UGPS mail whale,
-initialises each world with its own scripts, and keeps a versioned `merge.sav`
-beside the save files each game already writes. See `docs/YELLOW.md`.
+initialises each world with its own scripts, carries Frisk's Clover-equipped
+ammunition and accessory slots in a versioned `merge.sav` beside the save files
+each game already writes, and re-applies the loadout after every crossing.
+`port/frisk.lua` draws Yellow's player as Frisk (pixels only; run poses, gun
+poses, goggles, the dance and lying poses stay Clover and are reported). The
+native LÖVE/xvfb gate plays the Undertale opening and then crosses into Yellow
+and back: one player per world, Frisk drawn in `rm_hotland_02`, and both
+crossings recorded in `merge.sav`. See `docs/YELLOW.md`.
 
 Piece 3 adds `tools/yellow/objects.py`, which writes each Yellow object in the same
 module shape `tools/convert.py` uses for Undertale (metadata plus

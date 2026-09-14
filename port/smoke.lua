@@ -116,6 +116,81 @@ function Smoke.new(game,touch)
         capture("native-toriel-walk")
         print(string.format("NATIVE SMOKE PASS: path_torielwalk1 walked to %.0f%% at (%.0f,%.0f), position recorded by the renderer",
             walker.v.path_position*100,walker.v.x,walker.v.y))
+        -- Fused-world gates. A single-game archive has no second world to
+        -- enter, so it stops here by design and everything above is its whole
+        -- surface; a merged archive must cross between the games natively.
+        if game.manifest.game~="merged" then
+            print("NATIVE SMOKE PASS: single-game build; the fused-world gates need the merged archive")
+            self.done=true;love.event.quit(0)
+            return
+        end
+        local function countInstances(object)
+            local total=0
+            for _,inst in ipairs(game.instances) do
+                if inst.alive and inst.v.object_index==object then total=total+1 end
+            end
+            return total
+        end
+        -- River Person crossing. global.plot=122 is the boat's own Create gate
+        -- below which it destroys itself; at it, room_fire_dock's placed boat
+        -- survives, and holding X through the ride arms the fused crossing.
+        game.global.plot=122
+        game:gotoRoom(140);game:applyTransitions();wait(5)
+        assert(game.roomState.name=="room_fire_dock","The Hotland dock did not load: "..tostring(game.roomState.name))
+        assert(countInstances(game.constants.obj_dogboat_thing)>=1,"The dock's own boat is missing")
+        hold(88,2)
+        assert(game.travel.riverLatch,"Holding X during the boat ride did not arm the fused crossing")
+        game:gotoRoom(140);game:applyTransitions();wait(10)
+        assert(game.travel.world=="yellow","The fused boat ride never left Undertale")
+        assert(game.roomState.name=="rm_hotland_02","The boat landed in "..tostring(game.roomState.name))
+        local clover=game.manifest.yellow_names.objects["obj_pl"]
+        assert(countInstances(clover)==1,"Yellow's world does not hold exactly one player")
+        assert(countInstances(game.constants.obj_mainchara)==0,"Frisk survived the crossing into Yellow")
+        local landed
+        for _,inst in ipairs(game.instances) do
+            if inst.alive and inst.v.object_index==clover then landed=inst end
+        end
+        assert(landed.v.x==170 and landed.v.y==120,
+            "The boat landed the player at "..tostring(landed.v.x)..","..tostring(landed.v.y).." instead of Yellow's own 170,120")
+        -- Frisk-only rendering, proven renderer-side: the player body this room
+        -- drew is Undertale's, and Clover's four walk sprites never appear.
+        game.drawLog={};wait(2)
+        local friskDrawn,cloverWalk={},0
+        for _,entry in ipairs(game.drawLog) do
+            if entry[1]=="sprite" then
+                local name=tostring(entry[2])
+                if name:find("spr_mainchara",1,true) then friskDrawn=true end
+                for _,walk in ipairs({"spr_pl_up","spr_pl_down","spr_pl_left","spr_pl_right"}) do
+                    if name==walk then cloverWalk=cloverWalk+1 end
+                end
+            end
+        end
+        assert(friskDrawn,"Yellow's player was never drawn as Frisk natively")
+        assert(cloverWalk==0,"Clover's walk sprites leaked into the merged rendering")
+        capture("native-fusion-yellow")
+        write("native-fusion-yellow.txt","room="..game.roomState.name.." player="..
+            string.format("%.0f,%.0f",landed.v.x,landed.v.y).." crossings="..tostring(game.travel.crossings).."\n")
+        -- Back through the UGPS whale's own travel globals.
+        game.global.fast_travel_point="Waterfall - Dock";wait(2)
+        game:gotoRoom(125);game:applyTransitions();wait(10)
+        assert(game.travel.world=="undertale","The whale never carried the player home")
+        assert(game.vars.room==125,"The whale landed in room "..tostring(game.vars.room))
+        assert(countInstances(game.constants.obj_mainchara)==1,"Undertale's world does not hold exactly one Frisk")
+        assert(countInstances(clover)==0,"Yellow's player survived the crossing back")
+        game.builtins.ini_open(nil,"merge.sav")
+        local savedCrossings=game.builtins.ini_read_real(nil,"merge","crossings",0)
+        local savedWorld=game.builtins.ini_read_string(nil,"merge","world","")
+        local savedAmmo=game.builtins.ini_read_string(nil,"merge","ammo","")
+        local savedVersion=game.builtins.ini_read_real(nil,"merge","version",0)
+        game.builtins.ini_close()
+        assert(savedVersion==1,"merge.sav version="..tostring(savedVersion))
+        assert(savedCrossings==2,"merge.sav crossings="..tostring(savedCrossings))
+        assert(savedWorld=="undertale","merge.sav world="..tostring(savedWorld))
+        assert(savedAmmo~="","merge.sav lost the equipment slot record")
+        capture("native-fusion-back")
+        write("native-fusion-back.txt","room="..tostring(game.roomState.name).." crossings="..
+            tostring(savedCrossings).." world="..savedWorld.." ammo="..savedAmmo.."\n")
+        print("NATIVE SMOKE PASS: fused boat ride to Undertale Yellow, one player per world, Frisk rendered in Yellow, versioned merged save with equipment slots")
         self.done=true;love.event.quit(0)
     end)
     return self
@@ -123,9 +198,10 @@ end
 function Smoke:beforeTick()
     if self.done then return end
     self.frames=self.frames+1
-    -- Budget covers the whole scripted opening including Flowey's tutorial fight
-    -- and Toriel's walked corridor; a hang must still fail fast, not run forever.
-    assert(self.frames<9000,"Native smoke exceeded its tick budget")
+    -- Budget covers the whole scripted opening including Flowey's tutorial fight,
+    -- Toriel's walked corridor and the fused-world section; a hang must still
+    -- fail fast, not run forever.
+    assert(self.frames<12000,"Native smoke exceeded its tick budget")
     local ok,err=coroutine.resume(self.thread)
     if not ok then error("Native smoke: "..tostring(err)) end
 end

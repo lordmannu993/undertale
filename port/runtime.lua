@@ -100,6 +100,9 @@ function Runtime.new(manifest,input,options)
     require("port.yellow_builtins")(self)
     -- Only a merged manifest has two worlds to travel between.
     require("port.travel").install(self)
+    -- Merged builds draw Yellow's player as Frisk (see port/frisk.lua); a
+    -- single-game manifest leaves every sprite exactly as converted.
+    require("port.frisk").install(self)
     return self
 end
 

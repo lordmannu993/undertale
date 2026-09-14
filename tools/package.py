@@ -10,12 +10,15 @@ import argparse
 import hashlib
 import json
 from pathlib import Path
+import re
 import subprocess
 import sys
 import zipfile
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from convert import Converter, ROOT
+
+YELLOW_REFERENCE = re.compile(r'"(yellow_src/[^"]+)"')
 
 
 def merged_files(generated: Path) -> list[Path]:
@@ -43,6 +46,23 @@ def merged_files(generated: Path) -> list[Path]:
     files = [generated / "merged" / "manifest.lua"]
     files += sorted(path for path in yellow.rglob("*")
                     if path.is_file() and not any(part.startswith(".") for part in path.relative_to(ROOT).parts))
+    # The converted records open their assets by archive-relative path inside
+    # the pinned checkout (sprite frames, sounds, font atlases, tileset pages).
+    # A merged archive that shipped the modules without those files would draw
+    # nothing and play no sound, so the referenced set is derived from the
+    # records themselves - never copied wholesale from the ~580 MB checkout -
+    # and a missing file stops the build instead of failing at runtime.
+    referenced = set()
+    for module in yellow.rglob("*.lua"):
+        referenced.update(YELLOW_REFERENCE.findall(module.read_text(encoding="utf-8")))
+    missing = sorted(name for name in referenced if not (ROOT / name).is_file())
+    if missing:
+        raise ValueError(
+            f"{len(missing)} pinned Yellow files referenced by the conversion are absent "
+            f"(run tools/fetch_yellow.py); first: {missing[0]}"
+        )
+    files += [ROOT / name for name in sorted(referenced)]
+    print(f"Merged archive carries {len(referenced)} referenced pinned Yellow asset files.")
     return files
 
 

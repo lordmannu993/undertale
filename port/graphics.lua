@@ -69,6 +69,9 @@ function Graphics.install(R)
         partImage(image(file),file,left,top,width,height,x,y,sx,sy,tint,alpha,transform)
     end
     local function sprite(E,index,sub,x,y,sx,sy,angle,tint,alpha,crop)
+        -- Merged builds draw Yellow's player body as Frisk (port/frisk.lua);
+        -- the remap is pixels-only, so gameplay reads stay on the same record.
+        if R.spriteForDraw then index=R.spriteForDraw(index) end
         local s=R.assets.sprites[index]
         if not s then
             if index>=0 then R:warn("sprite:"..tostring(index),"Unresolved sprite ID "..tostring(index).."; see conversion-report.json.") end
