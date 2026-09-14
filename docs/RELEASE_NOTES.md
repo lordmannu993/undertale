@@ -4,12 +4,14 @@ This prerelease makes the current `.love` package downloadable from GitHub. It
 contains the converted Lua and the assets supplied for both merged games. **It
 is not a completed or native-device-verified game, and it is not an APK.**
 
-## v1.2.1 — both travel services open from the start (branch build, not yet published)
+## v1.2.1 — every stop travels
 
-The owner's second round of feedback: *"make sure that the River Person and
+Two rounds of owner feedback. First: *"make sure that the River Person and
 UGPS are always available to use"* and *"I can fast travel to all of their old
-and new locations"*. Neither service is locked behind story progress any more,
-and both can be used in the first minutes of a run.
+and new locations"* — neither service is locked behind story progress any
+more, and both can be used in the first minutes of a run. Then, with one named
+stop left: implement the particle system, the only blocker, leaving no travel
+stop behind.
 
 - **The River Person is at every dock from the first frame.** The boat's own
   Create event deletes itself while `global.plot` is under 122 — the value
@@ -40,16 +42,23 @@ and both can be used in the first minutes of a run.
   `view_camera[0]` to place its whale; that table had never been created, so
   ringing a bell stopped the frame with *"Camera 0 does not exist"*. Every
   visible viewport's camera now exists from room load.
-- **One known gap, reported rather than hidden:** the Yellow stop
-  *"Snowdin - Forest"* (and Undertale's Snowdin boat crossing, which lands in
-  the same room) stops in `rm_snowdin_11_yellow`, because that room's
-  `part_snow` needs GameMaker's particle system, which this runtime does not
-  implement yet. It is a named compatibility stop, never a silent stub. The
-  other six Yellow stops and all three docks travel and land.
-- **294 automated tests** pass on this branch (three new ones: the boat present
-  at all three docks at `global.plot` 10, the full bell → Mail/Travel → menu →
-  Yellow-stop flight landing in the merged room, and a check of every offered
-  stop against the pinned Yellow source).
+- **The particle system is implemented, so Snowdin travels.** GameMaker's
+  `part_*` builtins — systems, types, emitters, direct creation — run in a new
+  `port/particles.lua`: `part_snow`'s snowfall draws at depth -9999 in all 19
+  Snowdin rooms that place it, and the Snowdin-forest whale stop plus
+  Undertale's Snowdin boat crossing land instead of stopping. All ten UGPS
+  stops and all three dock crossings travel and land.
+- **The same landing needed three small rules, all reported.** The forest's
+  shadow system passes Yellow's raw object numbers where the merged build
+  needs the banded ones, so Yellow callers get their numbers banded
+  (`object-band`) in `with`, `instance_create` and `instance_create_depth`;
+  `object_get_parent` answers Yellow callers in Yellow's number space; and
+  `texture_set_stage` joins the report-and-skip shader flow, since the
+  palette-shader path binds through it on every shaded actor.
+- **309 automated tests** pass on this branch (fifteen new: eleven particle
+  unit tests, two static pins against the pinned Yellow source, and the two
+  Snowdin landing tests — whale stop and boat crossing — plus a native gate
+  that screenshots snowfall drawn in the forest).
 
 ## v1.2.0 — the Undertale ⊕ Undertale Yellow fusion build
 

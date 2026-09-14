@@ -20,9 +20,9 @@ workspace. See [port status](docs/PORTING.md) and [validation](docs/VALIDATION.m
 
 ## Download the experimental `.love` file
 
-[**Download `undertale-yellow-fusion-v1.2.0-experimental.love` (~390 MB)**](https://github.com/lordmannu993/undertale/releases/download/love-v1.2.0-fusion-experimental/undertale-yellow-fusion-v1.2.0-experimental.love)
+[**Download `undertale-yellow-fusion-v1.2.1-experimental.love` (~390 MB)**](https://github.com/lordmannu993/undertale/releases/download/love-v1.2.1-fusion-experimental/undertale-yellow-fusion-v1.2.1-experimental.love)
 
-[Release notes, SHA-256 checksum, and both conversion reports](https://github.com/lordmannu993/undertale/releases/tag/love-v1.2.0-fusion-experimental)
+[Release notes, SHA-256 checksum, and both conversion reports](https://github.com/lordmannu993/undertale/releases/tag/love-v1.2.1-fusion-experimental)
 
 Download the **`.love` asset**, not GitHub's automatic “Source code” ZIP. It
 contains the generated Lua and supplied assets for **both games**; you do not
@@ -35,6 +35,27 @@ to Undertale, and to Yellow's unclaimed battle and story systems (see the
 release notes). The large archive is hosted as a GitHub Release asset rather
 than committed to Git. To regenerate it yourself, follow the build instructions
 below.
+
+### Added in v1.2.1 — every stop travels
+
+- **Both travel services are open from the first frame.** The River Person's
+  boat waits at every dock before Hotland (its plot guard is lifted for its
+  own Create event only), and the UGPS whale offers all ten stops — Yellow's
+  seven plus the three Undertale docks — visited or not. Whales finish their
+  landing approach, and mail-station bells no longer stop the runtime.
+- **The particle system, so Snowdin travels.** GameMaker's `part_*` builtins
+  run in the runtime: `part_snow`'s snowfall draws over the forest, and the
+  Snowdin-forest whale stop plus Undertale's Snowdin boat crossing land
+  instead of stopping. All ten stops and all three dock crossings travel.
+- **The forest's shadows and palettes come with it.** The room's shadow
+  system resolves Yellow's raw object numbers through the merged ID band,
+  `object_get_parent` answers Yellow callers in Yellow's number space, and
+  palette-shader bindings join the reported-and-skipped shader flow.
+- **Native Snowdin gate.** The release's LÖVE/xvfb gate lands in the forest
+  natively and screenshots snowfall drawn there, on top of both crossings.
+- **309 automated tests** passed for this release (was 285), including
+  eleven particle unit tests, static pins against the pinned Yellow source,
+  and both Snowdin landings proven headless and native.
 
 ### Added in v1.2.0 — the Undertale ⊕ Undertale Yellow fusion
 
@@ -255,7 +276,7 @@ any of it could run. That work was split into five pieces, tracked in
 | 2 | GameMaker Studio 2 GML in the compiler; all 1,155 Yellow scripts converted with name-resolved calls and GMS2 runtime adapters | **complete** |
 | 3 | All 3,224 Yellow objects and their 8,494 events, with parents, masks and collision-event targets, plus the event dispatches they need (Clean Up, Draw Begin/End, Draw GUI, per-instance mouse) | **complete** |
 | 4 | All 287 Yellow rooms, tile layers and paths, with tile transforms, animation and the `layer_*` families | **complete** |
-| 5 | The connected world: cross-game travel through both hubs, Frisk-only rendering with Clover's X-run, Clover's ammo/accessory slots, versioned merged saves, packaging and the fused native release gate | **complete** (v1.2.0) |
+| 5 | The connected world: cross-game travel through both hubs, Frisk-only rendering with Clover's X-run, Clover's ammo/accessory slots, versioned merged saves, packaging and the fused native release gate | **complete** (v1.2.0; both services open and the particle system in v1.2.1) |
 
 Yellow's ~580 MB of assets are fetched from the pinned commit at build time
 (`python3 tools/fetch_yellow.py`) and are never committed to this repository;

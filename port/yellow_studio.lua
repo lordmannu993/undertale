@@ -476,6 +476,16 @@ return function(R)
             end
         end)
     end
+    reg("texture_set_stage",function(_,stage,texture)
+        -- The palette-swap shader flow binds its palette texture here and
+        -- draws one sprite through it. Shaders are reported and skipped by
+        -- this port, so the binding is recorded and the draw that follows
+        -- keeps the scene's original colours, exactly as shader_set does.
+        R.shaderState.stages=R.shaderState.stages or {}
+        R.shaderState.stages[stage]=texture
+        R:warn("shader:stage","texture_set_stage: shaders are not converted by this port; "..
+            "the palette binding is recorded and the scene keeps its original colours.")
+    end)
     reg("sprite_get_texture",function(_,index,frame)
         local sprite=R.assets.sprites[index]
         if not sprite then return -1 end
@@ -615,6 +625,21 @@ return function(R)
 
     -- Miscellaneous Studio 2 helpers --------------------------------------
     reg("object_get_name",function(_,index) local object=R:object(index);return object and object.name or "" end)
+    reg("object_get_parent",function(E,index)
+        -- Both Yellow call sites (obj_shadow_master, obj_light_master_old)
+        -- switch the result against Yellow's own raw numbers (1130 for
+        -- obj_npc_base, ...), so a Yellow caller gets the parent back in
+        -- Yellow's number space, exactly as its own project numbers it.
+        local object=R:object(R:resolveObjectIndex(index,E))
+        if not object then
+            R:unsupported("object_get_parent","Unknown object ID "..tostring(index))
+        end
+        local parent=object.parent
+        if parent==nil or parent<0 then return -1 end
+        local base=R.manifest.yellow_base or 1000000
+        if parent>=base and R:callerIsYellow(E) then return parent-base end
+        return parent
+    end)
     reg("object_is_ancestor",function(_,index,ancestor)
         local object=R:object(index)
         local visited={}

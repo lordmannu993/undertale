@@ -265,6 +265,10 @@ The original GameMaker files have not been changed.
 - Rendering uses a cached, nearest-filtered canvas, sprite origins/transforms,
   bitmap glyphs, tile depths, backgrounds and viewports. UI draws afterward in
   device coordinates and cannot alter the game's virtual coordinates.
+- GameMaker's particle system (systems, types, emitters, direct creation) runs
+  in `port/particles.lua`: systems tick once per game step, after End Step, and
+  draw at their own depth among the instances and tiles. Undertale never calls
+  it, so the family is inert outside Yellow.
 - Collision queries use a bounding-box broad phase and transformed mask tests.
   Exact parity, especially the collision-event response/order, remains unverified.
 - Audio resource IDs and playback handles are separate, with gain/pitch,
