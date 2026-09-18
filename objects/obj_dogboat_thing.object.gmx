@@ -170,6 +170,12 @@ p.hspeed= hspeed + 7;
     rman.image_speed= 0.1;
     global.typer= 5;
     global.msc= 770;
+    // SCR_TEXT's repaired switch labels put the River Person dialogue at 770.
+    // Keep a fresh terminator behind its intentional blank line; this prevents
+    // a stale Yellow/global message slot from making the writer scan forever.
+    global.msg[3]= "%%%";
+    global.msg[4]= "%%%";
+    global.msg[5]= "%%%";
     global.facechoice= 0;
     instance_create(0, 0, 779/* obj_dialoguer */);
     myinteract= 2;
