@@ -4,6 +4,21 @@ This prerelease makes the current `.love` package downloadable from GitHub. It
 contains the converted Lua and the assets supplied for both merged games. **It
 is not a completed or native-device-verified game, and it is not an APK.**
 
+## v1.2.2 — Snowdin Inn HP and River Person destinations
+
+- **Snowdin Inn restores HP to at least the current maximum +10 at every LV.**
+  The bonus is temporary current HP, not a permanent maximum-HP increase.
+  Repeat stays do not stack it, and an existing higher HP value is preserved.
+  Examples: LV 1 → 30/20 HP, LV 8 → 58/48 HP, LV 20 → 109/99 HP.
+  This replaces the original low-level-only bonus table as requested.
+- **The River Person Yellow destination fix is now in the download.** PR #27's
+  corrected dialogue dispatch and terminated message slots make the Yellow
+  destination selector reachable; all seven Yellow choices use their own
+  landing coordinates. v1.2.1 was built before this fix and does not contain it.
+- **A fresh, versioned fusion archive**, published only after the automated
+  suite, merged packaging checks and native Linux LÖVE gate pass. Android
+  device validation and full-game compatibility remain unclaimed.
+
 ## v1.2.1 — every stop travels
 
 Two rounds of owner feedback. First: *"make sure that the River Person and

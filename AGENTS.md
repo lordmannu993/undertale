@@ -76,6 +76,20 @@ bugs and fidelity gaps, not unchecked pieces.
 - **Issues are disabled** on this repo. Plans, piece lists and verification results go into PR
   descriptions/comments and `docs/`, not issues.
 
+## v1.2.2 release task (2026-09-19)
+
+- [x] Replace the Snowdin Inn's fixed low-LV HP table with a temporary heal to
+  at least `global.maxhp + 10`; never raise maxhp or stack repeat-stay bonuses.
+  This is an owner-requested gameplay rule, documented in `docs/PORTING.md`.
+- [x] Add wake-up regression coverage at every LV, including LV 20's 99 maxhp,
+  injured/full/overhealed HP, repeat stays and leveling between stays.
+- [x] Carry merged PR #27's River Person Yellow destination fix in the next
+  downloadable archive (v1.2.1 predates it).
+- [x] Bump runtime, README download links, release notes and pinned publisher
+  to v1.2.2 on `arena/01a0b92c-undertale`.
+- [ ] Publish `love-v1.2.2-fusion-experimental` through the draft-only workflow,
+  verify its four assets and gates, and merge the README update by PR.
+
 ## Current state
 
 | item | state |
@@ -86,7 +100,7 @@ bugs and fidelity gaps, not unchecked pieces.
 | Yellow merge | **Complete.** `tools/fetch_yellow.py` pins commit `4ec23bd9` of `lordmannu993/UnderTale-Yellow`; `tools/yellow_convert.py --stage rooms` converts 3 796 sprites / 673 sounds / 11 fonts / 1 155 script resources / 3 224 objects with 8 494 events / **287 rooms, 68 paths, 199 454 drawables, 3 006 layers** into `generated/yellow/`, with 1 178 named function exports, 1 explicit GMLive stop (the shipped build's GMLive is inert, so the other 21 convert literally) and 0 compile errors. `tools/merge.py` + `port/merge.lua` build one manifest from both games, `port/travel.lua` connects the River Person boat (hold X during the ride; open below its plot gate) and Yellow's UGPS whale (every stop offered from Yellow's world init), `port/frisk.lua` draws Yellow's player as Frisk (28 walk poses remapped; the 24 run poses, the gun poses, goggles, dance and lying stay Clover - listed and asserted, so a run pose entering the remap stops the build), Yellow's own pause menu equips Clover's ammo/accessories beside Frisk's own gear, and the port's pause menu carries the merged AUTO RUN toggle, and `merge.sav` versions the merged layer including the loadout. The native LÖVE/xvfb gate crosses between worlds and back. Still unclaimed: Yellow's battle/story systems, shaders (reported, skipped), 25 rooms with named stops, and any Android-device certification |
 | Part-ID recovery | `tools/recover_parts.py` fetches nothing by default: the checked-in `port/recovered_parts.json` is imported by `convert.py`. Regenerate with `GITHUB_TOKEN="$(gh auth token)" python3 tools/recover_parts.py` (pinned to the same `249ffa27` ref as the registry/path recoveries), re-verify offline with `--check`. IDs come from this checkout's own `partN=` literals; only names are paired from upstream; 38 annotated sites are re-validated as anchors. `tests/test_monster_parts.py` guards all of it plus every Snowdin battlegroup end-to-end |
 | Old releases | `love-v0.1.0`…`love-v1.2.0-fusion-experimental` are **kept on purpose** (owner declined deletion) and renamed with a "Superseded (…)" prefix as each is replaced. Version branches `v0.1.0`..`v0.1.3` point at each tagged build |
-| Release plumbing | `.github/workflows/love-prerelease.yml` publishes on push to one pinned branch (`arena/01a0a100-undertale` for the v1.2.1 fusion) and **refuses unless a draft release with that tag already exists**; `workflow_dispatch` re-runs it. The publish job fetches Yellow, converts, runs the suite with `PORT_REQUIRE_YELLOW=1`, packages `--merged`, runs the fused native gate, uploads four assets and flips `--draft=false` |
+| Release plumbing | `.github/workflows/love-prerelease.yml` publishes on push to one pinned branch (`arena/01a0b92c-undertale` for the v1.2.2 fusion) and **refuses unless a draft release with that tag already exists**; `workflow_dispatch` re-runs it. The publish job fetches Yellow, converts, runs the suite with `PORT_REQUIRE_YELLOW=1`, packages `--merged`, runs the fused native gate, uploads four assets and flips `--draft=false` |
 
 ### To publish a version (only when a piece list says a release is due)
 
