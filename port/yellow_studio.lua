@@ -38,7 +38,8 @@ return function(R)
         gp_shoulderl=32773,gp_shoulderlb=32775,gp_shoulderr=32774,gp_shoulderrb=32776,
         gp_select=32777,gp_start=32778,gp_stickl=32779,gp_stickr=32780,
         gp_padu=32781,gp_padd=32782,gp_padl=32783,gp_padr=32784,
-        gp_axislh=32785,gp_axislv=32786,gp_axisrh=32787,gp_axisrv=32788}) do
+        gp_axislh=32785,gp_axislv=32786,gp_axisrh=32787,gp_axisrv=32788,
+        mb_none=0,mb_any=-1,mb_left=1,mb_right=2,mb_middle=3}) do
         if R.constants[name]==nil then R.constants[name]=value end
     end
 
@@ -623,6 +624,23 @@ return function(R)
     reg("gamepad_get_description",function(_,id) noGamepad("get_description");return "" end)
     reg("gamepad_set_axis_deadzone",function(_,id,value) noGamepad("set_axis_deadzone") end)
 
+    -- Touch and mobile device helpers: this port maps touch and keyboard onto
+    -- GameMaker's key events, so device mouse / touch buttons report inactive.
+    reg("device_mouse_dbclick_enable",function(_,enable) return 0 end)
+    reg("device_mouse_check_button",function(_,device,button) return 0 end)
+    reg("device_mouse_check_button_pressed",function(_,device,button) return 0 end)
+    reg("device_mouse_check_button_released",function(_,device,button) return 0 end)
+    reg("device_mouse_x_to_gui",function(_,device) return -100 end)
+    reg("device_mouse_y_to_gui",function(_,device) return -100 end)
+    reg("device_mouse_x",function(_,device) return -100 end)
+    reg("device_mouse_y",function(_,device) return -100 end)
+    reg("device_mouse_raw_x",function(_,device) return -100 end)
+    reg("device_mouse_raw_y",function(_,device) return -100 end)
+    reg("device_is_keypad_open",function(_) return 0 end)
+    reg("device_get_tilt_x",function(_) return 0 end)
+    reg("device_get_tilt_y",function(_) return 0 end)
+    reg("device_get_tilt_z",function(_) return 0 end)
+
     -- Miscellaneous Studio 2 helpers --------------------------------------
     reg("object_get_name",function(_,index) local object=R:object(index);return object and object.name or "" end)
     reg("object_get_parent",function(E,index)
@@ -690,6 +708,10 @@ return function(R)
     end)
     reg("point_in_rectangle",function(_,x,y,x1,y1,x2,y2)
         return N(x>=math.min(x1,x2) and x<=math.max(x1,x2) and y>=math.min(y1,y2) and y<=math.max(y1,y2))
+    end)
+    reg("point_in_circle",function(_,px,py,cx,cy,rad)
+        local dx,dy=px-cx,py-cy
+        return N(dx*dx+dy*dy<=rad*rad)
     end)
     reg("dsin",function(_,value) return math.sin(math.rad(value)) end)
     reg("dcos",function(_,value) return math.cos(math.rad(value)) end)

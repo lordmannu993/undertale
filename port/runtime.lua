@@ -43,7 +43,7 @@ function Runtime.new(manifest,input,options)
         vars={},constants=copy(manifest.names or {}),instances={},byId={},objects={},scripts={},rooms={},
         assets={sprites={},backgrounds={},sounds={},fonts={}},builtins={},warnings={},warningList={},
         storedRooms={},roomPersistence={},nextId=200000,frame=0,budget=0,globalNames={},currentEvent=nil,
-        pathData={},roomState=nil},Runtime)
+        pathData={},roomState=nil,eventCache={},isACache={},collisionSelectors={}},Runtime)
     for _,entry in ipairs(manifest.asset_modules or {}) do
         for id,asset in pairs(require(entry.module)) do self.assets[entry.kind][id]=deepCopy(asset) end
     end
@@ -57,7 +57,8 @@ function Runtime.new(manifest,input,options)
         fa_left=0,fa_center=1,fa_right=2,fa_top=0,fa_middle=1,fa_bottom=2,
         path_action_stop=0,path_action_restart=1,path_action_continue=2,path_action_reverse=3,
         ev_create=0,ev_destroy=1,ev_alarm=2,ev_step=3,ev_collision=4,ev_keyboard=5,
-        ev_other=7,ev_draw=8,ev_keypress=9,ev_keyrelease=10,ev_step_normal=0,ev_step_begin=1,ev_step_end=2}
+        ev_other=7,ev_draw=8,ev_keypress=9,ev_keyrelease=10,ev_step_normal=0,ev_step_begin=1,ev_step_end=2,
+        mb_none=0,mb_any=-1,mb_left=1,mb_right=2,mb_middle=3}
     constants["true"],constants["false"]=1,0
     constants["undefined"]=Runtime.UNDEFINED
     for k,v in pairs(constants) do self.constants[k]=v end
@@ -133,14 +134,23 @@ function Runtime:object(id)
     local object=require(path);self.objects[id]=object;return object
 end
 function Runtime:isA(instance,selector)
+    if not instance or not instance.v then return false end
     local index=instance.v.object_index
+    if not index or index<0 then return false end
+    selector=self:resolveObjectIndex(selector,self:scope(instance))
+    local cache=self.isACache[index]
+    if not cache then cache={};self.isACache[index]=cache end
+    local cached=cache[selector]
+    if cached~=nil then return cached end
+    local cur=index
     local visited={}
-    while index and index>=0 and not visited[index] do
-        if index==selector then return true end
-        visited[index]=true
-        local def=self:object(index)
-        index=def and def.parent
+    while cur and cur>=0 and not visited[cur] do
+        if cur==selector then cache[selector]=true;return true end
+        visited[cur]=true
+        local def=self:object(cur)
+        cur=def and def.parent or nil
     end
+    cache[selector]=false
     return false
 end
 -- A Yellow caller is Yellow code running in either world: an instance of a
@@ -318,7 +328,7 @@ function Runtime:call(name,E,...)
     if type(localFunction)=="function" then
         return localFunction(self,self:scope(E._self,E._other,{...},locals)) or 0
     end
-    local builtin=self.builtins[name]
+    local builtin=self.builtins[name] or (type(name)=="string" and self.builtins[name:lower()])
     if builtin then return builtin(E,...) or 0 end
     -- GMS2 scripts are name-resolved because Studio 2 does not expose a stable
     -- script index to the decompiler.  Prefer that string key before checking
@@ -372,14 +382,29 @@ function Runtime:dispatchSwitch(E,value,labels,handlers,default)
 end
 
 function Runtime:findEvent(index,key)
-    local visited={}
-    while index and index>=0 and not visited[index] do
-        visited[index]=true
-        local object=self:object(index)
-        if not object then return nil end
-        if object.events[key] then return object.events[key],index end
-        index=object.parent
+    if not index or index<0 then return nil end
+    local cache=self.eventCache[index]
+    if not cache then cache={};self.eventCache[index]=cache end
+    local owner=cache[key]
+    if owner~=nil then
+        if owner==false then return nil end
+        local obj=self:object(owner)
+        if obj and obj.events[key] then return obj.events[key],owner end
     end
+    local cur=index
+    local visited={}
+    while cur and cur>=0 and not visited[cur] do
+        visited[cur]=true
+        local object=self:object(cur)
+        if not object then break end
+        if object.events[key] then
+            cache[key]=cur
+            return object.events[key],cur
+        end
+        cur=object.parent
+    end
+    cache[key]=false
+    return nil
 end
 function Runtime:event(inst,kind,number,other,from)
     if not inst.alive then return end
@@ -410,7 +435,7 @@ function Runtime:create(objectIndex,x,y,spec,defer)
     local instance={_instance=true,id=id,alive=true,active=true,
         v={object_index=objectIndex,x=x,y=y,xprevious=x,yprevious=y,xstart=x,ystart=y,
            sprite_index=object.sprite,mask_index=object.mask,visible=object.visible,solid=object.solid,
-           persistent=object.persistent,depth=object.depth,image_index=0,image_speed=1,
+           persistent=object.persistent,depth=object.depth or 0,image_index=0,image_speed=1,
            image_xscale=spec.scaleX or 1,image_yscale=spec.scaleY or 1,
            image_angle=spec.rotation or 0,image_blend=(spec.colour or 16777215)%16777216,image_alpha=1,
            hspeed=0,vspeed=0,speed=0,direction=0,friction=0,gravity=0,gravity_direction=270,
@@ -670,9 +695,12 @@ function Runtime:step()
     self:collisionEvents(snapshot)
     for _,i in ipairs(snapshot) do
         if i.alive and i.active then
-            local l,t,r,b=self:bbox(i)
-            if r<0 or b<0 or l>=self.vars.room_width or t>=self.vars.room_height then self:event(i,7,0) end
-            if l<0 or t<0 or r>=self.vars.room_width or b>=self.vars.room_height then self:event(i,7,1) end
+            local objIdx=i.v.object_index
+            if self:findEvent(objIdx,"7:0") or self:findEvent(objIdx,"7:1") then
+                local l,t,r,b=self:bbox(i)
+                if r<0 or b<0 or l>=self.vars.room_width or t>=self.vars.room_height then self:event(i,7,0) end
+                if l<0 or t<0 or r>=self.vars.room_width or b>=self.vars.room_height then self:event(i,7,1) end
+            end
         end
     end
     each(3,2) -- End Step

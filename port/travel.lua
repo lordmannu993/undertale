@@ -243,7 +243,11 @@ function Travel:setRiverMessage(text)
 end
 
 function Travel:setRiverChoice(prompt, left, right)
-    self:setRiverMessage("* " .. prompt .. "& &         " .. left .. "         " .. right .. "\\C")
+    if #left > 10 then
+        self:setRiverMessage("* " .. prompt .. "&  " .. left .. "&         Ride        " .. right .. "\\C")
+    else
+        self:setRiverMessage("* " .. prompt .. "& &         " .. left .. "         " .. right .. "\\C")
+    end
 end
 
 function Travel:holdRiverBoat()
