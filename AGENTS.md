@@ -15,16 +15,26 @@ explicitly **not a finished game** and every release note says so.
 Since pieces 1 and 2 of the **Undertale Yellow merge** it also carries a GameMaker
 *Studio 2* front end (`tools/yellow/`, `tools/gml2.py`, `tools/yellow_convert.py`,
 `tools/fetch_yellow.py`) that converts a second, fetched-on-demand project into the
-same runtime. That merge is **complete** (all five pieces, published as
-`love-v1.2.0-fusion-experimental`); its piece list and the shipped scope are
-[docs/YELLOW.md](docs/YELLOW.md). Future work is expected to be owner-reported
-bugs and fidelity gaps, not unchecked pieces.
+same runtime. All five conversion pieces shipped (published as
+`love-v1.2.0-fusion-experimental`, since v1.2.3); its piece list and the shipped
+scope are [docs/YELLOW.md](docs/YELLOW.md).
+
+**"Five pieces complete" means the conversion pipeline is complete — it does not
+mean the two games play as one game.** The owner reports that the shipped fusion
+still behaves as two games in one executable (separate inventory/progression,
+swapped-in character controllers, broken overworld depth, duplicated sprite
+layers). The binding requirement set for fixing that is
+[`docs/UNIFIED_FUSION_SPEC.md`](docs/UNIFIED_FUSION_SPEC.md) — read it before
+touching the merge, and treat it as authoritative where it and `docs/YELLOW.md`
+disagree.
 
 ## Start here, in order
 
 1. `git fetch origin && git log --oneline origin/master -3` and `gh pr list --state all`.
-2. Read the piece list and its statuses in [`docs/PATHS.md`](docs/PATHS.md), then the
-   limitation set in `docs/PORTING.md`.
+2. Read the owner's binding brief, [`docs/UNIFIED_FUSION_SPEC.md`](docs/UNIFIED_FUSION_SPEC.md)
+   (16 numbered requirements + acceptance criteria), then the piece list and its
+   statuses in [`docs/PATHS.md`](docs/PATHS.md), then the limitation set in
+   `docs/PORTING.md`.
 3. Set up: `python3 -m venv .venv && .venv/bin/python -m pip install -r requirements-dev.txt`.
 4. Pick the **highest unchecked piece** and treat it as the whole job. One piece per commit,
    small commits, one PR.
