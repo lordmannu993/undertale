@@ -20,13 +20,13 @@ workspace. See [port status](docs/PORTING.md) and [validation](docs/VALIDATION.m
 
 ## Download the newest experimental `.love` file
 
-**Newest build: v1.2.2**, published 2026-09-19 — tag
-`love-v1.2.2-fusion-experimental`, source commit `1538133`, SHA-256 in the
+**Newest build: v1.2.3**, published 2026-09-19 — tag
+`love-v1.2.3-fusion-experimental`, source commit `6d59f5d`, SHA-256 in the
 release notes.
 
-[**Download `undertale-yellow-fusion-v1.2.2-experimental.love` (~390 MB)**](https://github.com/lordmannu993/undertale/releases/download/love-v1.2.2-fusion-experimental/undertale-yellow-fusion-v1.2.2-experimental.love)
+[**Download `undertale-yellow-fusion-v1.2.3-experimental.love` (~390 MB)**](https://github.com/lordmannu993/undertale/releases/download/love-v1.2.3-fusion-experimental/undertale-yellow-fusion-v1.2.3-experimental.love)
 
-- [Release notes, SHA-256 checksum, and both conversion reports](https://github.com/lordmannu993/undertale/releases/tag/love-v1.2.2-fusion-experimental)
+- [Release notes, SHA-256 checksum, and both conversion reports](https://github.com/lordmannu993/undertale/releases/tag/love-v1.2.3-fusion-experimental)
 - [All releases, newest first](https://github.com/lordmannu993/undertale/releases) —
   every older build stays downloadable; each is retitled “Superseded — …” when a
   newer one replaces it.
@@ -43,11 +43,10 @@ release notes). The large archive is hosted as a GitHub Release asset rather
 than committed to Git. To regenerate it yourself, follow the build instructions
 below.
 
-### Merged after this archive was built — in the source, not in the download
+### Added in v1.2.3 — the four phone fixes
 
-Four fixes are merged on `master`, but they landed **after** the v1.2.2 archive
-was packaged, so the download above does not contain them yet; they ship in the
-next versioned build ([PR #30](https://github.com/lordmannu993/undertale/pull/30)):
+From [PR #30](https://github.com/lordmannu993/undertale/pull/30), merged after
+the v1.2.2 archive was packaged; this build carries them:
 
 - **The dialogue box draws over the world.** `obj_dialoguer` sat at depth 0 while
   its text, portraits and cursors are at −500…−600, so props and negative-depth
@@ -62,7 +61,7 @@ next versioned build ([PR #30](https://github.com/lordmannu993/undertale/pull/30
   drawing across the Heart 1 cursor and past the right margin.
 - **Large rooms traverse faster.** `isA` and event lookups plus collision
   selectors are cached, `bbox` has a no-allocation path at angle 0, and static
-  tiles draw from a per-room list; the linked pull request's own bench reported
+  tiles draw from a per-room list; the pull request's own bench reported
   roughly 80% more frames per second in the rooms it measured.
 
 ### Added in v1.2.2 — Snowdin Inn HP and River Person destinations
