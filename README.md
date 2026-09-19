@@ -21,7 +21,7 @@ workspace. See [port status](docs/PORTING.md) and [validation](docs/VALIDATION.m
 ## Download the newest experimental `.love` file
 
 **Newest build: v1.2.3**, published 2026-09-19 — tag
-`love-v1.2.3-fusion-experimental`, source commit `7157855`, SHA-256 in the
+`love-v1.2.3-fusion-experimental`, source commit `6d59f5d`, SHA-256 in the
 release notes.
 
 [**Download `undertale-yellow-fusion-v1.2.3-experimental.love` (~390 MB)**](https://github.com/lordmannu993/undertale/releases/download/love-v1.2.3-fusion-experimental/undertale-yellow-fusion-v1.2.3-experimental.love)
