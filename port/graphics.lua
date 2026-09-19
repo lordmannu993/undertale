@@ -37,7 +37,7 @@ function Graphics.install(R)
         return result
     end
     local function quad(file,x,y,w,h,iw,ih)
-        local key=file..":"..table.concat({x,y,w,h},",")
+        local key=file..":"..x..":"..y..":"..w..":"..h
         if not state.quads[key] then state.quads[key]=g.newQuad(x,y,w,h,iw,ih) end
         return state.quads[key]
     end
@@ -600,14 +600,27 @@ function Graphics.install(R)
         end
         local list={}
         local layers=self.roomState.layers
-        for i,tile in ipairs(self.roomState.tiles) do
-            local layer=tile.layer and layers[tile.layer]
-            list[#list+1]={depth=(layer and layer.depth) or tile.depth,order=i,tile=tile,layer=layer}
+        local staticTiles=self.roomState.staticTileDrawList
+        if not staticTiles then
+            staticTiles={}
+            for i,tile in ipairs(self.roomState.tiles) do
+                local layer=tile.layer and layers[tile.layer]
+                staticTiles[#staticTiles+1]={depth=(layer and layer.depth) or tile.depth,order=i,tile=tile,layer=layer}
+            end
+            self.roomState.staticTileDrawList=staticTiles
         end
+        for i=1,#staticTiles do
+            local item=staticTiles[i]
+            local layer=item.layer
+            if layer then item.depth=layer.depth or item.tile.depth end
+            list[i]=item
+        end
+        local base=#list
         for i,inst in ipairs(self.instances) do
             if inst.alive and inst.active then
                 local layer=inst.layer and layers[inst.layer]
-                list[#list+1]={depth=(layer and layer.depth) or inst.v.depth,order=1000000+i,instance=inst,layer=layer}
+                base=base+1
+                list[base]={depth=(layer and layer.depth) or inst.v.depth or 0,order=1000000+i,instance=inst,layer=layer}
             end
         end
         -- Particle systems draw at their own depth among the instances and
@@ -629,6 +642,15 @@ function Graphics.install(R)
             return not (layer and layer.visible==false)
         end
         local function drawPass(kind,number,ignoreLayers)
+            local key=tostring(kind)..":"..tostring(number)
+            local any=false
+            for _,inst in ipairs(self.instances) do
+                if inst.alive and inst.active and self:findEvent(inst.v.object_index,key) then
+                    any=true
+                    break
+                end
+            end
+            if not any then return end
             for _,item in ipairs(list) do
                 local inst=item.instance
                 if inst and inst.alive and inst.active and self.truth(inst.v.visible)

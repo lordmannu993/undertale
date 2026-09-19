@@ -15,12 +15,23 @@ function C.install(R)
         if not s then return v.x,v.y,v.x-1,v.y-1 end
         local x1,x2=(s.bbox_left-s.xorig)*v.image_xscale,(s.bbox_right+1-s.xorig)*v.image_xscale
         local y1,y2=(s.bbox_top-s.yorigin)*v.image_yscale,(s.bbox_bottom+1-s.yorigin)*v.image_yscale
-        local c,si=math.cos(math.rad(v.image_angle)),math.sin(math.rad(v.image_angle))
-        local l,t,r,b=math.huge,math.huge,-math.huge,-math.huge
-        for _,p in ipairs({{x1,y1},{x2,y1},{x1,y2},{x2,y2}}) do
-            local x,y=v.x+p[1]*c+p[2]*si,v.y-p[1]*si+p[2]*c
-            l,t,r,b=math.min(l,x),math.min(t,y),math.max(r,x),math.max(b,y)
+        if v.image_angle==0 then
+            local l=v.x+(x1<x2 and x1 or x2)
+            local r=v.x+(x1<x2 and x2 or x1)
+            local t=v.y+(y1<y2 and y1 or y2)
+            local b=v.y+(y1<y2 and y2 or y1)
+            return l,t,r-0.0001,b-0.0001
         end
+        local rad=math.rad(v.image_angle)
+        local c,si=math.cos(rad),math.sin(rad)
+        local px1,py1=x1*c+y1*si,y1*c-x1*si
+        local px2,py2=x2*c+y1*si,y1*c-x2*si
+        local px3,py3=x1*c+y2*si,y2*c-x1*si
+        local px4,py4=x2*c+y2*si,y2*c-x2*si
+        local l=v.x+math.min(px1,px2,px3,px4)
+        local r=v.x+math.max(px1,px2,px3,px4)
+        local t=v.y+math.min(py1,py2,py3,py4)
+        local b=v.y+math.max(py1,py2,py3,py4)
         return l,t,r-0.0001,b-0.0001
     end
     function R:maskPoint(inst,x,y,precise)
@@ -149,39 +160,55 @@ function C.install(R)
         return best
     end
     function R:collisionEvents(snapshot)
+        local cache=self.collisionSelectors
         for _,inst in ipairs(snapshot) do
             if inst.alive and inst.active then
-                local selectors,seen={},{}
-                local index=inst.v.object_index
-                while index and index>=0 do
-                    local obj=self:object(index);if not obj then break end
-                    for key in pairs(obj.events) do
-                        if key:sub(1,2)=="4:" then
-                            local selector=tonumber(key:sub(3))
-                            if not seen[selector] then selectors[#selectors+1]=selector;seen[selector]=true end
+                local objIndex=inst.v.object_index
+                local selectors=cache[objIndex]
+                if not selectors then
+                    local sel,seen={},{}
+                    local index=objIndex
+                    while index and index>=0 do
+                        local obj=self:object(index);if not obj then break end
+                        for key in pairs(obj.events) do
+                            if key:sub(1,2)=="4:" then
+                                local selector=tonumber(key:sub(3))
+                                if not seen[selector] then sel[#sel+1]=selector;seen[selector]=true end
+                            end
                         end
+                        index=obj.parent
                     end
-                    index=obj.parent
+                    table.sort(sel)
+                    selectors=sel
+                    cache[objIndex]=selectors
                 end
-                table.sort(selectors)
-                for _,selector in ipairs(selectors) do
-                    for _,other in ipairs(self:select(selector,self:scope(inst))) do
-                        -- A more-specific collision event shadows an ancestor
-                        -- event for the same target, as in GameMaker.
-                        local shadowed=false
-                        for _,specific in ipairs(selectors) do
-                            if specific~=selector and self:isA(other,specific) then
-                                local def=self:object(specific)
-                                while def and def.parent>=0 do
-                                    if def.parent==selector then shadowed=true;break end
-                                    def=self:object(def.parent)
+                if #selectors>0 then
+                    local inst_l,inst_t,inst_r,inst_bot=self:bbox(inst)
+                    for _,selector in ipairs(selectors) do
+                        for _,other in ipairs(self:select(selector,self:scope(inst))) do
+                            if inst~=other and other.alive then
+                                local other_l,other_t,other_r,other_bot=self:bbox(other)
+                                if inst_l<=other_r and inst_r>=other_l and inst_t<=other_bot and inst_bot>=other_t then
+                                    -- A more-specific collision event shadows an ancestor
+                                    -- event for the same target, as in GameMaker.
+                                    local shadowed=false
+                                    for _,specific in ipairs(selectors) do
+                                        if specific~=selector and self:isA(other,specific) then
+                                            local def=self:object(specific)
+                                            while def and def.parent>=0 do
+                                                if def.parent==selector then shadowed=true;break end
+                                                def=self:object(def.parent)
+                                            end
+                                        end
+                                        if shadowed then break end
+                                    end
+                                    if not shadowed and self:overlap(inst,other,true) then
+                                        if self.truth(other.v.solid) then inst.v.x=inst.v.xprevious;inst.v.y=inst.v.yprevious end
+                                        self:event(inst,4,selector,other)
+                                        inst_l,inst_t,inst_r,inst_bot=self:bbox(inst)
+                                    end
                                 end
                             end
-                            if shadowed then break end
-                        end
-                        if inst~=other and inst.alive and other.alive and not shadowed and self:overlap(inst,other,true) then
-                            if self.truth(other.v.solid) then inst.v.x=inst.v.xprevious;inst.v.y=inst.v.yprevious end
-                            self:event(inst,4,selector,other)
                         end
                     end
                 end
