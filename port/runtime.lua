@@ -43,7 +43,8 @@ function Runtime.new(manifest,input,options)
         vars={},constants=copy(manifest.names or {}),instances={},byId={},objects={},scripts={},rooms={},
         assets={sprites={},backgrounds={},sounds={},fonts={}},builtins={},warnings={},warningList={},
         storedRooms={},roomPersistence={},nextId=200000,frame=0,budget=0,globalNames={},currentEvent=nil,
-        pathData={},roomState=nil,eventCache={},isACache={},collisionSelectors={}},Runtime)
+        pathData={},roomState=nil,eventCache={},isACache={},collisionSelectors={},
+        scriptCollisions={},scriptSplitReported={}},Runtime)
     for _,entry in ipairs(manifest.asset_modules or {}) do
         for id,asset in pairs(require(entry.module)) do self.assets[entry.kind][id]=deepCopy(asset) end
     end
@@ -160,8 +161,10 @@ end
 -- callers keep exact numeric IDs, so Undertale's behaviour is unchanged.
 function Runtime:callerIsYellow(E)
     local base=self.manifest.yellow_base or 1000000
-    local caller=E and E._self
-    if caller and caller.v and type(caller.v.object_index)=="number"
+    local caller=type(E)=="table" and rawget(E,"_self") or nil
+    -- A GML `with`/collision scope can hand the caller in as a bare instance id.
+    if type(caller)=="number" then caller=self.byId[caller] end
+    if type(caller)=="table" and caller.v and type(caller.v.object_index)=="number"
         and caller.v.object_index>=base then
         return true
     end
@@ -318,6 +321,47 @@ function Runtime:increment(owner,key,amount,post,E)
     return post and old or old+amount
 end
 
+-- Both games name their scripts differently, and four names exist in each
+-- conversion meaning something different:
+--
+--   scr_depth                   Undertale: depth = 50000 - y*10 + sprite_height*10
+--                               (the overworld's Y-sort key)
+--                               Yellow:    depth = -y
+--   scr_interact                Undertale: sets the caller's myinteract flag
+--                               Yellow:    proximity + facing test against obj_pl
+--   keyboard_multicheck(_pressed)   Undertale: enter/Z, shift/X, ctrl/C
+--                                   Yellow:    the same plus ord("Y") and a
+--                                              gamepad check per cluster
+--
+-- A merged manifest holds Undertale's scripts under the numeric GMX index they
+-- were decompiled with and Yellow's under their own names, because that is how
+-- each project resolves a call (733 numeric script_execute sites in Undertale's
+-- conversion, 2102 name-resolved ones in Yellow's, zero of the other kind in
+-- either).  A single flat name lookup therefore cannot serve both: whichever
+-- game wins the name would silently run its own function inside the other
+-- game's objects.  Resolution is by the CALLER's world instead.
+--
+-- This is the reported "sprites render on the wrong layer" class of bug: 288 of
+-- Undertale's converted objects fetch their sort key by the name scr_depth, and
+-- before this split they were handed Yellow's depth = -y, so every Undertale
+-- overworld entity (the player included) sorted by a key from the other game's
+-- scale -- and the River Person's boat, which sets depth = rman.depth + 10
+-- against the game's own numbers, ended up on the wrong side of both the player
+-- and the river tiles.
+function Runtime:scriptEntry(name,E)
+    local scripts=self.manifest.scripts or {}
+    local numeric=(self.manifest.names or {})[name]
+    -- Undertale's copy of this name, addressed the way Undertale addresses it.
+    local undertale=(type(name)~="number" and numeric~=nil) and scripts[numeric] or nil
+    -- Yellow's copy of this name, addressed the way Yellow addresses it.
+    local yellow=(type(name)=="string") and scripts[name] or nil
+    if type(name)=="number" then return scripts[name] end
+    if undertale and yellow and undertale~=yellow then
+        self.scriptCollisions[name]={undertale=numeric,yellow=yellow}
+    end
+    if self:callerIsYellow(E) then return yellow or undertale end
+    return undertale or yellow
+end
 function Runtime:call(name,E,...)
     -- Studio 2 lets an event declare its own functions.  They live in the event
     -- scope, not in the script table, so two objects can each own a function
@@ -330,15 +374,38 @@ function Runtime:call(name,E,...)
     end
     local builtin=self.builtins[name] or (type(name)=="string" and self.builtins[name:lower()])
     if builtin then return builtin(E,...) or 0 end
-    -- GMS2 scripts are name-resolved because Studio 2 does not expose a stable
-    -- script index to the decompiler.  Prefer that string key before checking
-    -- the GMX name-to-numeric-index table, so a cross-game name collision can
-    -- never redirect a Yellow call through Undertale's numeric namespace.
-    local scripts=self.manifest.scripts or {}
-    if scripts[name] then return self:script(name,E,...) end
-    local index=(self.manifest.names or {})[name]
-    if index~=nil and scripts[index] then return self:script(index,E,...) end
+    local entry=self:scriptEntry(name,E)
+    if entry then
+        local numeric=(self.manifest.names or {})[name]
+        local scripts=self.manifest.scripts or {}
+        -- Pass the key that the entry is actually stored under, so the cached
+        -- callable stays distinct for the two games' same-named scripts.
+        if type(name)=="string" and scripts[name]==entry and numeric==nil then return self:script(name,E,...) end
+        if type(name)=="string" and scripts[name]==entry and numeric~=nil then
+            -- Both games define it and the caller is Yellow: its own copy.
+            self:reportScriptSplit(name,E)
+            return self:script(name,E,...)
+        end
+        if type(name)=="string" and numeric~=nil and scripts[numeric]==entry then
+            self:reportScriptSplit(name,E)
+            return self:script(numeric,E,...)
+        end
+        return self:script(entry,E,...)
+    end
     self:unsupported(name,"Unknown GML function. Nothing was silently stubbed.")
+end
+-- One warning per shared name, stating which world got which implementation.
+-- The four names above are the complete set in this conversion, so this is a
+-- finite report rather than per-frame noise.
+function Runtime:reportScriptSplit(name,E)
+    if self.scriptSplitReported[name] then return end
+    local collision=self.scriptCollisions[name]
+    if not collision then return end
+    self.scriptSplitReported[name]=true
+    self:warn("script-split:"..name,
+        ("Script %s exists in both games: Undertale (index %s) and Undertale Yellow. "..
+         "Each world now calls its own copy instead of the name resolving to Yellow's."):format(
+            name,tostring(collision.undertale)))
 end
 function Runtime:script(index,E,...)
     local scripts=self.manifest.scripts or {}

@@ -176,6 +176,44 @@ def test_river_person_ride_with_x_held_lands_in_yellow(vm):
 
 
 @live
+def test_shared_script_names_resolve_to_each_worlds_own_copy(vm):
+    """scr_depth exists in both games with different formulas.
+
+    Undertale places a sprite by world y and its height; Yellow's copy is
+    ``depth = -y``. The merged manifest keys Undertale's scripts numerically and
+    Yellow's by name, so a name-first lookup would hand every Undertale caller
+    Yellow's copy (which is what put the boat, the River Person and the player
+    on the wrong layer at the dock). Each world must reach its own copy.
+    """
+    assert vm.execute("local ok,err=pcall(function() R:start() end) return ok and 'ok' or tostring(err)") == "ok"
+    result = vm.execute('''
+        crossTo(70)                       -- an Undertale dock room
+        local frisk=nil
+        for _,inst in ipairs(R.instances) do
+            if inst.alive and inst.v.object_index==R.manifest.names["obj_mainchara"] then frisk=inst end
+        end
+        if not frisk then return "no Frisk in the Undertale dock" end
+        R:call("scr_depth", R:scope(frisk))
+        local expected = 50000 - frisk.v.y*10 + R:instanceGet(frisk,"sprite_height")*10
+        if math.abs(frisk.v.depth - expected) > 0.001 then
+            return "Undertale scr_depth gave "..tostring(frisk.v.depth)..", expected "..tostring(expected)
+        end
+        crossTo(R.manifest.yellow_names.rooms["rm_dunes_05"])
+        local clover=nil
+        for _,inst in ipairs(R.instances) do
+            if inst.alive and inst.v.object_index==playerOf("yellow") then clover=inst end
+        end
+        if not clover then return "no Clover in the Yellow room" end
+        R:call("scr_depth", R:scope(clover))
+        if math.abs(clover.v.depth + clover.v.y) > 0.001 then
+            return "Yellow scr_depth gave "..tostring(clover.v.depth)..", expected "..tostring(-clover.v.y)
+        end
+        return "ok"
+    ''')
+    assert result == "ok", result
+
+
+@live
 def test_ugps_whale_entries_use_yellows_own_travel_globals(vm):
     assert vm.execute("local ok,err=pcall(function() R:start() end) return ok and 'ok' or tostring(err)") == "ok"
     result = vm.execute('''
