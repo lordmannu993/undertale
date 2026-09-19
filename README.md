@@ -20,9 +20,9 @@ workspace. See [port status](docs/PORTING.md) and [validation](docs/VALIDATION.m
 
 ## Download the experimental `.love` file
 
-[**Download `undertale-yellow-fusion-v1.2.1-experimental.love` (~390 MB)**](https://github.com/lordmannu993/undertale/releases/download/love-v1.2.1-fusion-experimental/undertale-yellow-fusion-v1.2.1-experimental.love)
+[**Download `undertale-yellow-fusion-v1.2.2-experimental.love` (~390 MB)**](https://github.com/lordmannu993/undertale/releases/download/love-v1.2.2-fusion-experimental/undertale-yellow-fusion-v1.2.2-experimental.love)
 
-[Release notes, SHA-256 checksum, and both conversion reports](https://github.com/lordmannu993/undertale/releases/tag/love-v1.2.1-fusion-experimental)
+[Release notes, SHA-256 checksum, and both conversion reports](https://github.com/lordmannu993/undertale/releases/tag/love-v1.2.2-fusion-experimental)
 
 Download the **`.love` asset**, not GitHub's automatic “Source code” ZIP. It
 contains the generated Lua and supplied assets for **both games**; you do not
@@ -35,6 +35,21 @@ to Undertale, and to Yellow's unclaimed battle and story systems (see the
 release notes). The large archive is hosted as a GitHub Release asset rather
 than committed to Git. To regenerate it yourself, follow the build instructions
 below.
+
+### Added in v1.2.2 — Snowdin Inn HP and River Person destinations
+
+- **Snowdin Inn restores HP to at least the current maximum +10 at every LV.**
+  The bonus is temporary current HP, not a permanent maximum-HP increase.
+  Repeat stays do not stack it, and an existing higher HP value is preserved.
+  Examples: LV 1 → 30/20 HP, LV 8 → 58/48 HP, LV 20 → 109/99 HP.
+  This replaces the original low-level-only bonus table as requested.
+- **The River Person Yellow destination fix is now in the download.** PR #27's
+  corrected dialogue dispatch and terminated message slots make the Yellow
+  destination selector reachable; all seven Yellow choices use their own
+  landing coordinates. v1.2.1 was built before this fix and does not contain it.
+- **A fresh, versioned fusion archive**, published only after the automated
+  suite, merged packaging checks and native Linux LÖVE gate pass. Android
+  device validation and full-game compatibility remain unclaimed.
 
 ### Added in v1.2.1 — every stop travels
 

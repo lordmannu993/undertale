@@ -314,3 +314,20 @@ layout, so a future complete export will not silently be painted over. Other roo
 retain their own original tiles/backgrounds. Full-game scenery fidelity is still
 not certified. Android's recent-app thumbnail is also scaled, rotated and dimmed;
 judge the new rendering inside the running app.
+
+## Snowdin Inn HP rule (v1.2.2)
+
+Owner-requested gameplay deviation, not a general runtime or decompiler repair:
+`obj_townnpc_innlady`'s Begin Step wake-up branch (`conversation == 6`) now sets
+`global.hp = max(global.hp, global.maxhp + 10)`. The checked-in source previously
+healed to maxhp, then mapped HP 20/24/28/32/36 to 30/32/34/36/38; that gave smaller
+bonuses at LV 2–5 and none at higher levels. The new rule uses the actual maximum
+from `scr_levelup`, including LV 20's 99 HP, without changing `maxhp`, LV or EXP.
+Damage can consume the excess normally; staying again refreshes rather than
+stacks the bonus, and HP already above the target is not reduced. No other
+healing, save-point or combat behavior is changed.
+
+`tests/test_snowdin_inn.py` exercises all 20 levels at five initial HP values
+through the real room, wake-up alarm and converted Begin Step event. It also
+checks repeat stays, leveling between stays, no healing before the alarm or on
+an ordinary visit, and no continuous regeneration after waking.
