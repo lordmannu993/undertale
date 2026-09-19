@@ -18,11 +18,18 @@ problems, plus remaining runtime fidelity work, prevent a full-game
 compatibility claim. No native Android APK has been built or tested in this
 workspace. See [port status](docs/PORTING.md) and [validation](docs/VALIDATION.md).
 
-## Download the experimental `.love` file
+## Download the newest experimental `.love` file
+
+**Newest build: v1.2.2**, published 2026-09-19 — tag
+`love-v1.2.2-fusion-experimental`, source commit `1538133`, SHA-256 in the
+release notes.
 
 [**Download `undertale-yellow-fusion-v1.2.2-experimental.love` (~390 MB)**](https://github.com/lordmannu993/undertale/releases/download/love-v1.2.2-fusion-experimental/undertale-yellow-fusion-v1.2.2-experimental.love)
 
-[Release notes, SHA-256 checksum, and both conversion reports](https://github.com/lordmannu993/undertale/releases/tag/love-v1.2.2-fusion-experimental)
+- [Release notes, SHA-256 checksum, and both conversion reports](https://github.com/lordmannu993/undertale/releases/tag/love-v1.2.2-fusion-experimental)
+- [All releases, newest first](https://github.com/lordmannu993/undertale/releases) —
+  every older build stays downloadable; each is retitled “Superseded — …” when a
+  newer one replaces it.
 
 Download the **`.love` asset**, not GitHub's automatic “Source code” ZIP. It
 contains the generated Lua and supplied assets for **both games**; you do not
@@ -35,6 +42,28 @@ to Undertale, and to Yellow's unclaimed battle and story systems (see the
 release notes). The large archive is hosted as a GitHub Release asset rather
 than committed to Git. To regenerate it yourself, follow the build instructions
 below.
+
+### Merged after this archive was built — in the source, not in the download
+
+Four fixes are merged on `master`, but they landed **after** the v1.2.2 archive
+was packaged, so the download above does not contain them yet; they ship in the
+next versioned build ([PR #30](https://github.com/lordmannu993/undertale/pull/30)):
+
+- **The dialogue box draws over the world.** `obj_dialoguer` sat at depth 0 while
+  its text, portraits and cursors are at −500…−600, so props and negative-depth
+  layers — the River Person's pillars, for example — rendered in front of it.
+  The box and its Create event are now at depth −400.
+- **The boat crossing into Yellow no longer stops** on GameMaker Studio 2 touch
+  built-ins: `device_mouse_dbclick_enable` and the `device_mouse_*` family are
+  registered, `point_in_circle` is implemented, and the runtime resolves calls
+  case-insensitively.
+- **The River Person destination pager lays its labels out.** Yellow's longer
+  destination names (“Dunes — Oasis Valley”) take their own line instead of
+  drawing across the Heart 1 cursor and past the right margin.
+- **Large rooms traverse faster.** `isA` and event lookups plus collision
+  selectors are cached, `bbox` has a no-allocation path at angle 0, and static
+  tiles draw from a per-room list; the linked pull request's own bench reported
+  roughly 80% more frames per second in the rooms it measured.
 
 ### Added in v1.2.2 — Snowdin Inn HP and River Person destinations
 
@@ -261,8 +290,8 @@ below.
   LÖVE smoke test with touch callbacks and pixel checks, required before publishing.
 
 Close the old running game and open the new, versioned download; resuming the old
-Android recent-app card will keep running the older build (v0.1.6 or earlier).
-Your save identity is unchanged.
+Android recent-app card will keep running the build you already had open
+(v1.2.1 or earlier). Your save identity is unchanged.
 The original flower tiles and gameplay collision layout are retained. v0.1.2 adds
 reference-guided backdrop artwork only to the two incomplete opening rooms;
 other rooms are not replaced by a generic background. Movement path point data
@@ -384,8 +413,12 @@ and the Undertale Yellow merge has its own piece list in
 python3 -m pip install -r requirements-dev.txt
 python3 tools/fetch_yellow.py                 # optional: the pinned Yellow source (~309 MB)
 python3 tools/yellow_convert.py --stage objects # optional: pieces 1-3 of the Yellow merge
-python3 -m pytest -q                           # 255 tests; Yellow live gates skip without the fetch
+python3 -m pytest -q                           # full suite; without the fetch the Yellow live gates skip
+python3 tools/check_download_links.py          # the download links above still name the newest release
 ```
+
+CI counted **413 tests** for the v1.2.2 build with the Yellow live gates
+included; a local run without `yellow_src/` collects them and skips those gates.
 
 The converter processes **173 scripts, 1,703 objects, and 334 rooms**, including
 all event and instance-creation code. It preserves zero-based GML arrays,

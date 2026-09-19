@@ -95,6 +95,15 @@ bugs and fidelity gaps, not unchecked pieces.
   GitHub's published archive digest matches the release-note checksum; sandbox
   re-download was blocked by TLS/EOF to GitHub's release-asset host, so no
   independent local download verification is claimed.
+- [x] Make the README's download section say plainly which build is newest (tag,
+  date, source commit, size, release-page and all-releases links) and which
+  merged fixes that archive does not contain yet. Two guards now keep it from
+  going stale again: `tests/test_release_docs.py` (offline — README against the
+  workflow's `RELEASE_TAG`/`ASSET_BASE`, `port/version.lua`, the release notes
+  and every other `.md` in the repo) and `tools/check_download_links.py`
+  (online — the linked tag is the *newest published* release, the asset exists
+  with the advertised size and a checksum matching the release notes), which the
+  `LOVE port tests` workflow runs. Both were verified to fail on a stale pin.
 
 ## Current state
 
@@ -105,6 +114,8 @@ bugs and fidelity gaps, not unchecked pieces.
 | Open PR | **#24** (owner rounds 1-2): `port/frisk.lua` now asserts every one of the 24 run poses stays Clover's and none enters the walk remap (the startup report counts them instead of `#remap`, which was always 0), and PAUSE gains **AUTO RUN: ON/OFF** beside COLLISION - Yellow's own `option_autorun`, persisted in `touch-settings-v1.txt`, mirrored to the `Controls.sav` key Yellow's `scr_savecontrols` writes, and re-applied on boot and after every crossing. Round 2 makes both travel services available from the first frame: `Travel:openRiverService()` lifts `obj_dogboat_thing`'s own `global.plot < 122` guard for that one Create event (restored after, warn `travel-river-service`), `Travel:openWhaleService()` sets Yellow's `global.player_can_travel` and seeds ten stops through Yellow's own `scr_fasttravel_add` (warn `travel-ugps`), Yellow stops resolve through the merged ID band (`56` -> `1000056`, not Undertale's 56), `Travel:landWhales()` reads the whale's unreachable `fly_speed == 0` landing as the landing it was written to be (warn `travel-ugps-landing`), and `port/runtime.lua` gives every viewport a `view_camera` so a mail-station bell no longer stops the frame on "Camera 0 does not exist". Tests: boat at all three docks at plot 10, the whole bell -> Mail/Travel -> menu -> Yellow-stop flight, and every offered stop pinned against the pinned Yellow source (294 pass). Documented in `docs/YELLOW.md` and the release notes. Known gap reported, not hidden: the "Snowdin - Forest" stop needs the particle system the runtime lacks, so `rm_snowdin_11_yellow` stays a named stop. Still open from round 1: "it bugs a lot" (no reproducible symptom yet) |
 | Yellow merge | **Complete.** `tools/fetch_yellow.py` pins commit `4ec23bd9` of `lordmannu993/UnderTale-Yellow`; `tools/yellow_convert.py --stage rooms` converts 3 796 sprites / 673 sounds / 11 fonts / 1 155 script resources / 3 224 objects with 8 494 events / **287 rooms, 68 paths, 199 454 drawables, 3 006 layers** into `generated/yellow/`, with 1 178 named function exports, 1 explicit GMLive stop (the shipped build's GMLive is inert, so the other 21 convert literally) and 0 compile errors. `tools/merge.py` + `port/merge.lua` build one manifest from both games, `port/travel.lua` connects the River Person boat (hold X during the ride; open below its plot gate) and Yellow's UGPS whale (every stop offered from Yellow's world init), `port/frisk.lua` draws Yellow's player as Frisk (28 walk poses remapped; the 24 run poses, the gun poses, goggles, dance and lying stay Clover - listed and asserted, so a run pose entering the remap stops the build), Yellow's own pause menu equips Clover's ammo/accessories beside Frisk's own gear, and the port's pause menu carries the merged AUTO RUN toggle, and `merge.sav` versions the merged layer including the loadout. The native LÖVE/xvfb gate crosses between worlds and back. Still unclaimed: Yellow's battle/story systems, shaders (reported, skipped), 25 rooms with named stops, and any Android-device certification |
 | Part-ID recovery | `tools/recover_parts.py` fetches nothing by default: the checked-in `port/recovered_parts.json` is imported by `convert.py`. Regenerate with `GITHUB_TOKEN="$(gh auth token)" python3 tools/recover_parts.py` (pinned to the same `249ffa27` ref as the registry/path recoveries), re-verify offline with `--check`. IDs come from this checkout's own `partN=` literals; only names are paired from upstream; 38 annotated sites are re-validated as anchors. `tests/test_monster_parts.py` guards all of it plus every Snowdin battlegroup end-to-end |
+| Source newer than the archive | `master` carries [PR #30](https://github.com/lordmannu993/undertale/pull/30)'s four fixes (dialogue-box depth −400, GameMaker Studio 2 touch built-ins in Yellow's phone controls, River Person pager label layout, cached `isA`/collision/static-tile drawing), merged 2026-09-19 12:34Z — **after** the v1.2.2 archive was packaged from `1538133` at 10:35Z. The README lists them under the download link as source-only. The next publication must carry them and drop that note; no new archive has been built or published since v1.2.2 |
+| Download links | README's download section is guarded by `tests/test_release_docs.py` and `tools/check_download_links.py` (CI, token-authenticated). Publishing a version means the README, the workflow pins, `port/version.lua` and `docs/RELEASE_NOTES.md` all move together, and no superseded `releases/download/<tag>` link may survive in any document |
 | Old releases | `love-v0.1.0`…`love-v1.2.1-fusion-experimental` are **kept on purpose** (owner declined deletion) and renamed with a "Superseded (…)" prefix as each is replaced. Version branches `v0.1.0`..`v0.1.3` point at each tagged build |
 | Release plumbing | `.github/workflows/love-prerelease.yml` publishes on push to one pinned branch (`arena/01a0b92c-undertale` for the v1.2.2 fusion) and **refuses unless a draft release with that tag already exists**; `workflow_dispatch` re-runs it. The publish job fetches Yellow, converts, runs the suite with `PORT_REQUIRE_YELLOW=1`, packages `--merged`, runs the fused native gate, uploads four assets and flips `--draft=false` |
 
@@ -118,7 +129,11 @@ bugs and fidelity gaps, not unchecked pieces.
    LÖVE gate, then verifies asset sizes/digests and flips `--draft=false`. It cannot overwrite a
    published build, which is intended.
 5. Update the README download links (the repo page shows `master`'s README; a stale link there is
-   what makes people download the old build).
+   what makes people download the old build). `python3 tools/check_download_links.py` must pass once
+   the release is published, the "Merged after this archive was built" note must be deleted (the new
+   build contains those fixes), and `tests/test_release_docs.py` fails if the README, the workflow
+   pins, `port/version.lua` and the release notes disagree or a superseded download link survives
+   anywhere in the repository's documents.
 
 ## Hard rules, and why
 
