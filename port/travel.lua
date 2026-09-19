@@ -5,7 +5,9 @@
 --     obj_dogboat_thing travelling to one of three dock rooms (70 Snowdin,
 --     125 Waterfall, 140 Hotland). Holding X - the cancel button, on screen
 --     for the touch controls - during the ride sends the same choice to the
---     matching Undertale Yellow landing spot instead.
+--     matching Undertale Yellow landing spot instead. The native two-option
+--     location chooser also gets a category/pager layer so Yellow's seven own
+--     stops are selectable without changing obj_choicer.
 --   * Yellow's UGPS mail whale. obj_fast_travel_menu lists global.fast_travel_list
 --     and writes global.fast_travel_newroom/newx/newy for the entry the player
 --     highlighted. The bridge adds three Undertale dock entries to that list and
@@ -32,6 +34,16 @@ local RIVER_DESTINATIONS = {
     [125] = {label = "Dunes - West Mines", room = "rm_dunes_05", x = 510, y = 170},
     [140] = {label = "Hotland - Crossroads", room = "rm_hotland_02", x = 170, y = 120},
 }
+-- SCR_TEXT is one of the decompiler-repaired switches.  The branch that was
+-- written as case 587 in the GMX source is dispatched as 770 after the audited
+-- label repair; 771 is its two-dock menu and 772 commits the selected dock.
+-- Keep these IDs here instead of changing SCR_TEXT.gml (the repair is hash
+-- guarded and the original script remains the source of truth).
+local RIVER_TEXT_GREETING = 770
+local RIVER_TEXT_LOCATIONS = 771
+local RIVER_TEXT_RESULT = 772
+local RIVER_TEXT_CUSTOM_START = 773
+
 local WHALE_DESTINATIONS = {
     {label = "Snowdin - Dock", room = 70},
     {label = "Waterfall - Dock", room = 125},
@@ -81,6 +93,19 @@ local YELLOW_TRAVEL_POINTS = {
 -- Exposed for the merge tests, which pin every label and every room against
 -- the pinned Yellow source rather than against this file.
 Travel.YELLOW_TRAVEL_POINTS = YELLOW_TRAVEL_POINTS
+-- The same Step_0 switch also supplies the landing coordinates.  Keep these
+-- alongside (rather than inside) the label/room records so the native stop list
+-- remains easy to audit and the River Person can use the exact same landings.
+local YELLOW_TRAVEL_COORDINATES = {
+    ["Dunes - Oasis Valley"] = {880, 720},
+    ["Dunes - West Mines"] = {510, 170},
+    ["Hotland - Crossroads"] = {170, 120},
+    ["Snowdin - Forest"] = {200, 100},
+    ["Steamw. - C. Station"] = {400, 290},
+    ["Steamw. - Commons"] = {520, 120},
+    ["Wild East - Farm"] = {600, 120},
+}
+Travel.YELLOW_TRAVEL_COORDINATES = YELLOW_TRAVEL_COORDINATES
 
 -- Every UGPS whale ends its fly-in when fly_speed reaches exactly zero, and
 -- the approach decrements it by 0.2 from 2 - a subtraction no binary float
@@ -110,6 +135,8 @@ function Travel.install(R)
         base = base,
         crossings = 0,
         riverLatch = false,
+        riverDestination = nil,
+        riverDialogue = nil,
         pendingInit = nil,
         world = nil,
         ids = {
@@ -139,6 +166,18 @@ function Travel.install(R)
     function R:gotoRoom(index)
         return gotoRoom(self, travel:resolve(index))
     end
+    -- The location screen lives in the audited Undertale SCR_TEXT switch.  Its
+    -- original chooser has two slots, so the merged River Person menu is layered
+    -- after that script returns rather than changing the source switch or the
+    -- generic obj_choicer.  Other scripts keep the exact Runtime:script path.
+    local script = R.script
+    function R:script(index, E, ...)
+        local result = script(self, index, E, ...)
+        if index == undertaleNames["SCR_TEXT"] then
+            travel:afterRiverText(select(1, ...))
+        end
+        return result
+    end
     -- The port's AUTO RUN setting, applied through the game's own global.
     function R:setAutorun(value)
         travel:setAutorun(value)
@@ -167,6 +206,152 @@ function Travel:exists(object)
         if instance.alive and instance.v.object_index == object then return true end
     end
     return false
+end
+
+-- The original obj_choicer is deliberately a two-option object.  River Person
+-- gets a small pager instead of a third-party menu: one page offers a Yellow
+-- stop and More (the last page offers Back), and the next page is written only
+-- after the player chooses More.  This keeps the game's own chooser, input,
+-- cursor and dialogue animation intact while making all seven Yellow stops
+-- reachable.
+local RIVER_UNDERTALE_CHOICES = {
+    [70] = {{label = "Waterfall", flag = 2}, {label = "Hotland", flag = 3}},
+    [125] = {{label = "Snowdin", flag = 1}, {label = "Hotland", flag = 3}},
+    [140] = {{label = "Snowdin", flag = 1}, {label = "Waterfall", flag = 2}},
+}
+
+function Travel:riverBoat()
+    local id = self.ids.undertale.boat
+    if not id then return nil end
+    for _, instance in ipairs(self.runtime.instances) do
+        if instance.alive and instance.v.object_index == id then return instance end
+    end
+    return nil
+end
+
+function Travel:setRiverMessage(text)
+    local R = self.runtime
+    local messages = R.global.msg
+    if type(messages) ~= "table" then
+        messages = R.defaults("%%")
+        R.global.msg = messages
+    end
+    messages[0] = text
+    -- OBJ_WRITER stops at %%%.  Clear every slot the native River Person uses
+    -- so a previous long dialogue can never leak a line into this pager.
+    for index = 1, 8 do messages[index] = "%%%" end
+end
+
+function Travel:setRiverChoice(prompt, left, right)
+    self:setRiverMessage("* " .. prompt .. "& &         " .. left .. "         " .. right .. "\\C")
+end
+
+function Travel:holdRiverBoat()
+    local boat = self:riverBoat()
+    if boat then boat.v.con = 0 end
+end
+
+function Travel:riverUndertalePage()
+    local choices = RIVER_UNDERTALE_CHOICES[self.runtime.vars.room]
+    if not choices then
+        choices = {{label = "Snowdin", flag = 1}, {label = "Waterfall", flag = 2}}
+    end
+    self:setRiverChoice("Where will we go today?", choices[1].label, choices[2].label)
+    self.riverDialogue.undertaleChoices = choices
+end
+
+function Travel:riverYellowPage(page)
+    local destination = YELLOW_TRAVEL_POINTS[page]
+    if not destination then
+        self.riverDialogue = nil
+        return
+    end
+    local nextLabel = page < #YELLOW_TRAVEL_POINTS and "More..." or "Back"
+    self:setRiverChoice("Where will we go today?", destination.label, nextLabel)
+    self.riverDialogue.page = page
+end
+
+function Travel:finishRiverChoice(flag, destination)
+    local R = self.runtime
+    local flags = R.global.flag
+    if type(flags) ~= "table" then
+        flags = R.defaults(0)
+        R.global.flag = flags
+    end
+    flags[459] = flag
+    self.riverDestination = destination
+    -- An explicit Yellow selection is a destination choice, not the old
+    -- hold-X shortcut.  resolve() consumes this record at the boat's own
+    -- room_goto, after the native ride animation has finished.
+    self.riverLatch = destination ~= nil
+    local boat = self:riverBoat()
+    if boat then boat.v.con = 0.1 end
+    self:setRiverMessage("* Then we're off.../%%")
+    self.riverDialogue = nil
+end
+
+function Travel:afterRiverText(message)
+    if self.world ~= "undertale" or type(message) ~= "number" then return end
+    local R = self.runtime
+    if message == RIVER_TEXT_GREETING then
+        -- SCR_TEXT 770 is only made by the boat interaction in this service.
+        -- Replacing an old pending pager here also makes a second conversation
+        -- start cleanly after a completed ride.
+        if self:riverBoat() then
+            self.riverDestination = nil
+            self.riverDialogue = {stage = "initial"}
+        end
+        return
+    end
+    local dialogue = self.riverDialogue
+    if not dialogue then return end
+
+    if message == RIVER_TEXT_LOCATIONS then
+        if R.global.choice == 0 then
+            dialogue.stage = "world"
+            self:holdRiverBoat()
+            self:setRiverChoice("Where will we go?", "Yellow", "Undertale")
+        else
+            -- The native No branch already filled the final dialogue.
+            self.riverDialogue = nil
+        end
+        return
+    end
+
+    if message == RIVER_TEXT_RESULT and dialogue.stage == "world" then
+        self:holdRiverBoat()
+        if R.global.choice == 0 then
+            dialogue.stage = "yellow"
+            self:riverYellowPage(1)
+        else
+            dialogue.stage = "undertale"
+            self:riverUndertalePage()
+        end
+        return
+    end
+
+    if message < RIVER_TEXT_CUSTOM_START then return end
+    if dialogue.stage == "undertale" then
+        local choices = dialogue.undertaleChoices or RIVER_UNDERTALE_CHOICES[R.vars.room]
+        local selected = choices and choices[(R.global.choice or 0) + 1]
+        if selected then self:finishRiverChoice(selected.flag, nil) end
+        return
+    end
+    if dialogue.stage == "yellow" then
+        local page = dialogue.page or 1
+        if R.global.choice == 0 then
+            self:finishRiverChoice(1, YELLOW_TRAVEL_POINTS[page])
+        elseif page < #YELLOW_TRAVEL_POINTS then
+            self:holdRiverBoat()
+            self:riverYellowPage(page + 1)
+        else
+            -- Back returns to the native Undertale two-dock list without
+            -- adding a third chooser slot or inventing a separate menu.
+            dialogue.stage = "undertale"
+            self:holdRiverBoat()
+            self:riverUndertalePage()
+        end
+    end
 end
 
 function Travel:yellowRoom(name)
@@ -203,11 +388,28 @@ end
 
 function Travel:resolve(index)
     local target = index
-    if self.world == "undertale" and self.riverLatch and RIVER_DESTINATIONS[index] then
-        local destination = RIVER_DESTINATIONS[index]
-        target = self:yellowRoom(destination.room)
-        self.riverLatch = false
-        self.pendingCoordinates = {destination.x, destination.y}
+    if self.world == "undertale" and self.riverLatch then
+        -- A pager selection takes precedence over the old X-held mapping.  If
+        -- there is no explicit Yellow selection, retain the original bridge:
+        -- holding X during the native ride maps dock 70/125/140 to the existing
+        -- three River destinations.
+        local destination = self.riverDestination or RIVER_DESTINATIONS[index]
+        if destination then
+            target = self:yellowRoom(destination.room)
+            if self.riverDestination then
+                local coordinates = YELLOW_TRAVEL_COORDINATES[destination.label]
+                if coordinates then
+                    self.pendingCoordinates = {coordinates[1], coordinates[2]}
+                else
+                    local x, y = self:landingSpot("yellow", target)
+                    self.pendingCoordinates = {x, y}
+                end
+            else
+                self.pendingCoordinates = {destination.x, destination.y}
+            end
+            self.riverLatch = false
+            self.riverDestination = nil
+        end
     end
     local world = self:worldOf(target)
     if world ~= self.world then self:beginCrossing(world, target) end

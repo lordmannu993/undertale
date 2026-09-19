@@ -249,6 +249,116 @@ def test_river_person_boat_and_riverman_exist_below_the_plot_gate(vm):
 
 
 @live
+def test_river_person_pager_reaches_every_yellow_stop_without_writer_overflow(vm):
+    """The River Person keeps its native chooser but pages through Yellow's stops.
+
+    This drives the same SCR_TEXT/scr_msgup path the two-option chooser drives,
+    rather than calling the pager methods in isolation.  It catches both the
+    old writer overrun and a menu that merely displays a label without arming a
+    real merged-world destination.
+    """
+    assert vm.execute("local ok,err=pcall(function() R:start() end) return ok and 'ok' or tostring(err)") == "ok"
+    result = vm.execute('''
+        local ok,err=pcall(function()
+            R.global.plot=10
+            crossTo(140)
+            local boat=R.travel:riverBoat()
+            if not boat then error("the River Person's boat was not placed") end
+            -- The boat's own Draw/interaction event creates the native dialoguer
+            -- and writer, including the repaired runtime label 770.
+            boat.v.myinteract=1
+            R.global.interact=0
+            R:event(boat,8,0)
+            if R.global.msc~=770 then error("boat opened msc="..tostring(R.global.msc)) end
+            local writer
+            for _,instance in ipairs(R.instances) do
+                if instance.alive and instance.v.object_index==R.manifest.names["OBJ_WRITER"] then writer=instance end
+            end
+            if not writer then error("the River Person did not create a writer") end
+
+            -- Confirm Yes on the native ride prompt, then choose Yellow in the
+            -- merged category page.
+            R.global.choice=0
+            R:script(145,R:scope(writer))
+            if R.global.msc~=771 or not string.find(R.global.msg[0],"Yellow",1,true) then
+                error("the merged location category did not open")
+            end
+            R.global.choice=0
+            R:script(145,R:scope(writer))
+
+            local points=R.travel.YELLOW_TRAVEL_POINTS
+            for page=1,#points do
+                local label=points[page].label
+                if not string.find(R.global.msg[0],label,1,true) then
+                    error("page "..tostring(page).." omitted "..label)
+                end
+                if page<#points then
+                    R.global.choice=1 -- More...
+                else
+                    R.global.choice=0 -- select the final real destination
+                end
+                R:script(145,R:scope(writer))
+            end
+            if not R.travel.riverDestination then error("Yellow selection did not arm a destination") end
+            if R.travel.riverDestination.label~="Wild East - Farm" then
+                error("selected "..tostring(R.travel.riverDestination.label))
+            end
+            if boat.v.con~=0.1 then error("boat con="..tostring(boat.v.con)) end
+            if R.global.msg[0]~="* Then we're off.../%%" then
+                error("final message is "..tostring(R.global.msg[0]))
+            end
+
+            -- The selection uses the coordinates in Yellow's own menu switch,
+            -- not a made-up room centre.
+            R:gotoRoom(140); R:applyTransitions(); tick(5)
+            local wanted=R.manifest.yellow_names.rooms["rm_dunes_42"]
+            if R.vars.room~=wanted then error("landed in "..tostring(R.vars.room)) end
+            local player
+            for _,instance in ipairs(R.instances) do
+                if instance.alive and instance.v.object_index==R.travel.ids.yellow.player then player=instance end
+            end
+            if not player then error("Yellow's player did not spawn") end
+            if player.v.x~=600 or player.v.y~=120 then
+                error("landed at "..player.v.x..","..player.v.y.." instead of 600,120")
+            end
+        end)
+        return ok and "ok" or tostring(err)
+    ''')
+    assert result == "ok", result
+
+
+@live
+def test_river_person_category_keeps_the_native_undertale_destinations(vm):
+    """The new category layer does not remove Undertale's original two choices."""
+    assert vm.execute("local ok,err=pcall(function() R:start() end) return ok and 'ok' or tostring(err)") == "ok"
+    result = vm.execute('''
+        local ok,err=pcall(function()
+            R.global.plot=10
+            crossTo(140)
+            local boat=R.travel:riverBoat()
+            boat.v.myinteract=1; R.global.interact=0; R:event(boat,8,0)
+            local writer
+            for _,instance in ipairs(R.instances) do
+                if instance.alive and instance.v.object_index==R.manifest.names["OBJ_WRITER"] then writer=instance end
+            end
+            R.global.choice=0; R:script(145,R:scope(writer)) -- Yes -> category
+            R.global.choice=1; R:script(145,R:scope(writer)) -- Undertale
+            if not string.find(R.global.msg[0],"Snowdin",1,true)
+                or not string.find(R.global.msg[0],"Waterfall",1,true) then
+                error("native dock choices disappeared: "..tostring(R.global.msg[0]))
+            end
+            R.global.choice=0; R:script(145,R:scope(writer))
+            if R.global.flag[459]~=1 then error("Snowdin flag="..tostring(R.global.flag[459])) end
+            if R.travel.riverDestination then error("native dock picked a Yellow target") end
+            if boat.v.con~=0.1 then error("native choice con="..tostring(boat.v.con)) end
+            if R.global.msg[0]~="* Then we're off.../%%" then error("final message missing") end
+        end)
+        return ok and "ok" or tostring(err)
+    ''')
+    assert result == "ok", result
+
+
+@live
 def test_ugps_whale_lands_and_flies_a_yellow_stop_to_its_merged_room(vm):
     """Ring a bell, take Travel, and land in the far world's own room.
 
@@ -381,9 +491,23 @@ def test_yellow_travel_points_are_the_pinned_sources_own_stops():
         expected[block.group(1)] = rooms[int(block.group(2))]
     assert set(expected) == registered, (sorted(expected), sorted(registered))
     # The file under test offers exactly that list, in its own order.
-    offered = dict(re.findall(r'\{label = "([^"]+)", room = "([^"]+)"\}',
-                              (ROOT / "port" / "travel.lua").read_text()))
+    travel_source = (ROOT / "port" / "travel.lua").read_text()
+    offered = dict(re.findall(r'\{label = "([^"]+)", room = "([^"]+)"\}', travel_source))
     assert offered == expected, offered
+
+    expected_coordinates = {
+        label: (int(x), int(y))
+        for label, x, y in re.findall(
+            r'case "([^"]+)":\s*global\.fast_travel_newroom = \d+;\s*'
+            r'global\.fast_travel_newx = (\d+);\s*global\.fast_travel_newy = (\d+);',
+            menu,
+        )
+    }
+    offered_coordinates = {
+        label: (int(x), int(y))
+        for label, x, y in re.findall(r'\["([^"]+)"\] = \{(\d+), (\d+)\}', travel_source)
+    }
+    assert offered_coordinates == expected_coordinates, offered_coordinates
 
 
 @live

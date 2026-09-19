@@ -276,8 +276,14 @@ Two documented deviations are reported on every run instead of being silent:
   Holding **X** — the cancel button, on screen for touch — during the ride sends
   the same choice to the matching Yellow landing spot from Yellow's own fast-travel
   table: Snowdin dock → `rm_snowdin_11_yellow` (200, 100), Waterfall dock →
-  `rm_dunes_05` (510, 170), Hotland dock → `rm_hotland_02` (170, 120). No
-  recovered script or object was edited to do this.
+  `rm_dunes_05` (510, 170), Hotland dock → `rm_hotland_02` (170, 120). The
+  native River Person dialogue is dispatched at repaired runtime label **770**;
+  its three unused message slots are explicitly terminated so the writer cannot
+  scan stale data. After Yes, `port/travel.lua` layers a category page over the
+  native two-option chooser: **Yellow** pages through all seven Yellow labels with
+  the coordinates from `obj_fast_travel_menu/Step_0.gml`, while **Undertale** keeps
+  the original two dock choices. The native boat animation and `global.flag[459]`
+  commit still perform the ride.
 - **UGPS whale → Undertale.** `obj_fast_travel_menu` lists `global.fast_travel_list`
   and writes `global.fast_travel_newroom/newx/newy` for the highlighted entry, so
   the bridge adds three dock entries to that list with `ds_list_add` and fills the
@@ -308,8 +314,9 @@ startup under its own warning key.
   Create event destroys the instance while `global.plot < 122` (set by the six
   `obj_undyne*` resources). `Travel:openRiverService()` wraps that one event:
   while it runs, `global.plot` reads 122; afterwards it is restored to whatever
-  it was. Nothing else about the event changes, and no recovered script or
-  object is edited.
+  it was. Nothing else about the event changes. The separate River Person
+  interaction repair adds only the three `%%%` terminators in the boat source;
+  the audited `SCR_TEXT.gml` remains unchanged.
 - **`travel-ugps` — the whale's own unlock.** `global.player_can_travel` is
   Yellow's switch for "this whale will carry you" (normally set by the
   Dunes-42 delivery scene). `Travel:openWhaleService()` sets the same switch
