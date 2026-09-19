@@ -4,6 +4,27 @@ This prerelease makes the current `.love` package downloadable from GitHub. It
 contains the converted Lua and the assets supplied for both merged games. **It
 is not a completed or native-device-verified game, and it is not an APK.**
 
+## v1.2.3 — the four phone fixes
+
+- **The dialogue box draws over the world.** `obj_dialoguer` sat at depth 0 while
+  its text, portraits and cursors are at −500…−600, so props and negative-depth
+  layers — the River Person's pillars, for example — rendered in front of it.
+  The box and its Create event are now at depth −400.
+- **The boat crossing into Yellow no longer stops** on GameMaker Studio 2 touch
+  built-ins: `device_mouse_dbclick_enable` and the `device_mouse_*` family are
+  registered, `point_in_circle` is implemented, and the runtime resolves calls
+  case-insensitively.
+- **The River Person destination pager lays its labels out.** Yellow's longer
+  destination names ("Dunes — Oasis Valley") take their own line instead of
+  drawing across the Heart 1 cursor and past the right margin.
+- **Large rooms traverse faster.** `isA` and event lookups plus collision
+  selectors are cached, `bbox` has a no-allocation path at angle 0, and static
+  tiles draw from a per-room list; [PR #30](https://github.com/lordmannu993/undertale/pull/30)'s
+  own bench reported roughly 80% more frames per second in the rooms it measured.
+- **A fresh, versioned fusion archive**, published only after the automated
+  suite, merged packaging checks and native Linux LÖVE gate pass. Android
+  device validation and full-game compatibility remain unclaimed.
+
 ## v1.2.2 — Snowdin Inn HP and River Person destinations
 
 - **Snowdin Inn restores HP to at least the current maximum +10 at every LV.**
