@@ -331,3 +331,58 @@ healing, save-point or combat behavior is changed.
 through the real room, wake-up alarm and converted Begin Step event. It also
 checks repeat stays, leveling between stays, no healing before the alarm or on
 an ordinary visit, and no continuous regeneration after waking.
+
+## Sprite crop offsets (fusion requirement 12, first piece)
+
+This checkout's sprite PNGs are **cropped to their collision bbox** while the events
+that draw them keep using the original canvas: `spr_shopkeeper1`'s image is 61×111
+inside a 64×120 frame whose origin is the canvas origin. Drawing the exported pixels
+with the canvas origin therefore shifted every such sprite up/left by the crop — the
+Snowdin shopkeeper's face landed 9 rows above the eyes and mouth overlays, which is
+the owner-reported "four eyes, floating mouth", and the River Person's boat cover
+floated off the waterline.
+
+`tools/recover_sprite_offsets.py` recovers the missing canvas offset per sprite from
+one pinned upstream record — `sprites/<name>/<name>.yy` frame metadata in
+`kittibyte/UndertaleDecomp` at `249ffa27ee7e7eee0d7ce84b736c294458b38685`, the same
+dump docs/PATHS.md uses. **Offsets only; no artwork is imported.** A sprite is
+accepted only when all of these hold:
+
+1. the local `<sprite>.sprite.gmx` bbox equals the upstream frame bbox,
+2. both disagreeing canvas edges imply the same offset (`bbox_left - art_left` and
+   `bbox_top - art_top` agree with the canvas size),
+3. the canvas contains the exported image, and
+4. the offset is non-zero.
+
+**447 of the 1,428 candidates verify; the other 981 are listed in
+`port/sprite_offsets.json` `unresolved[]` with one of four reasons**
+(two-sided-disagreement 973, bbox-differs-from-upstream 6, canvas-too-small 1,
+not-in-upstream 1). They are drawn unshifted rather than guessed at, and
+`tests/test_sprite_offsets.py` fails if a regenerated file drops one without a
+reason. Accepted examples: `spr_shopkeeper1` (1,9) 64×120→61×111,
+`spr_dogboat_cover` (7,25) 91×40→78×15, `spr_riverman` (1,0) 29×42→27×42,
+`spr_maincharad` 20×30→19×29; `spr_shopkeeper1_face0..6`, the eyes/mouth overlays,
+`spr_heart` and `spr_shop1_bg` are already full-canvas and stay at (0,0).
+
+Pipeline: `convert.py` refuses to run without the file and carries `ox`/`oy` into
+`generated/assets/sprites_N.lua`; `port/graphics.lua` subtracts them from the origin
+in both the whole-image and `draw_sprite_part` paths (the crop rect too) and appends
+them to the draw log, so a probe can replay the shifted draw. `tools/pngalpha.py` is
+a stdlib-only PNG reader used to measure the exported alpha bounds without Pillow;
+it was validated against Pillow on 25 sprites with 0 mismatches.
+
+Regenerate with `python3 tools/recover_sprite_offsets.py --cache <upstream metadata>`
+(offline `--check` re-derives every row from the local tree alone; the recovery
+tools fetch nothing at test time).
+
+Recorded limitations for this piece:
+
+- the 981 unresolved sprites are still drawn with their exported origin, so any of
+  them with a cropped canvas keeps a cosmetic offset;
+- `sprite_get_width`/`sprite_get_height`/`image_width` report the **exported** image
+  dimensions, not the original canvas (95 call sites), which is what the original
+  1.4 semantics would have returned;
+- this is the asset-compatibility half of spec requirement 12 (origins, sheet
+  coordinates, render anchors). Y-sorting from the sprite's visual bottom point,
+  per-frame origins, movement speed, collision boxes and Yellow's GMS2 sprites are
+  separate pieces and are not claimed here.

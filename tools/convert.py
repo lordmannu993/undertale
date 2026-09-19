@@ -153,6 +153,38 @@ class Converter:
         self.ids[category][name] = index
         self.evidence[name] = why
 
+    def load_sprite_offsets(self):
+        """Canvas offsets for sprite images this checkout exported cropped.
+
+        The export cropped each PNG to its collision bbox while events keep
+        drawing in original canvas coordinates, so the renderer has to add the
+        crop back (see tools/recover_sprite_offsets.py for the evidence rule).
+        """
+        offsets_file = self.root / "port/sprite_offsets.json"
+        if not offsets_file.exists():
+            raise CompileError("port/sprite_offsets.json is missing; run tools/recover_sprite_offsets.py")
+        document = json.loads(self.read(offsets_file))
+        sprites = self.resources.get("sprites", {})
+        offsets = {}
+        for name, record in sorted(document.get("sprites", {}).items()):
+            if name not in sprites:
+                raise CompileError(f"sprite offset names an unknown sprite: {name}")
+            offsets[name] = (int(record["ox"]), int(record["oy"]))
+        self.sprite_offsets = offsets
+        self.report["sprite_offsets"] = {
+            "source": {"upstream": document.get("upstream"), "ref": document.get("ref")},
+            "rule": document.get("rule"),
+            "counts": document.get("counts"),
+            "applied": {name: {"ox": ox, "oy": oy} for name, (ox, oy) in sorted(offsets.items())},
+            "unresolved": len(document.get("unresolved", [])),
+            "limitations": [
+                "Sprites whose export cannot be tied back to the original canvas are left unshifted "
+                "and listed in port/sprite_offsets.json under unresolved.",
+                "sprite_get_width/height and image_width report the exported image size, not the "
+                "original canvas size the game's own arithmetic assumes.",
+            ],
+        }
+
     def recover_ids(self):
         # The GMX tree is alphabetized, but decompiler numeric IDs are NOT.
         # Recover annotated IDs rather than assigning the GMX tree's indices.
@@ -501,6 +533,8 @@ class Converter:
                 prefix = path.parent.relative_to(self.root).as_posix() + "/"
                 if category == "sprites":
                     data.update(child_fields(asset, "width height xorig yorigin colkind coltolerance sepmasks bboxmode bbox_left bbox_right bbox_top bbox_bottom"))
+                    if name in self.sprite_offsets:
+                        data["ox"], data["oy"] = self.sprite_offsets[name]
                     data["frames"] = [self.check_file(prefix + f.text, name) for f in asset.findall("frames/frame")]
                 elif category == "backgrounds":
                     data.update(child_fields(asset, "width height"))
@@ -577,6 +611,7 @@ class Converter:
     def run(self):
         self.collect()
         self.recover_ids()
+        self.load_sprite_offsets()
         self.emit()
         return self.report
 

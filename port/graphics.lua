@@ -80,17 +80,22 @@ function Graphics.install(R)
         if #s.frames==0 then return end
         if sub<0 then sub=E and E.image_index or 0 end
         local file=s.frames[math.floor(sub)%#s.frames+1]
-        log("sprite",s.name,math.floor(sub)%#s.frames,x,y,sx,sy,angle,tint,alpha)
+        -- The checkout exported some sprite images cropped to their collision
+        -- bbox while events keep drawing in original canvas coordinates, so
+        -- the crop offset is added back here (see port/sprite_offsets.json and
+        -- tools/recover_sprite_offsets.py). xorig/yorigin stay canvas values.
+        local ox,oy=s.ox or 0,s.oy or 0
+        log("sprite",s.name,math.floor(sub)%#s.frames,x,y,sx,sy,angle,tint,alpha,ox,oy)
         if not g then return end
-        if crop then part(file,crop[1],crop[2],crop[3],crop[4],x,y,sx,sy,tint,alpha)
+        if crop then part(file,crop[1]-ox,crop[2]-oy,crop[3],crop[4],x,y,sx,sy,tint,alpha)
         else
             local img=image(file);if not img then return end
-            color(tint,alpha);g.draw(img,x,y,-math.rad(angle),sx,sy,s.xorig,s.yorigin)
+            color(tint,alpha);g.draw(img,x,y,-math.rad(angle),sx,sy,s.xorig-ox,s.yorigin-oy)
         end
     end
     local function backgroundPart(asset,left,top,width,height,x,y,sx,sy,tint,alpha,transform)
         if not asset then return end
-        log("background",asset.name,x,y)
+        log("background",asset.name,x,y,left,top,width,height,sx,sy)
         part(asset.file,left,top,width,height,x,y,sx,sy,tint,alpha,transform)
     end
     function R:fillRectangle(x1,y1,x2,y2,tint,alpha)
@@ -408,12 +413,12 @@ function Graphics.install(R)
     B.draw_background=function(_,index,x,y)
         local b=R.assets.backgrounds[index]
         if not b then R:warn("background:"..tostring(index),"Unresolved background ID "..tostring(index));return end
-        log("background",b.name,x,y)
+        log("background",b.name,x,y,0,0,b.width,b.height,1,1)
         part(b.file,0,0,b.width,b.height,x,y,1,1,16777215,state.alpha)
     end
     B.draw_background_part_ext=function(_,index,l,t,w,h,x,y,sx,sy,tint,alpha)
         local b=R.assets.backgrounds[index]
-        if b then log("background",b.name,x,y);part(b.file,l,t,w,h,x,y,sx,sy,tint,alpha)
+        if b then log("background",b.name,x,y,l,t,w,h,sx,sy);part(b.file,l,t,w,h,x,y,sx,sy,tint,alpha)
         elseif index>=0 then R:warn("background:"..index,"Unresolved background ID "..index) end
     end
     B.draw_set_color=function(_,v) state.color=v end
