@@ -386,3 +386,51 @@ Recorded limitations for this piece:
   coordinates, render anchors). Y-sorting from the sprite's visual bottom point,
   per-frame origins, movement speed, collision boxes and Yellow's GMS2 sprites are
   separate pieces and are not claimed here.
+
+## Instance-array asset IDs (spec §7, §12 — second piece)
+
+The crop-offset recovery above fixed where the shopkeeper's sprites *land*; this
+piece fixes that the emotion faces *draw at all*. The Snowdin shopkeeper keeps its
+seven emotion faces inside an instance array and selects them by a computed index:
+
+    facespr[1]= 881;                              # obj_shopmouth1 / obj_shop1 Create
+    ...
+    draw_sprite(facespr[global.faceemotion], ...) # obj_shopmouth1 Draw
+
+No decompiler annotation covers a bare literal stored in an array, so the converter
+left the seven `spr_shopkeeper1_face*` sprites on synthetic IDs and every emotional
+line stopped with `Unresolved sprite ID 881` — the face never drew, leaving the mouth
+floating over the default two-eye frame. The same class hides five sibling sites:
+`obj_shop1`'s own (unreferenced) `facespr`, the Asgore body's eight `part` sprites
+(`draw_sprite_ext(part[i], ...)`), and three `background_index` slots
+(`obj_backgrounder_core` / `obj_backgrounder_tundra` / `obj_gameshake`) that the GM1.4
+decompile spells `background_index[i]= <id>;` while the GMS2 dump spells
+`background_index_set(i, <bg>)`.
+
+`tools/recover_asset_arrays.py` pairs each local literal with the asset name the
+pinned upstream decompilation (`kittibyte/UndertaleDecomp` at
+`249ffa27ee7e7eee0d7ce84b736c294458b38685`, the same ref as every other recovery)
+uses for the same statement — same variable, same subscript, same block. **IDs come
+only from this checkout's own literals; the dump contributes names, never numbers.**
+All 18 IDs (7 shopkeeper faces, 8 Asgore body parts, 3 backgrounds) across 32
+statement sites verify; `port/recovered_asset_arrays.json` records the local
+file+event+subscript and the upstream file+statement for every pair, and
+`tools/recover_asset_arrays.py --check` re-derives the sweep from the local tree
+alone (no network).
+
+Pipeline: `convert.py` imports the file in `recover_ids` (raising on a category or ID
+conflict) and registers the references so a dropped site shows up in
+`unresolved_numeric_references`. `tests/test_asset_arrays.py` pins the fix: the
+manifest maps each name to its original ID, each recovered ID indexes a real asset
+record, and in room 311 the shopkeeper's emotion faces for `faceemotion` 1-6 draw —
+which fails (and logs `Unresolved sprite ID 881`…`877`) without the converter import.
+
+Recorded limitations for this piece:
+
+- the **scalar** form of the same bug is out of scope: `obj_torielbody` assigns
+  `facespr= 2285;` (a plain variable, not an array) to nine Toriel faces
+  (`2282`-`2290`) that no annotation covers and which this sweep deliberately does
+  not touch; they remain `Unresolved sprite ID` stops;
+- this is the *frame-selection* half of spec §7. The crop-offset piece owns the
+  *position*; together they make the shopkeeper render as intended, and
+  `tests/test_sprite_offsets.py` + `tests/test_asset_arrays.py` cover the two halves.

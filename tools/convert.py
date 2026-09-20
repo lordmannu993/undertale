@@ -286,6 +286,34 @@ class Converter:
                 "imported": imported,
                 "anchors_revalidated": {name: record["id"] for name, record in parts.get("anchors", {}).items()},
             }
+        # Original sprite/background IDs the decompiler kept inside instance
+        # arrays (facespr[1]= 881 read back through a computed index) carry no
+        # decompiler annotation, so no pass above can see them. Recover the
+        # same way parts are recovered: pair each local literal with the asset
+        # name the pinned upstream decompilation uses for the same statement.
+        arrays_file = self.root / "port/recovered_asset_arrays.json"
+        if arrays_file.exists():
+            arrays = json.loads(self.read(arrays_file))
+            imported_arrays, array_site_refs = {}, []
+            for name, record in arrays.get("pairs", {}).items():
+                category = record["category"]
+                if self.category.get(name) != category:
+                    raise CompileError(f"recovered array asset {name} is not a {category} resource")
+                asset_id = int(record["id"])
+                if self.ids[category].get(name) not in (None, asset_id):
+                    raise CompileError(f"recovered array asset {name} conflicts with "
+                                       f"other ID evidence ({self.ids[category][name]} vs {asset_id})")
+                self.add_id(name, asset_id, "recovered instance-array pairing (port/recovered_asset_arrays.json)")
+                imported_arrays[name] = asset_id
+                for site in record["sites"]:
+                    array_site_refs.append((category, asset_id, site["file"] + f" event {site['event']}",
+                                            f"{site['variable']}[{site['index']}] instance-array literal"))
+            self.references.extend(array_site_refs)
+            self.report["recovered_asset_arrays"] = {
+                "source": {"upstream": arrays.get("upstream"), "ref": arrays.get("ref")},
+                "imported": imported_arrays,
+                "sites": sum(len(r["sites"]) for r in arrays.get("pairs", {}).values()),
+            }
         # The pinned dump uses its own ID space, so it is audit/conflict-only.
         # Never import its numeric IDs into the runtime registry.
         registry_file = self.root / "port/recovered_registry.json"

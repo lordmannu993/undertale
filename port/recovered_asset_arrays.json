@@ -1,0 +1,406 @@
+{
+ "schema": 1,
+ "generated_by": "tools/recover_asset_arrays.py",
+ "upstream": "kittibyte/UndertaleDecomp",
+ "ref": "249ffa27ee7e7eee0d7ce84b736c294458b38685",
+ "generated_on": "2026-09-20",
+ "note": "Original sprite/background IDs that the decompiler kept as bare literals inside instance arrays (var[i]= <id> read back through a computed index), which no decompiler annotation covers. Each ID is this checkout's own numeric literal; only the asset name is paired from the pinned upstream decompilation of the same game state, after both events were checked to assign the same variable at the same subscripts. The GM1.4 background_index[i] array is paired with the GMS2 background_index_set(i, ...) spelling. No number was taken from the pinned dump; its numbered lists remain audit-only in tools/recover_registry.py.",
+ "pairs": {
+  "bg_cr1": {
+   "category": "backgrounds",
+   "id": 162,
+   "sites": [
+    {
+     "object": "obj_backgrounder_core",
+     "event": "0:0",
+     "variable": "background_index",
+     "index": 0,
+     "file": "objects/obj_backgrounder_core.object.gmx",
+     "upstream_file": "objects/obj_backgrounder_core/Create_0.gml",
+     "upstream_statement": "background_index_set(0, bg_cr1)"
+    }
+   ]
+  },
+  "bg_num9": {
+   "category": "backgrounds",
+   "id": 193,
+   "sites": [
+    {
+     "object": "obj_gameshake",
+     "event": "0:0",
+     "variable": "background_index",
+     "index": 3,
+     "file": "objects/obj_gameshake.object.gmx",
+     "upstream_file": "objects/obj_gameshake/Create_0.gml",
+     "upstream_statement": "background_index_set(3, bg_num9)"
+    }
+   ]
+  },
+  "bg_tb": {
+   "category": "backgrounds",
+   "id": 161,
+   "sites": [
+    {
+     "object": "obj_backgrounder_tundra",
+     "event": "0:0",
+     "variable": "background_index",
+     "index": 0,
+     "file": "objects/obj_backgrounder_tundra.object.gmx",
+     "upstream_file": "objects/obj_backgrounder_tundra/Create_0.gml",
+     "upstream_statement": "background_index_set(0, bg_tb)"
+    }
+   ]
+  },
+  "spr_asgoreb_arml": {
+   "category": "sprites",
+   "id": 610,
+   "sites": [
+    {
+     "object": "obj_asgoreb_body",
+     "event": "0:0",
+     "variable": "part",
+     "index": 5,
+     "file": "objects/obj_asgoreb_body.object.gmx",
+     "upstream_file": "objects/obj_asgoreb_body/Create_0.gml",
+     "upstream_statement": "part[5] = spr_asgoreb_arml"
+    },
+    {
+     "object": "obj_asgoreb_body",
+     "event": "8:0",
+     "variable": "part",
+     "index": 5,
+     "file": "objects/obj_asgoreb_body.object.gmx",
+     "upstream_file": "objects/obj_asgoreb_body/Draw_0.gml",
+     "upstream_statement": "part[5] = spr_asgoreb_arml"
+    }
+   ]
+  },
+  "spr_asgoreb_armor": {
+   "category": "sprites",
+   "id": 613,
+   "sites": [
+    {
+     "object": "obj_asgoreb_body",
+     "event": "0:0",
+     "variable": "part",
+     "index": 6,
+     "file": "objects/obj_asgoreb_body.object.gmx",
+     "upstream_file": "objects/obj_asgoreb_body/Create_0.gml",
+     "upstream_statement": "part[6] = spr_asgoreb_armor"
+    },
+    {
+     "object": "obj_asgoreb_body",
+     "event": "8:0",
+     "variable": "part",
+     "index": 6,
+     "file": "objects/obj_asgoreb_body.object.gmx",
+     "upstream_file": "objects/obj_asgoreb_body/Draw_0.gml",
+     "upstream_statement": "part[6] = spr_asgoreb_armor"
+    }
+   ]
+  },
+  "spr_asgoreb_armr": {
+   "category": "sprites",
+   "id": 611,
+   "sites": [
+    {
+     "object": "obj_asgoreb_body",
+     "event": "0:0",
+     "variable": "part",
+     "index": 4,
+     "file": "objects/obj_asgoreb_body.object.gmx",
+     "upstream_file": "objects/obj_asgoreb_body/Create_0.gml",
+     "upstream_statement": "part[4] = spr_asgoreb_armr"
+    },
+    {
+     "object": "obj_asgoreb_body",
+     "event": "8:0",
+     "variable": "part",
+     "index": 4,
+     "file": "objects/obj_asgoreb_body.object.gmx",
+     "upstream_file": "objects/obj_asgoreb_body/Draw_0.gml",
+     "upstream_statement": "part[4] = spr_asgoreb_armr"
+    }
+   ]
+  },
+  "spr_asgoreb_cape": {
+   "category": "sprites",
+   "id": 608,
+   "sites": [
+    {
+     "object": "obj_asgoreb_body",
+     "event": "0:0",
+     "variable": "part",
+     "index": 0,
+     "file": "objects/obj_asgoreb_body.object.gmx",
+     "upstream_file": "objects/obj_asgoreb_body/Create_0.gml",
+     "upstream_statement": "part[0] = spr_asgoreb_cape"
+    },
+    {
+     "object": "obj_asgoreb_body",
+     "event": "8:0",
+     "variable": "part",
+     "index": 0,
+     "file": "objects/obj_asgoreb_body.object.gmx",
+     "upstream_file": "objects/obj_asgoreb_body/Draw_0.gml",
+     "upstream_statement": "part[0] = spr_asgoreb_cape"
+    }
+   ]
+  },
+  "spr_asgoreb_dress": {
+   "category": "sprites",
+   "id": 614,
+   "sites": [
+    {
+     "object": "obj_asgoreb_body",
+     "event": "0:0",
+     "variable": "part",
+     "index": 3,
+     "file": "objects/obj_asgoreb_body.object.gmx",
+     "upstream_file": "objects/obj_asgoreb_body/Create_0.gml",
+     "upstream_statement": "part[3] = spr_asgoreb_dress"
+    },
+    {
+     "object": "obj_asgoreb_body",
+     "event": "8:0",
+     "variable": "part",
+     "index": 3,
+     "file": "objects/obj_asgoreb_body.object.gmx",
+     "upstream_file": "objects/obj_asgoreb_body/Draw_0.gml",
+     "upstream_statement": "part[3] = spr_asgoreb_dress"
+    }
+   ]
+  },
+  "spr_asgoreb_feet": {
+   "category": "sprites",
+   "id": 616,
+   "sites": [
+    {
+     "object": "obj_asgoreb_body",
+     "event": "0:0",
+     "variable": "part",
+     "index": 1,
+     "file": "objects/obj_asgoreb_body.object.gmx",
+     "upstream_file": "objects/obj_asgoreb_body/Create_0.gml",
+     "upstream_statement": "part[1] = spr_asgoreb_feet"
+    },
+    {
+     "object": "obj_asgoreb_body",
+     "event": "8:0",
+     "variable": "part",
+     "index": 1,
+     "file": "objects/obj_asgoreb_body.object.gmx",
+     "upstream_file": "objects/obj_asgoreb_body/Draw_0.gml",
+     "upstream_statement": "part[1] = spr_asgoreb_feet"
+    }
+   ]
+  },
+  "spr_asgoreb_head1": {
+   "category": "sprites",
+   "id": 612,
+   "sites": [
+    {
+     "object": "obj_asgoreb_body",
+     "event": "0:0",
+     "variable": "part",
+     "index": 7,
+     "file": "objects/obj_asgoreb_body.object.gmx",
+     "upstream_file": "objects/obj_asgoreb_body/Create_0.gml",
+     "upstream_statement": "part[7] = spr_asgoreb_head1"
+    },
+    {
+     "object": "obj_asgoreb_body",
+     "event": "8:0",
+     "variable": "part",
+     "index": 7,
+     "file": "objects/obj_asgoreb_body.object.gmx",
+     "upstream_file": "objects/obj_asgoreb_body/Draw_0.gml",
+     "upstream_statement": "part[7] = spr_asgoreb_head1"
+    }
+   ]
+  },
+  "spr_asgoreb_legs": {
+   "category": "sprites",
+   "id": 615,
+   "sites": [
+    {
+     "object": "obj_asgoreb_body",
+     "event": "0:0",
+     "variable": "part",
+     "index": 2,
+     "file": "objects/obj_asgoreb_body.object.gmx",
+     "upstream_file": "objects/obj_asgoreb_body/Create_0.gml",
+     "upstream_statement": "part[2] = spr_asgoreb_legs"
+    },
+    {
+     "object": "obj_asgoreb_body",
+     "event": "8:0",
+     "variable": "part",
+     "index": 2,
+     "file": "objects/obj_asgoreb_body.object.gmx",
+     "upstream_file": "objects/obj_asgoreb_body/Draw_0.gml",
+     "upstream_statement": "part[2] = spr_asgoreb_legs"
+    }
+   ]
+  },
+  "spr_shopkeeper1_face0": {
+   "category": "sprites",
+   "id": 876,
+   "sites": [
+    {
+     "object": "obj_shopmouth1",
+     "event": "0:0",
+     "variable": "facespr",
+     "index": 0,
+     "file": "objects/obj_shopmouth1.object.gmx",
+     "upstream_file": "objects/obj_shopmouth1/Create_0.gml",
+     "upstream_statement": "facespr[0] = spr_shopkeeper1_face0"
+    }
+   ]
+  },
+  "spr_shopkeeper1_face1": {
+   "category": "sprites",
+   "id": 881,
+   "sites": [
+    {
+     "object": "obj_shop1",
+     "event": "0:0",
+     "variable": "facespr",
+     "index": 1,
+     "file": "objects/obj_shop1.object.gmx",
+     "upstream_file": "objects/obj_shop1/Create_0.gml",
+     "upstream_statement": "facespr[1] = spr_shopkeeper1_face1"
+    },
+    {
+     "object": "obj_shopmouth1",
+     "event": "0:0",
+     "variable": "facespr",
+     "index": 1,
+     "file": "objects/obj_shopmouth1.object.gmx",
+     "upstream_file": "objects/obj_shopmouth1/Create_0.gml",
+     "upstream_statement": "facespr[1] = spr_shopkeeper1_face1"
+    }
+   ]
+  },
+  "spr_shopkeeper1_face2": {
+   "category": "sprites",
+   "id": 880,
+   "sites": [
+    {
+     "object": "obj_shop1",
+     "event": "0:0",
+     "variable": "facespr",
+     "index": 2,
+     "file": "objects/obj_shop1.object.gmx",
+     "upstream_file": "objects/obj_shop1/Create_0.gml",
+     "upstream_statement": "facespr[2] = spr_shopkeeper1_face2"
+    },
+    {
+     "object": "obj_shopmouth1",
+     "event": "0:0",
+     "variable": "facespr",
+     "index": 2,
+     "file": "objects/obj_shopmouth1.object.gmx",
+     "upstream_file": "objects/obj_shopmouth1/Create_0.gml",
+     "upstream_statement": "facespr[2] = spr_shopkeeper1_face2"
+    }
+   ]
+  },
+  "spr_shopkeeper1_face3": {
+   "category": "sprites",
+   "id": 882,
+   "sites": [
+    {
+     "object": "obj_shop1",
+     "event": "0:0",
+     "variable": "facespr",
+     "index": 3,
+     "file": "objects/obj_shop1.object.gmx",
+     "upstream_file": "objects/obj_shop1/Create_0.gml",
+     "upstream_statement": "facespr[3] = spr_shopkeeper1_face3"
+    },
+    {
+     "object": "obj_shopmouth1",
+     "event": "0:0",
+     "variable": "facespr",
+     "index": 3,
+     "file": "objects/obj_shopmouth1.object.gmx",
+     "upstream_file": "objects/obj_shopmouth1/Create_0.gml",
+     "upstream_statement": "facespr[3] = spr_shopkeeper1_face3"
+    }
+   ]
+  },
+  "spr_shopkeeper1_face4": {
+   "category": "sprites",
+   "id": 879,
+   "sites": [
+    {
+     "object": "obj_shop1",
+     "event": "0:0",
+     "variable": "facespr",
+     "index": 4,
+     "file": "objects/obj_shop1.object.gmx",
+     "upstream_file": "objects/obj_shop1/Create_0.gml",
+     "upstream_statement": "facespr[4] = spr_shopkeeper1_face4"
+    },
+    {
+     "object": "obj_shopmouth1",
+     "event": "0:0",
+     "variable": "facespr",
+     "index": 4,
+     "file": "objects/obj_shopmouth1.object.gmx",
+     "upstream_file": "objects/obj_shopmouth1/Create_0.gml",
+     "upstream_statement": "facespr[4] = spr_shopkeeper1_face4"
+    }
+   ]
+  },
+  "spr_shopkeeper1_face5": {
+   "category": "sprites",
+   "id": 878,
+   "sites": [
+    {
+     "object": "obj_shop1",
+     "event": "0:0",
+     "variable": "facespr",
+     "index": 5,
+     "file": "objects/obj_shop1.object.gmx",
+     "upstream_file": "objects/obj_shop1/Create_0.gml",
+     "upstream_statement": "facespr[5] = spr_shopkeeper1_face5"
+    },
+    {
+     "object": "obj_shopmouth1",
+     "event": "0:0",
+     "variable": "facespr",
+     "index": 5,
+     "file": "objects/obj_shopmouth1.object.gmx",
+     "upstream_file": "objects/obj_shopmouth1/Create_0.gml",
+     "upstream_statement": "facespr[5] = spr_shopkeeper1_face5"
+    }
+   ]
+  },
+  "spr_shopkeeper1_face6": {
+   "category": "sprites",
+   "id": 877,
+   "sites": [
+    {
+     "object": "obj_shop1",
+     "event": "0:0",
+     "variable": "facespr",
+     "index": 6,
+     "file": "objects/obj_shop1.object.gmx",
+     "upstream_file": "objects/obj_shop1/Create_0.gml",
+     "upstream_statement": "facespr[6] = spr_shopkeeper1_face6"
+    },
+    {
+     "object": "obj_shopmouth1",
+     "event": "0:0",
+     "variable": "facespr",
+     "index": 6,
+     "file": "objects/obj_shopmouth1.object.gmx",
+     "upstream_file": "objects/obj_shopmouth1/Create_0.gml",
+     "upstream_statement": "facespr[6] = spr_shopkeeper1_face6"
+    }
+   ]
+  }
+ }
+}
