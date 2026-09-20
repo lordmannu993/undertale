@@ -40,8 +40,9 @@ completed pieces. If it has conflicts, resolve in favour of the newer
 | field | value |
 | --- | --- |
 | PR | [#36](https://github.com/lordmannu993/undertale/pull/36) |
-| branch | `arena/01a0be2f-undertale` |
-| head commit | `852ab34` — "Recover the asset IDs Undertale keeps inside instance arrays" |
+| branch | `arena/01a0be2f-undertale` ← **authoritative head**; merge *this branch* |
+| tip at last update | `35c35f0` (verify live with `git ls-remote origin arena/01a0be2f-undertale`) |
+| commits | `852ab34` piece 1 (asset-array IDs, §7/§12) + `35c35f0` this protocol |
 | CI | ✅ green (full `PORT_REQUIRE_YELLOW=1` + native LÖVE smoke) |
 | merged to master | **no** (open, on purpose — merge only at the final acceptance step) |
 | next ⬜ piece | **#2 Depth / Y-sort (§4 §5)** |
