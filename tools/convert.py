@@ -166,22 +166,35 @@ class Converter:
         document = json.loads(self.read(offsets_file))
         sprites = self.resources.get("sprites", {})
         offsets = {}
+        canvas = {}
         for name, record in sorted(document.get("sprites", {}).items()):
             if name not in sprites:
                 raise CompileError(f"sprite offset names an unknown sprite: {name}")
             offsets[name] = (int(record["ox"]), int(record["oy"]))
+            # The same pinned record carries the original canvas size the game's
+            # own arithmetic (notably scr_depth's Y-sort key) assumes. Carried
+            # only where the recovery rule verified it; unresolved sprites keep
+            # their exported size and are never guessed at (piece 6 owns them).
+            size = record.get("canvas") or []
+            if len(size) != 2 or not all(isinstance(v, int) and v > 0 for v in size):
+                raise CompileError(f"sprite offset has no verified canvas size: {name}")
+            canvas[name] = (size[0], size[1])
         self.sprite_offsets = offsets
+        self.sprite_canvas = canvas
         self.report["sprite_offsets"] = {
             "source": {"upstream": document.get("upstream"), "ref": document.get("ref")},
             "rule": document.get("rule"),
             "counts": document.get("counts"),
-            "applied": {name: {"ox": ox, "oy": oy} for name, (ox, oy) in sorted(offsets.items())},
+            "applied": {name: {"ox": ox, "oy": oy, "canvas": list(canvas[name])}
+                        for name, (ox, oy) in sorted(offsets.items())},
             "unresolved": len(document.get("unresolved", [])),
             "limitations": [
                 "Sprites whose export cannot be tied back to the original canvas are left unshifted "
                 "and listed in port/sprite_offsets.json under unresolved.",
                 "sprite_get_width/height and image_width report the exported image size, not the "
                 "original canvas size the game's own arithmetic assumes.",
+                "sprite_width/sprite_height instance reads use the recovered canvas size where it "
+                "verified (447 sprites) and the exported size elsewhere.",
             ],
         }
 
@@ -563,6 +576,8 @@ class Converter:
                     data.update(child_fields(asset, "width height xorig yorigin colkind coltolerance sepmasks bboxmode bbox_left bbox_right bbox_top bbox_bottom"))
                     if name in self.sprite_offsets:
                         data["ox"], data["oy"] = self.sprite_offsets[name]
+                    if name in self.sprite_canvas:
+                        data["cw"], data["ch"] = self.sprite_canvas[name]
                     data["frames"] = [self.check_file(prefix + f.text, name) for f in asset.findall("frames/frame")]
                 elif category == "backgrounds":
                     data.update(child_fields(asset, "width height"))

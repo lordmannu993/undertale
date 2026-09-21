@@ -222,8 +222,12 @@ function Runtime:instanceGet(inst,key)
     if key=="sprite_width" or key=="sprite_height" or key=="sprite_xoffset" or key=="sprite_yoffset" then
         local s=self.assets.sprites[v.sprite_index]
         if not s then return 0 end
-        if key=="sprite_width" then return s.width*math.abs(v.image_xscale) end
-        if key=="sprite_height" then return s.height*math.abs(v.image_yscale) end
+        -- The export cropped some PNGs to their collision bbox while the
+        -- game's arithmetic assumes the original canvas (scr_depth's Y-sort
+        -- key is sprite_height). Recovered sprites carry their pinned canvas
+        -- size (cw/ch); anything else reports its exported size, never a guess.
+        if key=="sprite_width" then return (s.cw or s.width)*math.abs(v.image_xscale) end
+        if key=="sprite_height" then return (s.ch or s.height)*math.abs(v.image_yscale) end
         return key=="sprite_xoffset" and s.xorig or s.yorigin
     end
     if key:sub(1,5)=="bbox_" then
@@ -245,6 +249,14 @@ function Runtime:instanceSet(inst,key,val)
         v.direction=val%360;v.hspeed=math.cos(math.rad(val))*speed;v.vspeed=-math.sin(math.rad(val))*speed
     elseif key=="id" or key=="object_index" then
         self:warn("readonly:"..key,"Ignored assignment to read-only instance field "..key)
+    elseif key=="depth" then
+        v.depth=val
+        -- Studio 2 moves a layered instance that is assigned a depth onto a
+        -- managed compatibility layer at that depth. That move is what makes
+        -- Yellow's Step-level `depth = -y` Y-sort actually sort; Undertale
+        -- instances have no layer, so the hook is a no-op for them and GameMaker
+        -- 1.4 depth stays a plain value.
+        if inst.layer~=nil and self.moveToDepthLayer then self:moveToDepthLayer(inst,val) end
     else v[key]=val end
 end
 

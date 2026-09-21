@@ -109,12 +109,49 @@ return function(R)
         end
     end
 
+    function R:moveToDepthLayer(inst, depth)
+        -- GameMaker Studio 2 moves a layered instance that is assigned a depth
+        -- onto a managed compatibility layer at that depth. Yellow's Step-level
+        -- `depth = -y` Y-sort depends on it: without the move the assignment is
+        -- ignored and the whole overworld draws in creation order. One layer per
+        -- depth value, reused across steps; the authored layer index is kept as
+        -- the home slot so depth ties still resolve by the room's own order.
+        local st=self.roomState
+        if not st or not st.layers or inst.layer==nil then return end
+        if type(depth)~="number" or depth~=depth then return end
+        st.managedLayers=st.managedLayers or {}
+        local index=st.managedLayers[depth]
+        local entry=index and st.layers[index] or nil
+        if entry==nil or entry.depth~=depth then
+            index=#st.layers+1
+            st.layers[index]={name="Compatibility_Instances_Depth_"..tostring(depth),
+                kind="GMRInstanceLayer",depth=depth,visible=true,x=0,y=0,hspeed=0,vspeed=0}
+            st.managedLayers[depth]=index
+        end
+        if inst.layer==index then return end
+        if inst._homeLayer==nil then inst._homeLayer=inst.layer end
+        inst.layer=index
+        if inst.element~=nil then inst.element.layer=index end
+    end
+
     -- Layer identity and state -------------------------------------------
     reg("layer_get_id",function(_,name) return layerIndex(name) or -1 end)
     reg("layer_exists",function(_,id) return N(layer(id)~=nil) end)
     reg("layer_get_name",function(_,id) local entry=layer(id);return entry and entry.name or "" end)
     reg("layer_get_depth",function(_,id) local entry=layer(id);return entry and entry.depth or 0 end)
-    reg("layer_depth",function(_,id,depth) local entry=layer(id);if entry then entry.depth=depth end end)
+    reg("layer_depth",function(_,id,depth)
+        local entry,index=layer(id)
+        if entry then
+            entry.depth=depth
+            -- Studio 2 mirrors a layer's depth onto its members, so an instance
+            -- that never took a managed depth of its own reads the new value
+            -- back. Managed actors live on their own layers and stay detached.
+            -- Written directly: sliding a layer must not re-trigger the move.
+            for _,inst in ipairs(R.instances) do
+                if inst.alive and inst.layer==index then inst.v.depth=depth end
+            end
+        end
+    end)
     reg("layer_set_visible",function(_,id,visible) local entry=layer(id);if entry then entry.visible=R.truth(visible) end end)
     reg("layer_get_visible",function(_,id) local entry=layer(id);return N(entry and entry.visible~=false) end)
     reg("layer_get_all",function()
