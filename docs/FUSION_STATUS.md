@@ -19,33 +19,28 @@ disagree on a requirement, the spec wins. Limitations and deviations live in
 
 ---
 
-## 1. Current fusion head (read this first)
+## 1. Where completed work lives (read this first)
 
-A fresh session is branched from `master`. The completed pieces below may still
-live on an **open PR branch** (the owner asked that the fusion not be merged
-until the end), so before doing any work, bring the current head in:
+Completed fusion pieces are **merged to `master`** as they go green. A fresh
+session is branched from `master`, so it **already has every merged piece** — no
+extra step for completed work. Do the next ⬜ piece from §3.
+
+Only if the *next* piece's PR is still **open** (work in flight, not yet merged)
+do you bring it in first:
 
 ```bash
 cd /home/user/undertale
 git fetch origin
-git merge --no-edit origin/arena/01a0be2f-undertale   # current fusion head (see table)
+git merge --no-edit origin/<that-open-PR-branch>   # clean fast-forward from master
 ```
 
-If the merge is trivial (it descends from `master`) you are now on top of all
-completed pieces. If it has conflicts, resolve in favour of the newer
-`docs/PORTING.md` / `AGENTS.md` and re-run the suite before continuing.
-
-**Current head:**
+**Progress:**
 
 | field | value |
 | --- | --- |
-| PR | [#36](https://github.com/lordmannu993/undertale/pull/36) |
-| branch | `arena/01a0be2f-undertale` ← **authoritative head**; merge *this branch* |
-| tip at last update | `35c35f0` (verify live with `git ls-remote origin arena/01a0be2f-undertale`) |
-| commits | `852ab34` piece 1 (asset-array IDs, §7/§12) + `35c35f0` this protocol |
-| CI | ✅ green (full `PORT_REQUIRE_YELLOW=1` + native LÖVE smoke) |
-| merged to master | **no** (open, on purpose — merge only at the final acceptance step) |
-| next ⬜ piece | **#2 Depth / Y-sort (§4 §5)** |
+| most recent merged piece | **#1** asset-array IDs (§7/§12) — PR #36, merged to `master` |
+| next ⬜ piece | **#2 Depth / Y-sort (§4 §5)** — starts fresh from `master` |
+| in-flight open PR | *(none)* |
 
 ---
 
@@ -143,19 +138,20 @@ A piece is not done until **all** of these hold:
 4. `.venv/bin/python -m pytest -q` is **green** locally **and** CI is green
    (`PORT_REQUIRE_YELLOW=1` + native LÖVE gate).
 5. `docs/FUSION_STATUS.md` and `AGENTS.md` are **updated in the same commit**
-   (status flipped to ✅, evidence row filled, current head advanced).
-6. Committed + pushed on the session branch; the fusion PR is kept **open** until
-   the final acceptance step.
+   (status flipped to ✅, evidence row filled, §1 "most recent merged piece" advanced).
+6. Committed + pushed on the session branch; **the piece's PR is merged once green**
+   (this repo's history is merge commits). The *final fusion* — all 16 requirements
+   plus the §15/§16 acceptance matrix (piece #8) — is the last step.
 
 ## 6. How a session records its progress
 
 After a green piece:
 1. Mark its row ✅ in §3 and fill the evidence column (PR + test names).
-2. If this is now the newest work, set it as the **Current fusion head** in §1
-   (new PR number, branch, head commit, CI state).
+2. Set it as the **most recent merged piece** in §1 once its PR is merged.
 3. Add a row to `AGENTS.md` "Current state" if warranted, and keep the
    verification-commands section accurate.
 4. One commit: `git add -A docs AGENTS.md <piece files> && git commit`. Push on the
    session branch.
 5. Add a short "piece N done, here is the evidence, here is piece N+1" note to the
-   PR body (the owner prefers that over option menus).
+   PR body (the owner prefers that over option menus), then **merge the PR once CI
+   is green** so the piece lands on `master` for the next session.
