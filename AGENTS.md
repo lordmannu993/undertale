@@ -4,6 +4,46 @@ Purpose: a new session pointed at this repository should be able to continue the
 without re-deriving history from a chat log. Everything below is verifiable in-repo or
 via `gh`.
 
+## Standing instruction: when the user says "Proceed ❤️"
+
+This is a durable, cross-session trigger. **When the user messages "Proceed ❤️" (or an
+obvious variant), do not ask what to do — continue the Undertale + Undertale Yellow
+**unified fusion** exactly as recorded on GitHub.** The requirement set is
+[docs/UNIFIED_FUSION_SPEC.md](docs/UNIFIED_FUSION_SPEC.md) (binding, owner-issued); the
+**live work queue, progress, and exact steps** are
+[docs/FUSION_STATUS.md](docs/FUSION_STATUS.md). Do these, in order:
+
+1. **Orient.** `git fetch origin`. Read `docs/FUSION_STATUS.md` §1 (current fusion
+   head) and §3 (ordered piece list). The work is "do the single highest-numbered ⬜
+   piece, in order."
+2. **Inherit completed work.** A fresh session is branched from `master`, which
+   already contains every **merged** piece — you start current. Only if the next
+   piece's PR is still **open** (work in flight, not yet merged) do you bring it in
+   first: `git fetch origin && git merge --no-edit origin/<that-PR-branch>` (a clean
+   fast-forward from master). See `docs/FUSION_STATUS.md` §1 for the exact state.
+3. **Set up + get green.** Run `docs/FUSION_STATUS.md` §4 (venv, fetch Yellow,
+   `yellow_convert --stage rooms` → `merge` → `convert`, then `pytest -q`). The suite
+   **must be green before you change anything.**
+4. **Do the next ⬜ piece** (§3), smallest-green-increment first if a piece is large.
+   Follow the non-negotiable rules in `docs/FUSION_STATUS.md` §2 — one player state,
+   no per-room/character hacks, depth = logical Y + sprite visual bottom point,
+   recovered data pinned & fetched (never hand-typed), missing resources stop by name.
+5. **A piece is done** only when `docs/FUSION_STATUS.md` §5 holds: a test that fails
+   without it, a `docs/` line, a scoped claim, green local + CI, and this file and
+   `FUSION_STATUS.md` updated **in the same commit**.
+6. **Record + push.** Commit on the session branch, push, and **merge the PR once CI
+   is green** so the piece lands on `master` (advance "most recent merged piece" in
+   `FUSION_STATUS.md` §1), and note "piece N done, here is the evidence, here is
+   piece N+1" in the PR body.
+
+Individual **pieces merge to `master` as they go green** (this repo's history is
+merge commits). The *final fusion* — all 16 requirements plus the §15/§16
+acceptance matrix (piece #8) — is the last step; do not declare the fusion
+**complete** before it. Never force-push `master`; never delete a release.
+
+If the top piece is already done/merged, just continue to the next ⬜ piece — the
+trigger is idempotent.
+
 ## What this repository is
 
 An experimental **LÖVE 11.5 / Android port of a decompiled GameMaker 1.4 Undertale
@@ -32,9 +72,10 @@ disagree.
 
 1. `git fetch origin && git log --oneline origin/master -3` and `gh pr list --state all`.
 2. Read the owner's binding brief, [`docs/UNIFIED_FUSION_SPEC.md`](docs/UNIFIED_FUSION_SPEC.md)
-   (16 numbered requirements + acceptance criteria), then the piece list and its
-   statuses in [`docs/PATHS.md`](docs/PATHS.md), then the limitation set in
-   `docs/PORTING.md`.
+   (16 numbered requirements + acceptance criteria), then the **fusion work queue**
+   and progress in [`docs/FUSION_STATUS.md`](docs/FUSION_STATUS.md) (this is what
+   "Proceed ❤️" continues), then the Yellow piece list in [`docs/PATHS.md`](docs/PATHS.md),
+   then the limitation set in `docs/PORTING.md`.
 3. Set up: `python3 -m venv .venv && .venv/bin/python -m pip install -r requirements-dev.txt`.
 4. Pick the **highest unchecked piece** and treat it as the whole job. One piece per commit,
    small commits, one PR.
@@ -140,6 +181,8 @@ disagree.
 | Open PR | **#24** (owner rounds 1-2): `port/frisk.lua` now asserts every one of the 24 run poses stays Clover's and none enters the walk remap (the startup report counts them instead of `#remap`, which was always 0), and PAUSE gains **AUTO RUN: ON/OFF** beside COLLISION - Yellow's own `option_autorun`, persisted in `touch-settings-v1.txt`, mirrored to the `Controls.sav` key Yellow's `scr_savecontrols` writes, and re-applied on boot and after every crossing. Round 2 makes both travel services available from the first frame: `Travel:openRiverService()` lifts `obj_dogboat_thing`'s own `global.plot < 122` guard for that one Create event (restored after, warn `travel-river-service`), `Travel:openWhaleService()` sets Yellow's `global.player_can_travel` and seeds ten stops through Yellow's own `scr_fasttravel_add` (warn `travel-ugps`), Yellow stops resolve through the merged ID band (`56` -> `1000056`, not Undertale's 56), `Travel:landWhales()` reads the whale's unreachable `fly_speed == 0` landing as the landing it was written to be (warn `travel-ugps-landing`), and `port/runtime.lua` gives every viewport a `view_camera` so a mail-station bell no longer stops the frame on "Camera 0 does not exist". Tests: boat at all three docks at plot 10, the whole bell -> Mail/Travel -> menu -> Yellow-stop flight, and every offered stop pinned against the pinned Yellow source (294 pass). Documented in `docs/YELLOW.md` and the release notes. Known gap reported, not hidden: the "Snowdin - Forest" stop needs the particle system the runtime lacks, so `rm_snowdin_11_yellow` stays a named stop. Still open from round 1: "it bugs a lot" (no reproducible symptom yet) |
 | Yellow merge | **Complete.** `tools/fetch_yellow.py` pins commit `4ec23bd9` of `lordmannu993/UnderTale-Yellow`; `tools/yellow_convert.py --stage rooms` converts 3 796 sprites / 673 sounds / 11 fonts / 1 155 script resources / 3 224 objects with 8 494 events / **287 rooms, 68 paths, 199 454 drawables, 3 006 layers** into `generated/yellow/`, with 1 178 named function exports, 1 explicit GMLive stop (the shipped build's GMLive is inert, so the other 21 convert literally) and 0 compile errors. `tools/merge.py` + `port/merge.lua` build one manifest from both games, `port/travel.lua` connects the River Person boat (hold X during the ride; open below its plot gate) and Yellow's UGPS whale (every stop offered from Yellow's world init), `port/frisk.lua` draws Yellow's player as Frisk (28 walk poses remapped; the 24 run poses, the gun poses, goggles, dance and lying stay Clover - listed and asserted, so a run pose entering the remap stops the build), Yellow's own pause menu equips Clover's ammo/accessories beside Frisk's own gear, and the port's pause menu carries the merged AUTO RUN toggle, and `merge.sav` versions the merged layer including the loadout. The native LÖVE/xvfb gate crosses between worlds and back. Still unclaimed: Yellow's battle/story systems, shaders (reported, skipped), 25 rooms with named stops, and any Android-device certification |
 | Part-ID recovery | `tools/recover_parts.py` fetches nothing by default: the checked-in `port/recovered_parts.json` is imported by `convert.py`. Regenerate with `GITHUB_TOKEN="$(gh auth token)" python3 tools/recover_parts.py` (pinned to the same `249ffa27` ref as the registry/path recoveries), re-verify offline with `--check`. IDs come from this checkout's own `partN=` literals; only names are paired from upstream; 38 annotated sites are re-validated as anchors. `tests/test_monster_parts.py` guards all of it plus every Snowdin battlegroup end-to-end |
+| Asset-array ID recovery | The decompiler also leaves bare original IDs *inside instance arrays* read back through a computed index — `facespr[1]= 881; draw_sprite(facespr[global.faceemotion],…)` (Snowdin shopkeeper emotion faces, the owner-reported §7 "four eyes, floating mouth"), `obj_shop1`'s own `facespr`, Asgore's eight `part` sprites, and three `background_index` slots. No annotation covers array literals, so they hit `Unresolved sprite ID`. `tools/recover_asset_arrays.py` pairs each literal with the asset name the pinned upstream decompilation (same `249ffa27` ref) uses for the same statement; 18 IDs / 32 sites land in `port/recovered_asset_arrays.json`, imported by `convert.py`, re-verifiable offline with `--check`. `tests/test_asset_arrays.py` pins it: the shopkeeper's `faceemotion` 1-6 draw in room 311, which fails (and logs `Unresolved sprite ID 881`…`877`) without the converter import. The scalar form (`obj_torielbody` `facespr= 2285`, nine Toriel faces) is a separate, still-open finding |
+| Unified fusion (binding spec) | The owner's 16-requirement [`UNIFIED_FUSION_SPEC.md`](docs/UNIFIED_FUSION_SPEC.md) is being worked as a **living queue** in [`docs/FUSION_STATUS.md`](docs/FUSION_STATUS.md) — that file is the single GitHub-readable source of truth for what is done, what is pending (in order), progress, the non-negotiable rules, and the "definition of a finished piece." **The user trigger "Proceed ❤️" continues it** (see the standing instruction at the top of this file). Pieces **merge to `master` as they go green**: piece 1 (asset-array IDs, [PR #36](https://github.com/lordmannu993/undertale/pull/36)) is merged; next ⬜ is piece 2, Depth/Y-sort §4 §5. The *final fusion* is certified **only** once piece 8 (the §15/§16 acceptance matrix) is green |
 | Source newer than the archive | none — v1.2.3 (source `6d59f5d`) is the newest published build and carries [PR #30](https://github.com/lordmannu993/undertale/pull/30)'s four fixes; this branch's second commit is metadata only (README source-commit claim, AGENTS.md record), so once it merges, `master` and the newest archive agree in content |
 | Download links | README's download section is guarded by `tests/test_release_docs.py` and `tools/check_download_links.py` (CI, token-authenticated). Publishing a version means the README, the workflow pins, `port/version.lua` and `docs/RELEASE_NOTES.md` all move together, and no superseded `releases/download/<tag>` link may survive in any document |
 | Old releases | `love-v0.1.0`…`love-v1.2.1-fusion-experimental` are **kept on purpose** (owner declined deletion) and renamed with a "Superseded (…)" prefix as each is replaced. Version branches `v0.1.0`..`v0.1.3` point at each tagged build |
@@ -196,6 +239,7 @@ python3 tools/yellow_convert.py --stage rooms                   # Yellow piece 4
 python3 tools/merge.py                                          # piece 5: write generated/merged/manifest.lua from both conversions
 python3 tools/package.py --merged --no-convert                  # the fusion archive: carries every referenced pinned Yellow asset file, gated on a complete Yellow rooms stage
 python3 tools/recover_paths.py --check                          # path data still matches its pinned source
+python3 tools/recover_asset_arrays.py --check                   # instance-array asset IDs still match the local tree (offline)
 python3 tools/package.py --output artifacts/check.love          # reproducible archive + report gates
 bash tools/native_smoke.sh artifacts/check.love                 # needs LOVE+xvfb: CI only
 python3 tools/build_android.py --allow-experimental             # APK, needs JDK17 + SDK 34 + NDK 25.2.9519653
