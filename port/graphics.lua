@@ -618,6 +618,7 @@ function Graphics.install(R)
             local item=staticTiles[i]
             local layer=item.layer
             if layer then item.depth=layer.depth or item.tile.depth end
+            item.slot=item.tile.layer
             list[i]=item
         end
         local base=#list
@@ -625,7 +626,8 @@ function Graphics.install(R)
             if inst.alive and inst.active then
                 local layer=inst.layer and layers[inst.layer]
                 base=base+1
-                list[base]={depth=(layer and layer.depth) or inst.v.depth or 0,order=1000000+i,instance=inst,layer=layer}
+                list[base]={depth=(layer and layer.depth) or inst.v.depth or 0,order=1000000+i,instance=inst,layer=layer,
+                    slot=inst._homeLayer or inst.layer}
             end
         end
         -- Particle systems draw at their own depth among the instances and
@@ -637,7 +639,20 @@ function Graphics.install(R)
                 end
             end
         end
-        table.sort(list,function(a,b) if a.depth==b.depth then return a.order<b.order end;return a.depth>b.depth end)
+        table.sort(list,function(a,b)
+            if a.depth==b.depth then
+                -- Across layers the room's own list order breaks the tie: the
+                -- layer nearer the front of the list (lower slot) draws later,
+                -- so a foreground tile layer covers a tied actor. A managed
+                -- actor compares by its home slot, not its appended layer.
+                -- Unlayered GameMaker 1.4 entries have no slot and keep the
+                -- creation order GameMaker uses for depth ties.
+                local sa,sb=a.slot,b.slot
+                if sa~=nil and sb~=nil and sa~=sb then return sa>sb end
+                return a.order<b.order
+            end
+            return a.depth>b.depth
+        end)
         -- GameMaker runs a whole Draw Begin pass over the instances, then Draw,
         -- then Draw End, and skips all of them for an invisible instance. A
         -- Studio 2 layer hidden with layer_set_visible hides its instances too:

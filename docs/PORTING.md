@@ -383,9 +383,10 @@ Recorded limitations for this piece:
   dimensions, not the original canvas (95 call sites), which is what the original
   1.4 semantics would have returned;
 - this is the asset-compatibility half of spec requirement 12 (origins, sheet
-  coordinates, render anchors). Y-sorting from the sprite's visual bottom point,
-  per-frame origins, movement speed, collision boxes and Yellow's GMS2 sprites are
-  separate pieces and are not claimed here.
+  coordinates, render anchors). Per-frame origins, movement speed, collision boxes
+  and Yellow's GMS2 sprites are separate pieces and are not claimed here.
+  Y-sorting from the sprite's visual bottom point was a separate piece too and is
+  now claimed by "Depth / Y-sort" below.
 
 ## Instance-array asset IDs (spec §7, §12 — second piece)
 
@@ -434,3 +435,58 @@ Recorded limitations for this piece:
 - this is the *frame-selection* half of spec §7. The crop-offset piece owns the
   *position*; together they make the shopkeeper render as intended, and
   `tests/test_sprite_offsets.py` + `tests/test_asset_arrays.py` cover the two halves.
+
+## Depth / Y-sort (spec §4, §5 — unified-fusion piece 2)
+
+Both worlds Y-sort and both were broken, each in its own way:
+
+- **Undertale** sorts its overworld through `scr_depth`
+  (`depth = 50000 - y*10 + sprite_height*10`, called every step by 181 objects
+  including the player), but `sprite_height` read the *exported* (cropped)
+  image size while the game's arithmetic assumes the original canvas. Two
+  actors whose crops differ could draw in the wrong relative order.
+- **Yellow** sorts by assigning `depth = -y` every step (the player, every NPC
+  on `obj_npc_base`, every actor with `npc_dynamic_depth`), but the renderer
+  drew each room-placed (layered) instance at its *authored layer* depth and
+  ignored the assignment, so same-layer actors drew in creation order. In
+  Dalv's room the chest (y=148) drew behind the player (y=140).
+
+The fix keeps each world's own `scr_depth` routing (each world still calls its
+own copy, as the shared-script split established) and repairs the two systems:
+
+1. Recovered sprites carry their pinned canvas size (`cw`/`ch` from the same
+   `port/sprite_offsets.json` record that owns `ox`/`oy`; `convert.py` refuses
+   a record without one). The `sprite_width`/`sprite_height` instance reads
+   use it; sprites without a verified canvas (the 981 unresolved, e.g. Frisk's
+   own walk set) keep reporting their exported size — never a guess.
+2. Assigning `depth` to a layered instance moves it onto a managed
+   `Compatibility_Instances_Depth_N` layer at that depth — one layer per depth
+   value, reused across steps — which is what GameMaker Studio 2 itself does
+   with runtime depth assignment. Managed actors detach from their authored
+   layer (visibility, destroy, `layer_depth` no longer follow it); `layer_depth`
+   mirrors the new depth onto the members that stay. `instance_create` and
+   `instance_create_depth` paths are unchanged.
+3. Depth ties across layers resolve by the room's own layer-list slot (the
+   layer nearer the front of the list draws later), with a managed actor
+   comparing by its home slot. Unlayered GameMaker 1.4 entries keep creation
+   order. The draw list is therefore deterministic frame to frame: no flicker
+   or popping between layers.
+
+Evidence: `tests/test_depth_sort.py` (11 tests — every behaviour test fails
+without the change, verified by stash). Live pins: the Waterfall statue
+(`spr_statue`, 59px exported / 80px canvas) sorts from 80 in
+`room_water_statue`, and `rm_dalvsroom` draws diary → player → chest →
+gramophone, behind to front. Per-world `scr_depth` routing is still pinned by
+`tests/test_yellow_merge.py::test_shared_script_names_resolve_to_each_worlds_own_copy`.
+
+Recorded limitations for this piece:
+
+- `sprite_get_width`/`sprite_get_height`/`image_width` still report the
+  *exported* size (95 call sites): piece 6 owns the builtins, so until it
+  lands the builtins and the instance reads temporarily disagree on the 447
+  recovered sprites.
+- the 981 unresolved sprites sort from their exported dims too, for the same
+  no-guessing rule;
+- the cross-layer tie rule (room list order) is best-available: GameMaker
+  Studio 2 draws by depth and its exact-tie order is undocumented. Distinct
+  depths — the common case — never reach the tie-break.

@@ -38,8 +38,8 @@ git merge --no-edit origin/<that-open-PR-branch>   # clean fast-forward from mas
 
 | field | value |
 | --- | --- |
-| most recent merged piece | **#1** asset-array IDs (§7/§12) — PR #36, merged to `master` |
-| next ⬜ piece | **#2 Depth / Y-sort (§4 §5)** — starts fresh from `master` |
+| most recent merged piece | **#2** Depth / Y-sort (§4 §5) — [PR #37](https://github.com/lordmannu993/undertale/pull/37), merged to `master` |
+| next ⬜ piece | **#3 River Person boat/water (§6)** — starts fresh from `master` |
 | in-flight open PR | *(none)* |
 
 ---
@@ -82,7 +82,7 @@ piece may be split into sub-pieces if it is too large for one green increment.
 | # | spec § | Piece | Status | Files | Evidence (PR / test) |
 | --- | --- | --- | --- | --- | --- |
 | 1 | §7, §12 (2nd) | Recover asset IDs kept inside instance arrays (Snowdin shopkeeper emotion faces + 5 siblings) | ✅ | `tools/recover_asset_arrays.py`, `port/recovered_asset_arrays.json`, `tools/convert.py`, `tests/test_asset_arrays.py`, `docs/PORTING.md`, `AGENTS.md` | [PR #36](https://github.com/lordmannu993/undertale/pull/36) / `tests/test_asset_arrays.py` (10 tests; 3 proven to fail without the fix, logging `Unresolved sprite ID 881…877`) |
-| 2 | §4, §5 | **Depth / Y-sort** — order the draw list by the sprite's visual bottom point, stable tie-break, keep per-world `scr_depth` routing | ⬜ **NEXT** | `port/graphics.lua` (~line 638 sort), `tests/test_depth_sort.py`, `docs/PORTING.md` | — |
+| 2 | §4, §5 | **Depth / Y-sort** — order the draw list by the sprite's visual bottom point, stable tie-break, keep per-world `scr_depth` routing | ✅ | `tools/convert.py` (canvas carriage), `port/runtime.lua` (canvas reads, depth hook), `port/yellow_layers.lua` (managed layers), `port/graphics.lua` (slot tie-break), `tests/test_depth_sort.py`, `docs/PORTING.md`, `AGENTS.md` | [PR #37](https://github.com/lordmannu993/undertale/pull/37) / `tests/test_depth_sort.py` (11 tests; 10 proven to fail without the fix) |
 | 3 | §6 | River Person boat/water rendering — split into components, not a blanket global layer | ⬜ | `port/graphics.lua`/`port/yellow_layers.lua`, rooms 125/70/140/316, `obj_dogboat_thing`/`obj_riverman`/`obj_dogboat_pillar` (depths 49330/49320/49300, ride x 338→118), `tests/`, `docs/PORTING.md` | — |
 | 4 | §8 | No duplicated characters/sprite layers — system test for a character drawn twice (incl. a UT + Yellow twin in one scene); audit `port/merge.lua` and its 42 name collisions | ⬜ | `port/merge.lua`, `tests/`, `docs/PORTING.md` | — |
 | 5 | §1 §3 §9–§11 §13 §14 | **Unified Player state** (the biggest): one Player record + shared item table, projected at world boundaries, serialised as `Player` + `World` blocks; crossing zeroes `flag[0..29]` (do not park state there). Grow `tests/test_yellow_merge.py` (`playerOf`, `crossTo`) into `tests/test_unified_player_state.py` | ⬜ | `port/travel.lua`, `port/storage.lua`, `port/merge.lua`, `port/frisk.lua`, `tests/test_unified_player_state.py`, `docs/` | — |
