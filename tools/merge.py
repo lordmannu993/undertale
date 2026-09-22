@@ -48,6 +48,11 @@ def main() -> int:
     args.output.mkdir(parents=True, exist_ok=True)
     manifest = args.output / "manifest.lua"
     manifest.write_text(MODULE)
+    # Piece 5b: the shared item catalog is extracted from both games' item
+    # scripts alongside the manifest, so every merged build carries one catalog.
+    import item_catalog
+    items = args.output / "items.lua"
+    items.write_text(item_catalog.to_lua(item_catalog.build()), encoding="utf-8")
     yellow = json.loads(yellow_report.read_text())
     # The report groups the shared names by category, so the honest count is the
     # sum of the groups -- not len() of the mapping, which is the number of
@@ -56,6 +61,7 @@ def main() -> int:
     total = sum(len(entries) for entries in collisions.values())
     per_category = ", ".join(f"{category} {len(entries)}" for category, entries in sorted(collisions.items()))
     print(f"Merged manifest: {manifest.relative_to(ROOT)}")
+    print(f"Shared item catalog: {items.relative_to(ROOT)}")
     print(f"Yellow band base: {yellow.get('yellow_base')}; "
           f"assets both games name: {total} ({per_category})")
     return 0

@@ -42,6 +42,14 @@ the entire game.
 - Likewise, progress obtained from Undertale Yellow content must remain available when
   returning to Undertale content.
 
+> Claim (scoped to what ran, 2026-09-22): piece **5b** implements this requirement at the
+> state level — one shared 8-slot inventory plus one four-slot equipment set on `R.player`,
+> both spellings (`global.item`, `global.item_slot`, the weapon/armor and modifier globals)
+> as live views/adapters over it, item actions that route foreign items through a catalog
+> extracted from both games' own item scripts, and content initializers that cannot reset
+> any of it. Headless suite and the CI native gate; see `docs/PORTING.md` and
+> `docs/FUSION_STATUS.md` for the evidence and the exact boundaries.
+
 Treat the player's progression as belonging to **one continuous protagonist/game state**,
 rather than belonging to either source game.
 

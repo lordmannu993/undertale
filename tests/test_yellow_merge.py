@@ -765,8 +765,10 @@ def test_equipped_slots_survive_crossings_through_the_merged_save(vm):
         if accessory~="Steel Buckle" then return "save accessory="..tostring(accessory) end
         return "ok"
     ''') == "ok"
-    # scr_initialize resets the slots on every crossing; the merged save must
-    # bring the loadout back, with Yellow's own stat scripts re-run.
+    # Since piece 5b the equipped ammo/accessory are live shared equipment
+    # (port/inventory.lua): the crossing preserves them directly and the save
+    # record above documents the same loadout.  These assertions are the
+    # either-way invariant: the loadout is there after re-entering Yellow.
     assert vm.execute('''
         hold(88,2)
         R:gotoRoom(140); R:applyTransitions(); tick(10)
