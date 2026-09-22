@@ -26,6 +26,10 @@ render layer, it repairs two pixel defects inside that layering:
 Scope: headless converted flow plus the draw log, with native rendering
 evidence from CI. No Android GPU or pixel-perfect parity claim.
 """
+import json
+import subprocess
+import sys
+
 import pytest
 from lupa.luajit21 import LuaRuntime
 
@@ -39,8 +43,30 @@ DOCK_DEPTH = {"boat": 49330, "riverman": 49320, "player": 49300}
 TUNDRA_DEPTH = {"boat": 950000, "riverman": 49320, "player": 48280}
 
 
+@pytest.fixture(scope="session")
+def yellow_rooms(converted):
+    """Both games converted, Yellow through its rooms stage."""
+    if not LIVE:
+        pytest.skip("needs the pinned Yellow source: tools/fetch_yellow.py")
+    report = ROOT / "generated/yellow/conversion-report.json"
+    stage = json.loads(report.read_text())["stage"] if report.is_file() else None
+    if stage != "rooms":
+        subprocess.run([sys.executable, "tools/yellow_convert.py", "--stage", "rooms"], cwd=ROOT, check=True)
+    return ROOT / "generated/yellow"
+
+
+@pytest.fixture(scope="session")
+def merged(yellow_rooms):
+    """The merged manifest, built exactly like the other merged-build gates
+    do — the CI pipeline never runs tools/merge.py itself."""
+    run = subprocess.run([sys.executable, "tools/merge.py"], cwd=ROOT, capture_output=True, text=True)
+    assert run.returncode == 0, run.stderr
+    assert "Merged manifest" in run.stdout
+    return ROOT / "generated/merged/manifest.lua"
+
+
 @pytest.fixture(scope="module")
-def boat(converted):
+def boat(merged):
     """Merged Runtime booted like the game, before the waterfall plot point."""
     vm = LuaRuntime(unpack_returned_tuples=True)
     vm.execute("package.path='./?.lua;./?/init.lua;'..package.path")
