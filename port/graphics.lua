@@ -79,19 +79,33 @@ function Graphics.install(R)
         end
         if #s.frames==0 then return end
         if sub<0 then sub=E and E.image_index or 0 end
-        local file=s.frames[math.floor(sub)%#s.frames+1]
+        -- GameMaker interpolates a fractional sub-index between the two
+        -- frames (the boat's waterline cover runs cc += 0.1 per draw);
+        -- flooring it would snap the ripple to hard steps, so crossfade
+        -- instead: the base frame, then the next frame at the fractional
+        -- amount. That matches GM's per-pixel lerp except where the frames
+        -- differ in transparency at their edges.
+        local n=#s.frames
+        local base=math.floor(sub)%n
+        local frac=sub-base
+        local blend=frac>0 and (base+1)%n or nil
+        local file=s.frames[base+1]
         -- The checkout exported some sprite images cropped to their collision
         -- bbox while events keep drawing in original canvas coordinates, so
         -- the crop offset is added back here (see port/sprite_offsets.json and
         -- tools/recover_sprite_offsets.py). xorig/yorigin stay canvas values.
         local ox,oy=s.ox or 0,s.oy or 0
-        log("sprite",s.name,math.floor(sub)%#s.frames,x,y,sx,sy,angle,tint,alpha,ox,oy)
+        log("sprite",s.name,base,x,y,sx,sy,angle,tint,alpha,ox,oy,blend,blend and frac or nil)
         if not g then return end
-        if crop then part(file,crop[1]-ox,crop[2]-oy,crop[3],crop[4],x,y,sx,sy,tint,alpha)
-        else
-            local img=image(file);if not img then return end
-            color(tint,alpha);g.draw(img,x,y,-math.rad(angle),sx,sy,s.xorig-ox,s.yorigin-oy)
+        local function layer(file_,alpha_)
+            if crop then part(file_,crop[1]-ox,crop[2]-oy,crop[3],crop[4],x,y,sx,sy,tint,alpha_)
+            else
+                local img=image(file_);if not img then return end
+                color(tint,alpha_);g.draw(img,x,y,-math.rad(angle),sx,sy,s.xorig-ox,s.yorigin-oy)
+            end
         end
+        layer(file,alpha)
+        if blend then layer(s.frames[blend+1],(alpha or state.alpha)*frac) end
     end
     local function backgroundPart(asset,left,top,width,height,x,y,sx,sy,tint,alpha,transform)
         if not asset then return end
