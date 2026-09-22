@@ -80,10 +80,19 @@ return function(R)
     reg("string_replace_all", function(value, old, new) return tostring(value):gsub(tostring(old):gsub("([^%w])", "%%%1"), tostring(new)) end)
     reg("string_trim", function(value) return tostring(value):gsub("^%s+", ""):gsub("%s+$", "") end)
 
-    reg("asset_get_index", function(name)
-        if type(name) == "number" then return name end
-        return (R.constants[tostring(name)] ~= nil and R.constants[tostring(name)]) or -1
-    end)
+    -- asset_get_index resolves by the *caller's* world: Yellow's own code looks
+    -- its assets up by name (its object-name list, the crayon/parallax sprite
+    -- families), and a name both games use must give Yellow's asset to Yellow's
+    -- caller -- otherwise the merged build hands Yellow Undertale's twin (spec
+    -- §8). The first argument is the caller's event scope, which
+    -- Runtime:assetName reads the world from.
+    if B.asset_get_index == nil and not has_script("asset_get_index") then
+        B.asset_get_index = function(E, name)
+            if type(name) == "number" then return name end
+            local value = R:assetName(tostring(name), E)
+            return value ~= nil and value or -1
+        end
+    end
     reg("variable_global_exists", function(name) return N(R.globalNames[tostring(name)] or R.global[tostring(name)] ~= nil) end)
     reg("variable_instance_exists", function(instance, name)
         local target = R:select(instance, nil)[1]

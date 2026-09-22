@@ -95,7 +95,50 @@ function Graphics.install(R)
         -- the crop offset is added back here (see port/sprite_offsets.json and
         -- tools/recover_sprite_offsets.py). xorig/yorigin stay canvas values.
         local ox,oy=s.ox or 0,s.oy or 0
-        log("sprite",s.name,base,x,y,sx,sy,angle,tint,alpha,ox,oy,blend,blend and frac or nil)
+        -- Provenance, for the duplicate-draw gate (spec §8): the sprite ID this
+        -- draw actually resolved to -- after the Frisk remap, so an Undertale
+        -- and a Yellow asset that share a name are still told apart -- and the
+        -- instance that asked for it. R.drawOwner is set by the instance draw
+        -- loops below; a draw a particle system or a background makes has none.
+        local owner=R.drawOwner
+        -- Shader-guarded redraw (spec §8). Yellow draws an actor and then asks
+        -- scr_draw_palette_shader to paint the very same pixels again under
+        -- sh_palette_swap, whose entire job is to recolour them; with no shader
+        -- applied (port/yellow_studio.lua reports them and keeps the original
+        -- colours) that second draw is the base sprite drawn twice. A draw that
+        -- repeats the previous sprite of the same instance with the same frame,
+        -- position, scale, angle, tint and alpha while an unconverted shader is
+        -- set is a duplicate and is not issued: the pixels are already correct.
+        -- Everything else still draws, so a shader-guarded draw that is the
+        -- only draw of that sprite is kept and nothing disappears. The blend
+        -- state counts too: the same pixels added on top of themselves are a
+        -- glow the original asked for (port/yellow_studio.lua records every
+        -- gpu_set_blendmode in R.gpuState), not a duplicate, so a repeat is
+        -- dropped only when the blend state did not change either.
+        local previous=state.lastSprite
+        local blendState=false
+        if R.gpuState then
+            blendState=R.gpuState.blendmode or -1
+            local ext=R.gpuState.blendmode_ext
+            if ext then blendState=tostring(blendState)..":"..tostring(ext[1])..":"..tostring(ext[2]) end
+        end
+        if R.shaderState and R.shaderState.active and previous
+           and previous.index==index and previous.base==base and previous.frac==frac
+           and previous.x==x and previous.y==y and previous.sx==sx and previous.sy==sy
+           and previous.angle==angle and previous.tint==tint and previous.alpha==alpha
+           and previous.owner==owner and previous.blendState==blendState then
+            R.shaderRedraws=(R.shaderRedraws or 0)+1
+            log("sprite-suppressed",s.name,index,owner and owner.id or -1)
+            R:warn("shader-redraw",
+                "Shaders are not converted by this port, so an unconverted shader's redraw of a "
+                .. "sprite it cannot recolour is not repeated: the sprite keeps its original colours "
+                .. "and is drawn once (spec §8).")
+            return
+        end
+        state.lastSprite={index=index,base=base,frac=frac,x=x,y=y,sx=sx,sy=sy,angle=angle,
+            tint=tint,alpha=alpha,owner=owner,blendState=blendState}
+        log("sprite",s.name,base,x,y,sx,sy,angle,tint,alpha,ox,oy,blend,blend and frac or nil,
+            index,owner and owner.id or -1)
         if not g then return end
         local function layer(file_,alpha_)
             if crop then part(file_,crop[1]-ox,crop[2]-oy,crop[3],crop[4],x,y,sx,sy,tint,alpha_)
@@ -268,8 +311,15 @@ function Graphics.install(R)
         local inst=E and E._self
         if not inst then return end
         local v=inst.v
+        -- draw_self is the one draw that can name its owner exactly, even when
+        -- an event draws another instance's sprite: the provenance recorded for
+        -- this draw is the instance whose pixels were drawn, not the event that
+        -- asked for them.
+        local previous=R.drawOwner
+        R.drawOwner=inst
         sprite(E,v.sprite_index,v.image_index,v.x,v.y,v.image_xscale,v.image_yscale,
             v.image_angle,v.image_blend,v.image_alpha)
+        R.drawOwner=previous
     end
     -- Display, window and GUI size. Studio 2 keeps a GUI layer of its own size
     -- and stretches it over the presented image, so display_set_gui_size(320,240)
@@ -606,6 +656,9 @@ function Graphics.install(R)
     end
     function R:renderFrame()
         self.drawLog={}
+        -- The duplicate-draw comparison is per frame: every frame paints a fresh
+        -- canvas, so the first draw of a frame always happens.
+        state.lastSprite=nil
         local views=self:views();local width,height=1,1
         for _,v in ipairs(views) do width=math.max(width,v.px+v.pw);height=math.max(height,v.py+v.ph) end
         self.displayWidth,self.displayHeight=width,height
@@ -689,7 +742,12 @@ function Graphics.install(R)
                 local inst=item.instance
                 if inst and inst.alive and inst.active and self.truth(inst.v.visible)
                    and (ignoreLayers or drawable(item)) then
+                    -- Draw Begin/End, Pre/Post Draw and the GUI passes name the
+                    -- instance they are drawing for, so every sprite entry in the
+                    -- log has a provenance even outside the main Draw pass.
+                    R.drawOwner=inst
                     self:event(inst,kind,number)
+                    R.drawOwner=nil
                 end
             end
         end
@@ -731,10 +789,12 @@ function Graphics.install(R)
                     local inst=item.instance
                     if inst then
                         if inst.alive and inst.active and self.truth(inst.v.visible) and drawable(item) then
+                            R.drawOwner=inst
                             local drawn=self:event(inst,8,0)
                             if not drawn and inst.v.sprite_index>=0 then
                                 local v=inst.v;sprite(self:scope(inst),v.sprite_index,v.image_index,v.x,v.y,v.image_xscale,v.image_yscale,v.image_angle,v.image_blend,v.image_alpha)
                             end
+                            R.drawOwner=nil
                         end
                     elseif item.particles then
                         drawParticles(item.particles,view,item.depth)
