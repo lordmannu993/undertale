@@ -692,3 +692,84 @@ Recorded limitations for this piece:
   rooms the merged tests already drive, not every room in both games;
 - the 42 shared names are pinned to the two manifests' revisions; a rebuilt
   conversion regenerates the list instead of patching it.
+
+## Shared core Player progression (spec §1, §9, §10 — unified-fusion piece 5a)
+
+This is the first **sub-piece**, not completion of piece 5. Previously, entering
+Yellow ran `scr_initialize` with LV 1 / EXP 0 / HP 20 / gold 0 / name Clover,
+while Undertale's corresponding globals retained an unrelated set of values.
+Returning did not carry Yellow's earned progression back.
+
+`port/player.lua`, installed before gameplay initialization in merged builds,
+now owns one live `R.player` record. The converted globals are compatibility
+**views**, not values copied on each frame or snapshots parked per world:
+
+| Player field | Undertale spelling | Yellow spelling |
+| --- | --- | --- |
+| `hp` | `hp` | `current_hp_self` |
+| `maxHp` | `maxhp` | `max_hp_self` |
+| `level` | `lv` | `player_level` |
+| `exp` | `xp` | `player_exp` |
+| `gold` | `gold` | `player_gold` |
+| `name` | `charname` | `player_name` |
+| `stats.attack` | `at` | `player_attack` |
+| `stats.defense` | `df` | `player_defense` |
+
+Both spellings read/write the same field through the global table's metatable;
+there is no raw copy of either alias in `global`. `Runtime:get/set/increment`
+and directly assigned Lua globals use the same path. Non-player globals and
+single-game manifests keep their old behavior. The existing source initializers
+supply starting values — this adapter introduces no new table of stat numbers.
+
+Travel runs its content initializer inside `Player:withDefaults`: existing
+Player fields cannot be replaced with new-game defaults, but genuinely absent
+fields may be initialized and all non-player initialization still runs. Nested
+scripts see the existing HP/stats *during* initialization, not a temporarily
+reset character followed by a restore. Zero and negative HP are not mistaken
+for absent fields; crossing neither heals nor clamps overheal nor recalculates
+stats from LV. The guard unwinds on errors and does not intercept explicit
+new-game, load, damage or reward writes outside content initialization.
+
+The queue's crossing-scratch policy is now explicit in both directions:
+`global.flag[0..29]` is cleared; shared progression is never stored there.
+Higher flags and `plot` are not cleared by this adapter. This is **not** a claim
+that the games' story/route flags are unified.
+
+Evidence: `tests/test_unified_player_state.py` (23 tests) covers all eight live
+alias pairs through direct writes and compiled GML; LV 1/8/20 crossings with
+injured/full/overhealed HP; updates from Yellow and a repeat entry; the real
+naming flow and Yellow pause header; Yellow's converted reward/level-up alarm;
+flag isolation; error unwinding; explicit new-game reset; and single-game
+inertness. The pre-change regression fails with `crossing reset field 1: 1 ~= 8`.
+Removing just the defaults guard reproduces that failure; removing just the
+flag clear fails with `cross-world scratch flag survived: 0`. All changes are
+restored before the green run. Full local suite: **508 passed, 1 skipped**
+with `PORT_REQUIRE_YELLOW=1 .venv/bin/python -m pytest -q`.
+
+The packaged Linux LÖVE gate (`port/smoke.lua`) now carries a scripted LV-8,
+709-EXP, 58/48-HP player through the existing native boat/whale crossings,
+mutates HP/EXP/gold through Yellow's aliases, and asserts the same record and
+values on return. `tools/native_smoke.sh` requires its
+`native-unified-player.txt` / `CORE PLAYER PASS` evidence. It is a state probe
+after the scripted opening, not a played-through Yellow battle or an Android
+certification.
+
+Still pending, explicitly:
+
+- **Inventory and primary equipment remain the legacy implementations.** The
+  shared item catalog, numeric-ID/string-name adaptation, item actions, boxes,
+  key items and four equipment slots are piece **5b**. Yellow's initializer
+  still resets its inventory on re-entry; this sub-piece does not claim to fix
+  that, or the STAT panel's hard-coded `"Clover"` heading and gear labels.
+- **The world entities/controllers are still replaced on crossing.** Shared
+  movement, running in Undertale, combined abilities and battle consumers are
+  piece **5c**. The source level-up calculations have not been normalized (for
+  example, Undertale's LV-20 max HP is 99; Yellow's table says 100). This piece
+  preserves the actual value; it does not silently choose a different rule.
+- **Persistence is not yet unified.** Existing `file*` / `Save.sav` scripts now
+  read/write the live core aliases, but `merge.sav` v1 still only records travel
+  and modifier slots. It cannot restore this Player and the whole World in one
+  load. Content initialization still recreates Yellow's world data on entry.
+  The `Player` + `World` format, legacy migration, world lifecycle and both
+  save-point/load paths are piece **5d**. No migration or restart-resume claim
+  is made here, and no new downloadable release is published for 5a.

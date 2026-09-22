@@ -435,8 +435,15 @@ function Travel:beginCrossing(world, room)
             R:destroy(instance, true)
         end
     end
+    -- Both games reuse flag[0..29] with different meanings. The fusion queue
+    -- reserves this range as crossing scratch space, never player storage.
+    -- Clear it in BOTH directions; scr_initialize used to clear it only when
+    -- entering Yellow. Leave all other flags/story globals to their content.
+    local flags = R:array(R.global, "flag")
+    for index = 0, 29 do flags[index] = 0 end
     -- Before the room loads: Yellow's own room creation code registers fast
-    -- travel points, which needs the globals scr_initialize creates.
+    -- travel points, which needs the globals scr_initialize creates. Shared
+    -- Player fields remain authoritative throughout this initialization.
     self:initialize(world, scope)
     if world == "yellow" then
         -- scr_initialize leaves the modifier slots at new-game state; a merged
@@ -481,7 +488,12 @@ function Travel:initialize(world, scope)
         scope = {_instance = true, id = -1, alive = true, active = true, v = R.defaults(0)}
         scope.v.x, scope.v.y, scope.v.object_index = 0, 0, -1
     end
-    R:script(name, R:scope(scope))
+    -- Initialize content, not a second protagonist. The aliases in
+    -- port/player.lua reject replacement defaults only for already-present
+    -- Player fields, while every world-specific initializer statement runs.
+    R.playerBridge:withDefaults(function()
+        return R:script(name, R:scope(scope))
+    end)
 end
 
 -- The two extra equipment slots. Frisk keeps Undertale's own weapon and

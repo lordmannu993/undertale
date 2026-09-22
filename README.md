@@ -43,6 +43,12 @@ release notes). The large archive is hosted as a GitHub Release asset rather
 than committed to Git. To regenerate it yourself, follow the build instructions
 below.
 
+**Merged after this archive was built:** the shared-script routing, rendering
+and unified-Player work tracked in [the fusion queue](docs/FUSION_STATUS.md)
+is newer source work, **not included in the v1.2.3 download**. The unified
+Player work is still being completed in small, tested sub-pieces; no new
+release is claimed for those changes yet.
+
 ### Added in v1.2.3 — the four phone fixes
 
 From [PR #30](https://github.com/lordmannu993/undertale/pull/30), merged after

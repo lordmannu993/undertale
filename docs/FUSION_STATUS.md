@@ -13,8 +13,9 @@ disagree on a requirement, the spec wins. Limitations and deviations live in
 > **If the user says "Proceed ❤️", do exactly this** (the full protocol is in
 > `AGENTS.md` → "Standing instruction: 'Proceed ❤️'"): bring the current fusion
 > head onto your branch, set up the pipeline, run the suite green, then do the
-> **single highest-numbered ⬜ piece** below, in order. One piece per session is
-> fine. Do **not** merge the final fusion until the §15/§16 acceptance piece is
+> **next pending piece, top-to-bottom**. If a piece is split, finish its next
+> pending sub-piece before advancing to the next numbered piece. One green
+> sub-piece per session is fine. Do **not** merge the final fusion until the §15/§16 acceptance piece is
 > itself green.
 
 ---
@@ -39,9 +40,9 @@ git merge --no-edit origin/<that-open-PR-branch>   # clean fast-forward from mas
 | field | value |
 | --- | --- |
 | most recent merged piece | **#4** No duplicated characters/sprite layers (§8) — [PR #39](https://github.com/lordmannu993/undertale/pull/39), merged to `master` |
-| in-flight piece | *(none — start the next ⬜ piece from `master`)* |
-| next ⬜ piece | **#5 Unified Player state (§1 §3 §9–§11 §13 §14)** |
-| in-flight open PR | *(none)* |
+| in-flight piece | **#5a Shared core Player progression** — 23 targeted tests and full local suite (508 passed / 1 skipped) green; CI/native gate required before merge |
+| next ⬜ piece | **#5b Shared item catalog / inventory / equipment**, after 5a lands; do not skip to #6 |
+| in-flight open PR | Session branch `arena/01a0c84b-undertale` (PR link recorded after creation) |
 
 ---
 
@@ -86,10 +87,23 @@ piece may be split into sub-pieces if it is too large for one green increment.
 | 2 | §4, §5 | **Depth / Y-sort** — order the draw list by the sprite's visual bottom point, stable tie-break, keep per-world `scr_depth` routing | ✅ | `tools/convert.py` (canvas carriage), `port/runtime.lua` (canvas reads, depth hook), `port/yellow_layers.lua` (managed layers), `port/graphics.lua` (slot tie-break), `tests/test_depth_sort.py`, `docs/PORTING.md`, `AGENTS.md` | [PR #37](https://github.com/lordmannu993/undertale/pull/37) / `tests/test_depth_sort.py` (11 tests; 10 proven to fail without the fix) |
 | 3 | §6 | River Person boat/water rendering — split into components, not a blanket global layer | ✅ | `tools/recover_sprite_offsets.py` (anchored path), `port/sprite_offsets.json` (448/980), `port/graphics.lua` (fractional sub-index crossfade), `tests/test_boat_water.py`, `tests/test_sprite_offsets.py`, `docs/PORTING.md` (rooms 125/70/140/316 pinned: depths 49330/49320/49300, ride 340→118, pillar −1 in front) | [PR #38](https://github.com/lordmannu993/undertale/pull/38) / `tests/test_boat_water.py` (10 tests; the offset test and the ripple test proven to fail without the change) + the anchored-provenance test in `tests/test_sprite_offsets.py` |
 | 4 | §8 | No duplicated characters/sprite layers — a character is drawn once; the 42 shared asset names resolve per world | ✅ | `port/graphics.lua` (draw provenance + unconverted-shader duplicate drop), `port/merge.lua` (`double_named`), `port/runtime.lua` (`assetName`/`assetOwnerIsYellow`/`reportNameSplit`), `port/yellow_builtins.lua` (world-aware `asset_get_index`), `tools/merge.py` (honest 42), `tests/test_duplicate_draws.py`, `docs/PORTING.md` | `tests/test_duplicate_draws.py` (11 tests; all five changes proven load-bearing by reverting each file: `sprite draw without provenance: spr_regboat`, `the flat collision list disagrees with the audit: 0 vs 32`, `spr_flowey gave 1095, not Yellow's 1000243`, `name collisions with Undertale: 4`) — [PR #39](https://github.com/lordmannu993/undertale/pull/39) |
-| 5 | §1 §3 §9–§11 §13 §14 | **Unified Player state** (the biggest): one Player record + shared item table, projected at world boundaries, serialised as `Player` + `World` blocks; crossing zeroes `flag[0..29]` (do not park state there). Grow `tests/test_yellow_merge.py` (`playerOf`, `crossTo`) into `tests/test_unified_player_state.py` | ⬜ | `port/travel.lua`, `port/storage.lua`, `port/merge.lua`, `port/frisk.lua`, `tests/test_unified_player_state.py`, `docs/` | — |
+| 5 | §1 §3 §9–§11 §13 §14 | **Unified Player state** (split into 5a–5d below): one Player record + shared item table, projected at world boundaries, serialised as `Player` + `World` blocks; crossing zeroes `flag[0..29]` (do not park state there) | 🚧 **5a implemented; 5b–5d pending** | `port/player.lua`, `port/runtime.lua`, `port/travel.lua`, `port/storage.lua`, `port/merge.lua`, `port/frisk.lua`, `tests/test_unified_player_state.py`, `docs/` | 5a: 23 targeted tests; pre-fix LV8→LV1 regression and independent defaults-guard/flag-clear mutations fail as expected. Parent piece is **not complete** |
 | 6 | §12 | Asset compatibility layer — `sprite_get_width/height` return cropped size at ~95 sites; per-frame origins; movement speed (UT 3 px/frame, Yellow +2 autorun); hitboxes/collision; the 980 `unresolved[]` crop offsets (never guess) | ⬜ | `port/graphics.lua`, `port/collision.lua`, `tools/yellow/assets.py`, `tests/`, `docs/PORTING.md` | — |
 | 7 | §7 (visual) | Shopkeeper §7 visual sweep — confirm, via the draw log, exactly one pair of eyes + a correctly-seated mouth for `faceemotion` 0–6 in room 311 (the ID half is piece 1) | ⬜ | `tests/test_asset_arrays.py` (extend), draw-log evidence in PR | — |
 | 8 | §15, §16 | Acceptance matrix + final merge — this file maps every requirement → code path / test / evidence; keep `AGENTS.md` current; then the single final merge | ⬜ | this file, `AGENTS.md`, PR body | — |
+
+### Piece 5 sub-pieces (finish these before #6)
+
+5a is intentionally a small, verifiable increment; it does **not** mark all of
+§1/§3/§9–§11/§13/§14 done. The remaining duplicate inventory, controller and save
+paths must be replaced, not papered over with per-world snapshots.
+
+| sub-piece | deliverable | state / evidence |
+| --- | --- | --- |
+| **5a** | One live `R.player` owner of HP, max HP, LV, EXP, money, name and base AT/DF; both games' global spellings are views. Content initialization cannot reset those fields. Clear crossing scratch flags in both directions. | 🚧 Implemented; `tests/test_unified_player_state.py` (23 tests), native `native-unified-player.txt` gate added. Awaiting CI/merge. |
+| **5b — next** | Shared item catalog from source, one inventory (including boxes/key items), numeric/string item adapters, common item actions and four-slot equipment; items must be usable in either content set, not just carried in hidden snapshots. Replace legacy gear/name UI consumers. | ⬜ `global.item[0..7]` and `global.item_slot[1..8]`, weapon/armor IDs versus strings, ammo/accessory determine scripts are the entry points. No fabricated item/stat data. |
+| **5c** | Shared player entity/controller, movement + combined abilities (X-run in Undertale too), battle consumers of the common state/equipment and a documented shared progression rule. | ⬜ `obj_mainchara`/`obj_pl` adapters and `port/frisk.lua`; core value aliases alone do not merge the controllers or the source level-up formulas. |
+| **5d** | One `Player` + `World` save/load, explicit legacy migration, save points/loading from either world, and content initialization that does not reset world progress on re-entry. | ⬜ `port/storage.lua` / `port/travel.lua`; `merge.sav` v1 is still travel/modifier metadata, **not** a unified save. Preserve old saves during migration; unknown versions stop by name. |
 
 ---
 
@@ -98,15 +112,16 @@ piece may be split into sub-pieces if it is too large for one green increment.
 ```bash
 cd /home/user/undertale
 git fetch origin
-git merge --no-edit origin/arena/01a0be2f-undertale   # bring in completed pieces (§1)
+# Already-merged pieces are inherited from master. Only merge an open PR's
+# branch when §1 records unfinished work there; do not merge an obsolete branch.
 
 python3 -m venv .venv
 .venv/bin/pip install -q -r requirements-dev.txt       # never system pip (PEP 668)
 
 python3 tools/fetch_yellow.py --tarball-cache .yellow-cache
-python3 tools/yellow_convert.py --stage rooms \
-  && python3 tools/merge.py \
-  && python3 tools/convert.py
+python3 tools/convert.py \
+  && python3 tools/yellow_convert.py --stage rooms \
+  && python3 tools/merge.py
 
 .venv/bin/python -m pytest -q                          # must be green before you change anything
 ```
@@ -130,7 +145,8 @@ Notes:
 
 ## 5. Definition of a finished piece (gate before you push)
 
-A piece is not done until **all** of these hold:
+A piece (or a scoped sub-piece) is not done until **all** of these hold.
+A completed sub-piece does not turn its parent ✅ while sibling work remains:
 
 1. A **test that fails without the change** is added (and passes with it).
 2. A **line in `docs/PORTING.md`** (or the relevant doc) records what changed, the

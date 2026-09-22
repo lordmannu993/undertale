@@ -117,6 +117,9 @@ function Runtime.new(manifest,input,options)
     require("port.yellow_layers")(self)
     require("port.particles")(self)
     require("port.yellow_builtins")(self)
+    -- Bind progression before either game's initializer can create globals.
+    -- Single-game manifests keep their original global tables untouched.
+    require("port.player").install(self)
     -- Only a merged manifest has two worlds to travel between.
     require("port.travel").install(self)
     -- Merged builds draw Yellow's player as Frisk (see port/frisk.lua); a

@@ -39,3 +39,5 @@ grep -q 'fused boat ride' port-test-output/native.log || {
   echo 'The native gate never ran the fused-world section; a merged archive must cross between the games.' >&2
   exit 1
 }
+# Piece 5a's packaged-runtime state probe is required, not merely logged.
+grep -q 'CORE PLAYER PASS' port-test-output/native-unified-player.txt

@@ -138,11 +138,33 @@ function Smoke.new(game,touch)
         game:gotoRoom(140);game:applyTransitions();wait(5)
         assert(game.roomState.name=="room_fire_dock","The Hotland dock did not load: "..tostring(game.roomState.name))
         assert(countInstances(game.constants.obj_dogboat_thing)>=1,"The dock's own boat is missing")
+        -- Piece 5a: non-default core progression must survive the *packaged*
+        -- crossings. This is a scripted state probe after the real opening,
+        -- not a claim that the smoke played a complete Yellow battle.
+        local player=game.player
+        local playerName=game.global.charname
+        local frisk=game:select(game.constants.obj_mainchara)[1]
+        game.global.xp=709
+        game:call("scr_levelup",game:scope(frisk))
+        game.global.hp=game.global.maxhp+10
+        game.global.gold=37
+        assert(player and player.level==8 and player.maxHp==48,"shared core player was not initialized")
         hold(88,2)
         assert(game.travel.riverLatch,"Holding X during the boat ride did not arm the fused crossing")
         game:gotoRoom(140);game:applyTransitions();wait(10)
         assert(game.travel.world=="yellow","The fused boat ride never left Undertale")
         assert(game.roomState.name=="rm_hotland_02","The boat landed in "..tostring(game.roomState.name))
+        assert(game.player==player,"the crossing replaced the Player record")
+        assert(game.global.player_level==8 and game.global.player_exp==709,"the crossing reset LV/EXP")
+        assert(game.global.current_hp_self==58 and game.global.max_hp_self==48,"the crossing reset overhealed HP")
+        assert(game.global.player_attack==24 and game.global.player_defense==11,"the crossing reset base stats")
+        assert(game.global.player_gold==37 and game.global.player_name==playerName,"the crossing reset money/name")
+        -- Writes through Yellow's spelling must be visible through Undertale's
+        -- immediately, not copied from a parked per-world snapshot on return.
+        game.global.current_hp_self=game.global.current_hp_self-3
+        game.global.player_exp=game.global.player_exp+11
+        game.global.player_gold=game.global.player_gold+7
+        assert(game.global.hp==55 and game.global.xp==720 and game.global.gold==44,"core aliases are not live")
         local clover=game.manifest.yellow_names.objects["obj_pl"]
         assert(countInstances(clover)==1,"Yellow's world does not hold exactly one player")
         assert(countInstances(game.constants.obj_mainchara)==0,"Frisk survived the crossing into Yellow")
@@ -195,6 +217,13 @@ function Smoke.new(game,touch)
         assert(game.vars.room==125,"The whale landed in room "..tostring(game.vars.room))
         assert(countInstances(game.constants.obj_mainchara)==1,"Undertale's world does not hold exactly one Frisk")
         assert(countInstances(clover)==0,"Yellow's player survived the crossing back")
+        assert(game.player==player and player.level==8 and player.exp==720,"return lost shared LV/EXP")
+        assert(player.hp==55 and player.maxHp==48 and player.gold==44,"return lost shared HP/money")
+        assert(player.stats.attack==24 and player.stats.defense==11 and player.name==playerName,
+            "return lost shared stats/name")
+        write("native-unified-player.txt","CORE PLAYER PASS: LV=8 EXP=720 HP=55/48 AT=24 DF=11 gold=44 name="..
+            playerName.."; one live record across both worlds. Inventory/controller/save migration not certified.\n")
+        print("NATIVE SMOKE PASS: shared core Player progression across both worlds")
         game.builtins.ini_open(nil,"merge.sav")
         local savedCrossings=game.builtins.ini_read_real(nil,"merge","crossings",0)
         local savedWorld=game.builtins.ini_read_string(nil,"merge","world","")
