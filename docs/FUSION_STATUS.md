@@ -39,8 +39,9 @@ git merge --no-edit origin/<that-open-PR-branch>   # clean fast-forward from mas
 | field | value |
 | --- | --- |
 | most recent merged piece | **#2** Depth / Y-sort (§4 §5) — [PR #37](https://github.com/lordmannu993/undertale/pull/37), merged to `master` |
-| next ⬜ piece | **#3 River Person boat/water (§6)** — starts fresh from `master` |
-| in-flight open PR | *(none)* |
+| in-flight piece | **#3 River Person boat/water (§6)** — 🚧 local suite green (474 passed, 1 skipped); push/PR blocked on GitHub reconnection (401), then merge once CI is green |
+| next ⬜ piece | **#4 No duplicated characters/sprite layers (§8)** — starts after #3 lands |
+| in-flight open PR | *(none yet — #3 awaits GitHub reconnection)* |
 
 ---
 
@@ -83,10 +84,10 @@ piece may be split into sub-pieces if it is too large for one green increment.
 | --- | --- | --- | --- | --- | --- |
 | 1 | §7, §12 (2nd) | Recover asset IDs kept inside instance arrays (Snowdin shopkeeper emotion faces + 5 siblings) | ✅ | `tools/recover_asset_arrays.py`, `port/recovered_asset_arrays.json`, `tools/convert.py`, `tests/test_asset_arrays.py`, `docs/PORTING.md`, `AGENTS.md` | [PR #36](https://github.com/lordmannu993/undertale/pull/36) / `tests/test_asset_arrays.py` (10 tests; 3 proven to fail without the fix, logging `Unresolved sprite ID 881…877`) |
 | 2 | §4, §5 | **Depth / Y-sort** — order the draw list by the sprite's visual bottom point, stable tie-break, keep per-world `scr_depth` routing | ✅ | `tools/convert.py` (canvas carriage), `port/runtime.lua` (canvas reads, depth hook), `port/yellow_layers.lua` (managed layers), `port/graphics.lua` (slot tie-break), `tests/test_depth_sort.py`, `docs/PORTING.md`, `AGENTS.md` | [PR #37](https://github.com/lordmannu993/undertale/pull/37) / `tests/test_depth_sort.py` (11 tests; 10 proven to fail without the fix) |
-| 3 | §6 | River Person boat/water rendering — split into components, not a blanket global layer | ⬜ | `port/graphics.lua`/`port/yellow_layers.lua`, rooms 125/70/140/316, `obj_dogboat_thing`/`obj_riverman`/`obj_dogboat_pillar` (depths 49330/49320/49300, ride x 338→118), `tests/`, `docs/PORTING.md` | — |
+| 3 | §6 | River Person boat/water rendering — split into components, not a blanket global layer | 🚧 local green, push/PR awaiting GitHub reconnection | `tools/recover_sprite_offsets.py` (anchored path), `port/sprite_offsets.json` (448/980), `port/graphics.lua` (fractional sub-index crossfade), `tests/test_boat_water.py`, `tests/test_sprite_offsets.py`, `docs/PORTING.md` (rooms 125/70/140/316 pinned: depths 49330/49320/49300, ride 340→118, pillar −1 in front) | `tests/test_boat_water.py` (10 tests; the offset test and the ripple test proven to fail without the change) + the anchored provenance test in `tests/test_sprite_offsets.py` |
 | 4 | §8 | No duplicated characters/sprite layers — system test for a character drawn twice (incl. a UT + Yellow twin in one scene); audit `port/merge.lua` and its 42 name collisions | ⬜ | `port/merge.lua`, `tests/`, `docs/PORTING.md` | — |
 | 5 | §1 §3 §9–§11 §13 §14 | **Unified Player state** (the biggest): one Player record + shared item table, projected at world boundaries, serialised as `Player` + `World` blocks; crossing zeroes `flag[0..29]` (do not park state there). Grow `tests/test_yellow_merge.py` (`playerOf`, `crossTo`) into `tests/test_unified_player_state.py` | ⬜ | `port/travel.lua`, `port/storage.lua`, `port/merge.lua`, `port/frisk.lua`, `tests/test_unified_player_state.py`, `docs/` | — |
-| 6 | §12 | Asset compatibility layer — `sprite_get_width/height` return cropped size at ~95 sites; per-frame origins; movement speed (UT 3 px/frame, Yellow +2 autorun); hitboxes/collision; the 981 `unresolved[]` crop offsets (never guess) | ⬜ | `port/graphics.lua`, `port/collision.lua`, `tools/yellow/assets.py`, `tests/`, `docs/PORTING.md` | — |
+| 6 | §12 | Asset compatibility layer — `sprite_get_width/height` return cropped size at ~95 sites; per-frame origins; movement speed (UT 3 px/frame, Yellow +2 autorun); hitboxes/collision; the 980 `unresolved[]` crop offsets (never guess) | ⬜ | `port/graphics.lua`, `port/collision.lua`, `tools/yellow/assets.py`, `tests/`, `docs/PORTING.md` | — |
 | 7 | §7 (visual) | Shopkeeper §7 visual sweep — confirm, via the draw log, exactly one pair of eyes + a correctly-seated mouth for `faceemotion` 0–6 in room 311 (the ID half is piece 1) | ⬜ | `tests/test_asset_arrays.py` (extend), draw-log evidence in PR | — |
 | 8 | §15, §16 | Acceptance matrix + final merge — this file maps every requirement → code path / test / evidence; keep `AGENTS.md` current; then the single final merge | ⬜ | this file, `AGENTS.md`, PR body | — |
 
@@ -119,7 +120,9 @@ Notes:
   `/home/user/scratch` (sandbox-local, **not persisted** — rebuild on demand).
   They drive `R:step(); R:renderFrame()` through `lupa.luajit21` (plain `lupa` is
   Lua 5.5 and has no `bit`) and print `R.drawLog` entries such as
-  `{"sprite", name, subframe, x, y, sx, sy, angle, tint, alpha, ox, oy}`.
+  `{"sprite", name, subframe, x, y, sx, sy, angle, tint, alpha, ox, oy[,
+  blendFrame, blendT]}` — the last two fields are present only when the
+  sub-index is fractional (piece 3's crossfade).
   Keep any screenshots/evidence in `/home/user/scratch/evidence/`. The committed
   pytest suite is the source of truth; the probes are for investigation only.
 

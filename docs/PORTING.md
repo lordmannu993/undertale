@@ -354,15 +354,35 @@ accepted only when all of these hold:
 3. the canvas contains the exported image, and
 4. the offset is non-zero.
 
-**447 of the 1,428 candidates verify; the other 981 are listed in
+There is one **anchored** extension (added for the River Person's dog boat,
+piece 3): when the export's crop keeps the art pinned to its top-left corner,
+spans the crop's full width, and the crop spans the bbox width exactly, both
+horizontal edges agree *without* upstream metadata, so
+`offset = (bbox_left, bbox_top)` follows from the local export alone. The
+vertical component additionally uses the no-trim invariant — the export never
+trims transparent rows *above* the art, which holds for every one of the
+upstream-verified records — so the crop top equals the bbox top. Because no
+upstream bbox is available to check against, the anchored path accepts only
+when a canvas can be pinned from records already verified upstream in this
+same file and sharing the sprite's draw call site
+(`CANVAS_CORROBORATION` in the tool; currently just the boat's own siblings
+`spr_regboat`/`spr_dogboat_cover`). The record carries
+`canvas_source: "sibling-pinned"` and `up_bbox: null` so its provenance stays
+auditable, and `--check` re-verifies it offline (re-derivation plus the
+sibling gate).
+
+**448 of the 1,428 candidates verify; the other 980 are listed in
 `port/sprite_offsets.json` `unresolved[]` with one of four reasons**
-(two-sided-disagreement 973, bbox-differs-from-upstream 6, canvas-too-small 1,
+(two-sided-disagreement 972, bbox-differs-from-upstream 6, canvas-too-small 1,
 not-in-upstream 1). They are drawn unshifted rather than guessed at, and
 `tests/test_sprite_offsets.py` fails if a regenerated file drops one without a
 reason. Accepted examples: `spr_shopkeeper1` (1,9) 64×120→61×111,
-`spr_dogboat_cover` (7,25) 91×40→78×15, `spr_riverman` (1,0) 29×42→27×42,
-`spr_maincharad` 20×30→19×29; `spr_shopkeeper1_face0..6`, the eyes/mouth overlays,
-`spr_heart` and `spr_shop1_bg` are already full-canvas and stay at (0,0).
+`spr_dogboat` (3,3) 91×40→85×31 (anchored — the upstream vertical edges
+disagree, 3 vs 8, because the export trimmed transparent rows below the hull
+art), `spr_dogboat_cover` (7,25) 91×40→78×15, `spr_riverman` (1,0) 29×42→27×42,
+`spr_maincharad` 20×30→19×29; `spr_shopkeeper1_face0..6`, the eyes/mouth
+overlays, `spr_heart` and `spr_shop1_bg` are already full-canvas and stay at
+(0,0).
 
 Pipeline: `convert.py` refuses to run without the file and carries `ox`/`oy` into
 `generated/assets/sprites_N.lua`; `port/graphics.lua` subtracts them from the origin
@@ -377,8 +397,10 @@ tools fetch nothing at test time).
 
 Recorded limitations for this piece:
 
-- the 981 unresolved sprites are still drawn with their exported origin, so any of
-  them with a cropped canvas keeps a cosmetic offset;
+- the 980 unresolved sprites are still drawn with their exported origin, so any of
+  them with a cropped canvas keeps a cosmetic offset (63 of them would qualify
+  for the anchored offset but have no pinned sibling canvas to gate it, so they
+  stay unresolved rather than guessed at);
 - `sprite_get_width`/`sprite_get_height`/`image_width` report the **exported** image
   dimensions, not the original canvas (95 call sites), which is what the original
   1.4 semantics would have returned;
@@ -457,7 +479,7 @@ own copy, as the shared-script split established) and repairs the two systems:
 1. Recovered sprites carry their pinned canvas size (`cw`/`ch` from the same
    `port/sprite_offsets.json` record that owns `ox`/`oy`; `convert.py` refuses
    a record without one). The `sprite_width`/`sprite_height` instance reads
-   use it; sprites without a verified canvas (the 981 unresolved, e.g. Frisk's
+   use it; sprites without a verified canvas (the 980 unresolved, e.g. Frisk's
    own walk set) keep reporting their exported size — never a guess.
 2. Assigning `depth` to a layered instance moves it onto a managed
    `Compatibility_Instances_Depth_N` layer at that depth — one layer per depth
@@ -483,10 +505,67 @@ Recorded limitations for this piece:
 
 - `sprite_get_width`/`sprite_get_height`/`image_width` still report the
   *exported* size (95 call sites): piece 6 owns the builtins, so until it
-  lands the builtins and the instance reads temporarily disagree on the 447
+  lands the builtins and the instance reads temporarily disagree on the 448
   recovered sprites.
-- the 981 unresolved sprites sort from their exported dims too, for the same
+- the 980 unresolved sprites sort from their exported dims too, for the same
   no-guessing rule;
 - the cross-layer tie rule (room list order) is best-available: GameMaker
   Studio 2 draws by depth and its exact-tie order is undocumented. Distinct
   depths — the common case — never reach the tie-break.
+## River Person's boat and water (spec §6 — unified-fusion piece 3)
+
+Spec §6 asks for the River Person's boat and water to render as separate visual
+components with the original layering — not a blanket global render layer. The
+merged build already carried the original layering (room instance depths 49330
+hull / 49320 riverman / 49300 player in the water and fire docks, 950000 boat in
+the tundra dock, 900000 during the ride, the water pillar at −1 in front of
+everything); this piece pins that reference from the draw log and repairs the
+two pixel defects inside it:
+
+1. **The dog boat hull floated above its waterline.** `spr_dogboat` was the one
+   boat sprite whose crop offset never recovered: the upstream vertical edges
+   disagree (3 vs 8) because the export trimmed transparent rows *below* the
+   hull art, so the original rule's two-sided gate rejected it and the 85×31
+   hull drew at (0,0) — 3 px up and left of its canvas place, paws dangling off
+   the boat rim its waterline cover (7,25) sits on. The anchored recovery path
+   (above) pins (3,3) with the 91×40 canvas corroborated by the sibling hull
+   and cover, which are upstream-verified and share the draw call. The
+   constrained `spr_dogboat` (84×34 second frame) still fits that canvas at
+   (3,3), which the record's frame list pins.
+2. **The waterline ripple snapped to hard steps.** The boat's draw event
+   animates the cover with a fractional sub-index (`cc += 0.1` per draw,
+   `draw_sprite(1529, cc, x, y)`), and GameMaker interpolates the fraction
+   between the two frames; `port/graphics.lua` floored it, stepping the 2-frame
+   ripple in discrete jumps. `sprite()` now draws the base frame, then the next
+   frame at the fractional amount (a crossfade; GM's per-pixel lerp differs
+   only where the frames differ in transparency at their edges). Integer
+   sub-indices log and draw exactly as before; the draw log appends the blend
+   frame and amount (fields 13/14) so the semantics are pinned.
+
+Evidence: `tests/test_boat_water.py` (10 tests). The offset test fails without
+the anchored record (the hull logs (0,0)), the ripple test fails without the
+crossfade (no blend fields), and the layering tests pin the original reference:
+water behind the boat → hull → cover → riverman → player in rooms 125/140/70,
+the regulated boat (flag 461 = 0) sharing the same layering, the original
+room-data depths, and the ride in room 316 (340 → 330 at 2 px/tick → 118, depth
+900000, water pillar in front). `tests/test_sprite_offsets.py` gains the
+(3,3) pin plus the anchored-provenance test, and the full suite is 474 passed,
+1 skipped.
+
+Recorded limitations for this piece:
+
+- the layering is pinned from the headless draw log against the decompiled
+  room data; parity with the original game's *pixels* is a CI-only visual
+  claim (the native smoke crosses the fire dock and plays the ride) and is not
+  claimed here;
+- the crossfade is a compositing crossfade (base frame, then next frame at the
+  fractional amount), not GM's exact per-pixel lerp: where the two frames
+  differ in transparency at their edges the result can differ by a fraction of
+  a pixel's alpha;
+- the anchored path currently corroborates one sprite (the dog boat hull).
+  63 other unresolved candidates satisfy the anchored geometry but have no
+  pinned sibling canvas, so they stay unresolved until upstream metadata (or a
+  new sibling corroboration) can gate them;
+- the boat's depth is event-assigned in every state (the original room data
+  carries no instance depth), so the recovered 91×40 canvas cannot move it;
+  the sprite's own draw uses the canvas origin, not `scr_depth`.

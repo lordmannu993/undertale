@@ -32,6 +32,7 @@ OFFSETS = json.loads((ROOT / "port/sprite_offsets.json").read_text())
 KEY_OFFSETS = {
     "spr_shopkeeper1": (1, 9),       # Snowdin shopkeeper body: the doubled face
     "spr_shopkeeper2_body": (0, 1),
+    "spr_dogboat": (3, 3),           # River Person's dog boat hull: was floating
     "spr_dogboat_cover": (7, 25),    # River Person's boat cover: the waterline
     "spr_regboat": (3, 9),
     "spr_riverman": (1, 0),
@@ -71,6 +72,29 @@ def test_shopkeeper_body_offset_is_what_reunites_the_face():
     assert record["oy"] - record["ox"] == 8  # (1, 9): the crop is not square
     assert record["gmx_bbox"] == [1, 9, 61, 119] == record["up_bbox"]
     assert record["art"] == [0, 0, 60, 110]
+
+
+def test_dogboat_hull_offset_is_the_anchored_derivation():
+    """The dog boat hull only recovers via the anchored path.
+
+    The upstream vertical edges disagree (the export trimmed transparent rows
+    below the hull art), so the original rule rejects it. The anchored path
+    derives (3, 3) from this checkout's own export geometry and pins the
+    canvas from the sibling records of the same draw call, both of which were
+    verified upstream.
+    """
+    record = OFFSETS["sprites"]["spr_dogboat"]
+    assert record["canvas_source"] == "sibling-pinned"
+    assert record["up_bbox"] is None  # never fetched: derived locally
+    siblings = sorted(record["canvas_siblings"])
+    assert siblings == ["spr_dogboat_cover", "spr_regboat"]
+    for name in siblings:
+        sibling = OFFSETS["sprites"][name]
+        assert sibling.get("canvas_source") != "sibling-pinned", \
+            "a sibling-pinned canvas must rest on an upstream-verified record"
+        assert sibling["canvas"] == record["canvas"]
+    # The anchored rule is documented in the file's rule statement.
+    assert "anchored" in OFFSETS["rule"]
 
 
 def test_every_candidate_is_recovered_or_explained():

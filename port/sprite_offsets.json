@@ -1,12 +1,12 @@
 {
  "counts": {
   "candidates": 1428,
-  "recovered": 447,
-  "unresolved": 981
+  "recovered": 448,
+  "unresolved": 980
  },
  "format": 1,
  "ref": "249ffa27ee7e7eee0d7ce84b736c294458b38685",
- "rule": "offset = (bbox_left - art_left, bbox_top - art_top) from the original canvas, accepted only when this checkout's bbox equals the pinned upstream frame bbox, both canvas edges agree on the offset, and the canvas contains the exported image",
+ "rule": "offset = (bbox_left - art_left, bbox_top - art_top) from the original canvas, accepted only when this checkout's bbox equals the pinned upstream frame bbox, both canvas edges agree on the offset, and the canvas contains the exported image; anchored: when the art is pinned to the crop's top-left corner, spans the crop's full width, and the crop spans the bbox width exactly, the same offset is accepted from this checkout's own export (both horizontal edges agree without upstream metadata; the vertical component uses the no-trim invariant, i.e. the export never trims transparent rows above the art, as in every upstream-verified record) and only when a pinned sibling canvas (CANVAS_CORROBORATION) contains every frame at that offset",
  "source": "sprites/<name>/<name>.yy frame metadata (no art is imported; offsets only)",
  "sprites": {
   "spr_5_mouth2": {
@@ -3128,6 +3128,46 @@
     32,
     33
    ]
+  },
+  "spr_dogboat": {
+   "art": [
+    0,
+    0,
+    84,
+    30
+   ],
+   "canvas": [
+    91,
+    40
+   ],
+   "canvas_siblings": [
+    "spr_dogboat_cover",
+    "spr_regboat"
+   ],
+   "canvas_source": "sibling-pinned",
+   "frames": [
+    [
+     85,
+     31
+    ],
+    [
+     84,
+     34
+    ]
+   ],
+   "gmx_bbox": [
+    3,
+    3,
+    87,
+    38
+   ],
+   "ox": 3,
+   "oy": 3,
+   "png": [
+    85,
+    31
+   ],
+   "up_bbox": null
   },
   "spr_dogboat_cover": {
    "art": [
@@ -14227,10 +14267,6 @@
   },
   {
    "name": "spr_dogbed",
-   "reason": "two-sided-disagreement"
-  },
-  {
-   "name": "spr_dogboat",
    "reason": "two-sided-disagreement"
   },
   {
