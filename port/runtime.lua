@@ -44,7 +44,8 @@ function Runtime.new(manifest,input,options)
         assets={sprites={},backgrounds={},sounds={},fonts={}},builtins={},warnings={},warningList={},
         storedRooms={},roomPersistence={},nextId=200000,frame=0,budget=0,globalNames={},currentEvent=nil,
         pathData={},roomState=nil,eventCache={},isACache={},collisionSelectors={},
-        scriptCollisions={},scriptSplitReported={}},Runtime)
+        scriptCollisions={},scriptSplitReported={},nameCollisions={},nameSplitReported={},
+        shaderRedraws=0},Runtime)
     for _,entry in ipairs(manifest.asset_modules or {}) do
         for id,asset in pairs(require(entry.module)) do self.assets[entry.kind][id]=deepCopy(asset) end
     end
@@ -71,6 +72,16 @@ function Runtime.new(manifest,input,options)
         for name,value in pairs(category) do
             if self.constants[name]==nil then self.constants[name]=value end
         end
+    end
+    -- The names both games use for *different* assets (port/merge.lua ->
+    -- double_named). Undertale's value stays in the flat table above, because
+    -- every direct reference to it (Undertale's own conversion, the port's Lua,
+    -- tests) means Undertale's asset; a caller that belongs to Yellow's world
+    -- resolves its own copy through Runtime:assetName instead. Without this the
+    -- merged build hands a Yellow script Undertale's sprite, sound or object of
+    -- the same name -- drawing or spawning the other game's twin.
+    for _,entry in ipairs(manifest.double_named or {}) do
+        self.nameCollisions[entry.name]={undertale=entry.undertale,yellow=entry.yellow,category=entry.category}
     end
     self.constants.working_directory="";self.constants.program_directory=""
     self.vars.mouse_x=0;self.vars.mouse_y=0
@@ -169,6 +180,56 @@ function Runtime:callerIsYellow(E)
         return true
     end
     return type(self.vars.room)=="number" and self.vars.room>=base
+end
+-- An asset *name* both games use (spec §8: "If assets from both games are
+-- required for different animations or states, select the appropriate asset
+-- rather than drawing both"). Undertale's flat name table holds one value per
+-- name, so the merged manifest also carries the pairs it found
+-- (`double_named`); a name in that set resolves by the caller's world: Yellow's
+-- own asset for a Yellow caller, Undertale's for everyone else. Every other
+-- name, and every name in a single-game manifest, is the plain constant.
+--
+-- This is safe for Undertale by inspection: Undertale's conversion resolves
+-- assets numerically (no sprite, object, sound or font name survives as a name
+-- read in generated/objects or generated/scripts), so only Yellow's dynamic
+-- lookups -- asset_get_index over a name, a bare name in Yellow's own code --
+-- can reach this path.
+function Runtime:assetName(name,E)
+    local constant=self.constants[name]
+    local collision=self.nameCollisions[name]
+    if collision==nil then return constant end
+    if self:assetOwnerIsYellow(E) then
+        self:reportNameSplit(name,collision)
+        return collision.yellow
+    end
+    return collision.undertale~=nil and collision.undertale or constant
+end
+-- The world an asset lookup belongs to.  Unlike a script call -- where
+-- Runtime:callerIsYellow asks which world is *running*, because the room decides
+-- which copy of a shared script to execute -- an asset belongs to the content
+-- its caller came from: the calling instance's own ID band decides, and only a
+-- caller with no instance (a global script, a room's creation code) falls back
+-- to the room's band.  A Yellow object carried into Undertale, or an Undertale
+-- object carried into Yellow, therefore keeps its own game's sprite instead of
+-- being handed the other game's same-named twin (spec §8).
+function Runtime:assetOwnerIsYellow(E)
+    local base=self.manifest.yellow_base or 1000000
+    local caller=type(E)=="table" and rawget(E,"_self") or nil
+    if type(caller)=="number" then caller=self.byId[caller] end
+    if type(caller)=="table" and caller.v and type(caller.v.object_index)=="number" then
+        return caller.v.object_index>=base
+    end
+    return type(self.vars.room)=="number" and self.vars.room>=base
+end
+-- One warning per double-named asset, naming both IDs, so the merged build
+-- reports which world got which copy instead of silently choosing one.
+function Runtime:reportNameSplit(name,collision)
+    if self.nameSplitReported[name] then return end
+    self.nameSplitReported[name]=true
+    self:warn("name-split:"..name,
+        ("%s exists in both games: Undertale (%s) and Undertale Yellow (%s). A Yellow caller "
+         .. "now resolves Yellow's own asset instead of Undertale's."):format(
+            name,tostring(collision.undertale),tostring(collision.yellow)))
 end
 -- Yellow's decompiler emits a raw asset number wherever it could not prove a
 -- number was an asset ("it can only GUESS what is an Asset and what is just a
@@ -278,7 +339,14 @@ function Runtime:scope(instance,other,args,locals)
             local arg=key:match("^argument(%d+)$")
             if arg then return args[tonumber(arg)+1] or 0 end
             if R.globalNames[key] then return R.global[key] end
-            if R.constants[key]~=nil then return R.constants[key] end
+            -- A name both games use for different assets resolves to the
+            -- caller's own copy (see Runtime:assetName); every other name is
+            -- the constant it always was.
+            if R.constants[key]~=nil then
+                local collision=R.nameCollisions[key]
+                if collision==nil then return R.constants[key] end
+                return R:assetName(key,E)
+            end
             if key=="keyboard_lastkey" then return R.input.lastkey end
             if key=="instance_count" then return #R:select(-3,E) end
             if R.vars[key]~=nil then return R.vars[key] end

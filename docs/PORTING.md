@@ -569,3 +569,126 @@ Recorded limitations for this piece:
 - the boat's depth is event-assigned in every state (the original room data
   carries no instance depth), so the recovered 91×40 canvas cannot move it;
   the sprite's own draw uses the canvas origin, not `scr_depth`.
+
+## No duplicated characters or sprite layers (spec §8 — unified-fusion piece 4)
+
+Spec §8 asks for one authoritative entity and one visual representation per
+character — never an Undertale copy and a Yellow copy of the same thing on screen
+at once — and it asks for the audit to start from the merged name tables rather
+than a hand-written list. Two things were wrong, one per half of that.
+
+**1. The base sprite was drawn twice.** In Yellow's Snowdin the player's body was
+issued twice in the same frame. The room carries a separate `obj_shadow_drawer`
+instance whose Draw event (`generated/yellow/objects/obj_shadow_drawer.lua`,
+event `8:0`) opens a `with (shadow_actor)` scope over the player and draws it
+there — the player itself is `visible` 0 and never enters the normal draw loop.
+Inside that scope three draws happen in a row: line 137 `draw_self()` paints the
+actor with the original palette; line 139 `scr_draw_palette_shader(palette_index)`
+paints **the same actor again** under `sh_palette_swap`
+(`generated/yellow/scripts/scr_draw_palette_shader.lua:12` is
+`shader_set(sh_palette_swap) → draw_self() → shader_reset()`, gated on the actor's
+own `shader_on`); line 141 `draw_sprite_ext(…, c_black, other.draw_alpha*image_alpha)`
+adds the shadow overlay as a separate layer (in this room at alpha 0, i.e.
+invisible). This port reports shaders as unconverted and keeps the original
+colours (`port/yellow_studio.lua`), so the "recoloured" pass paints the same
+pixels of the same frame at the same position, scale, angle, tint and alpha — a
+pixel-identical second draw, which is exactly §8's "do not draw the base sprite
+twice".
+
+The draw log proved it before the fix: two identical actor entries per frame, the
+first from `obj_shadow_drawer.lua:137` with no shader active, the second from
+`scr_draw_palette_shader.lua:12` with `R.shaderState.active` set and the actor's
+`shader_on` = 1 (probes `probe_frame.py`, `probe_trace.py`, `probe_shader_state.py`;
+the whole event dispatches once, so this is one event drawing one character
+twice, not two entities). `port/graphics.lua` now drops that repeat: while an
+unconverted shader is active, a draw whose sprite, frame, fraction, position,
+scale, angle, tint, alpha, owning instance *and* blend state all equal the
+previous draw's is not issued, is counted in `R.shaderRedraws`, logged as
+`sprite-suppressed` and reported once as `shader-redraw`. Everything else still
+draws — a draw under a shader that is not a repeat, and a repeat whose blend
+state changed (the same pixels added on top of themselves are how the original
+asks for a glow) — so nothing disappears from a scene, and the shadow overlay
+beside the body keeps its own tint and is untouched.
+
+**2. The 42 names both games use resolved to one game's asset for every caller.**
+At the pinned revisions the two games name 42 assets the same way while shipping
+different files. Undertale's flat name map is the merged `names`/`constants`
+table, so before this piece *every* caller — Yellow's own scripts included — got
+**Undertale's** Flowey sprite, `obj_floweytrigger`, `mus_shop`, `fnt_main`, …:
+
+| category | names | examples |
+| --- | --- | --- |
+| sprites (10) | `spr_dustcloud`, `spr_fakewaterl`, `spr_fakewateropenl`, `spr_fakewateropenm`, `spr_fakewaterr`, `spr_flowey`, `spr_fridge`, `spr_quittingmessage`, `spr_switch`, `spr_waterice` | `spr_flowey` = UT 1095 / Yellow 1000243 |
+| objects (10) | `obj_alphys_npc`, `obj_chairiel`, `obj_fakewater`, `obj_fakewaterl`, `obj_fakewaterm`, `obj_fakewateropenl`, `obj_fakewateropenm`, `obj_floweytrigger`, `obj_interactable`, `obj_solidparent` | `obj_floweytrigger` = UT 20598 / Yellow 1001312 |
+| sounds (21) | `mus_barrier`, `mus_birdnoise`, `mus_cymbal`, `mus_elevator`, `mus_f_laugh`, `mus_f_newlaugh`, `mus_intronoise`, `mus_shop`, `mus_vsasgore`, `mus_wind`, `snd_ehurt1`, `snd_fall2`, `snd_heavydamage`, `snd_hurtbeef`, `snd_hurtbig`, `snd_hurtbuzz`, `snd_hurtdragon`, `snd_hurtloox`, `snd_hurtsmall`, `snd_screenshake`, `snd_splash` | `mus_shop` = UT 239 / Yellow 1000126 |
+| fonts (1) | `fnt_main` | UT 1 / Yellow 1000009 |
+
+`port/merge.lua` now builds that list from the two manifests themselves
+(`manifest.double_named`, one `{name, category, undertale, yellow}` per pair; a
+new shared name appears by itself) and feeds it into
+`name_collisions_with_undertale`. `Runtime:assetName(name, E)` resolves a shared
+name by the caller's world — Yellow's own asset for a Yellow caller, Undertale's
+for everyone else — and `Runtime:assetOwnerIsYellow(E)` decides that from the
+*calling instance's own ID band*, falling back to the room band only for a caller
+with no instance (a global script or a room's creation code). An asset belongs to
+the content its caller came from, not to the room it is standing in: an Undertale
+character carried into Yellow keeps Undertale's Flowey. The scope read (`E["name"]`
+inside generated code) and `asset_get_index` both go through it, and
+`Runtime:reportNameSplit` warns once per shared name, naming both IDs.
+
+`tools/merge.py` also printed the collision count as `len()` of the report's
+per-category mapping (4 — the number of categories); it now sums the entries
+(`assets both games name: 42 (fonts 1, objects 10, sounds 21, sprites 10)`).
+
+**What can actually reach a colliding name.** The audit was checked against the
+converted code, not assumed: no generated Undertale file calls `asset_get_index`
+at all and none of the 32 shared sprite/sound/font names appears in it as a
+string — Undertale's conversion resolves assets numerically, so the split cannot
+change Undertale. The 10 shared *object* names do appear in Undertale's code as
+its own `with`-style selectors (`E["obj_alphys_npc"]`, `E["obj_fakewater"]`, …),
+which is why the scope read honours the caller's world rather than a room's.
+Yellow's side is the dynamic one: 20 `asset_get_index` call sites in 18 source
+files (`spr_crayon_*`, `spr_size_crayon_*`, `hotland_background_*`, room names
+from `global.current_room_overworld`, script names built at run time). Yellow's
+`__global_object_depths` — the only other place that would turn object *names*
+into IDs (`asset_get_index(global.__objectNames[i])`) — is generated but never
+runs in this port: nothing calls it, and its entry pragma
+`gml_pragma("global", …)` is a reported-unsupported builtin, so
+`global.__objectID2Depth` stays empty (nothing is silently filled with the wrong
+game's object). Should it ever be wired up, it goes through the same
+world-aware `asset_get_index`, so a Yellow caller gets Yellow's object.
+
+Evidence: `tests/test_duplicate_draws.py` (11 tests) — the audit's shape and the
+42-entry ID pairing read from the merged manifest; per-world resolution of all 42
+names through `asset_get_index`, a scope read and the flat constant; the concrete
+twins; an Undertale visitor in a Yellow room keeping Undertale's assets; the
+"no scene shows both copies of one name" sweep over five Undertale and four
+Yellow rooms; the duplicate-draw sweep over the same rooms (sprite ID + owning
+instance provenance from the draw log, with the fractional-sub-index crossfade
+and a differently tinted shadow allowed); the palette shader's dropped redraw;
+an unrelated draw under the same shader still drawn; and an additive repeat of
+identical pixels still drawn.
+
+Fails without the change (each verified by reverting that file alone):
+`port/graphics.lua` → the duplicate sweep reports `sprite draw without
+provenance: spr_regboat` (and the body-draw test fails); `port/merge.lua` → the
+audit test reports `the flat collision list disagrees with the audit: 0 vs 32`
+and `double_named` disappears; `port/runtime.lua` + `port/yellow_builtins.lua` →
+`spr_flowey gave 1095, not Yellow's 1000243; … fnt_main gave 1, not Yellow's
+1000009`; `tools/merge.py` → the count test reports the old
+`name collisions with Undertale: 4`. Full suite: 485 passed, 1 skipped.
+
+Recorded limitations for this piece:
+
+- this is the headless converted flow plus the draw log; the CI LÖVE gate renders
+  the same rooms, but no pixel-level or Android claim is made here;
+- the suppression covers the *duplicate*, not the shader's recolour: shaders
+  remain reported and unconverted, so a palette-swapped pass keeps the original
+  colours and is drawn once instead of twice;
+- the duplicate-draw gate only audits draws that belong to an instance; particle
+  systems, tile layers and backgrounds legitimately repeat one sprite and carry
+  owner −1 (Yellow's snow and dust systems do this thousands of times per frame);
+- "no scene shows both copies" was swept over the five Undertale and four Yellow
+  rooms the merged tests already drive, not every room in both games;
+- the 42 shared names are pinned to the two manifests' revisions; a rebuilt
+  conversion regenerates the list instead of patching it.

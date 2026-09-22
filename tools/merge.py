@@ -49,9 +49,15 @@ def main() -> int:
     manifest = args.output / "manifest.lua"
     manifest.write_text(MODULE)
     yellow = json.loads(yellow_report.read_text())
-    collisions = yellow.get("name_collisions_with_undertale") or []
+    # The report groups the shared names by category, so the honest count is the
+    # sum of the groups -- not len() of the mapping, which is the number of
+    # categories that happen to have a collision.
+    collisions = yellow.get("name_collisions_with_undertale") or {}
+    total = sum(len(entries) for entries in collisions.values())
+    per_category = ", ".join(f"{category} {len(entries)}" for category, entries in sorted(collisions.items()))
     print(f"Merged manifest: {manifest.relative_to(ROOT)}")
-    print(f"Yellow band base: {yellow.get('yellow_base')}; name collisions with Undertale: {len(collisions)}")
+    print(f"Yellow band base: {yellow.get('yellow_base')}; "
+          f"assets both games name: {total} ({per_category})")
     return 0
 
 
