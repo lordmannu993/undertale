@@ -446,9 +446,10 @@ function Travel:beginCrossing(world, room)
     -- Player fields remain authoritative throughout this initialization.
     self:initialize(world, scope)
     if world == "yellow" then
-        -- scr_initialize leaves the modifier slots at new-game state; a merged
-        -- save carries what the player actually equipped (see applyEquipment).
-        self:applyEquipment(scope)
+        -- Piece 5b: the ammo/accessory slots are live shared equipment now
+        -- (port/inventory.lua), and content initialization cannot reset them,
+        -- so no snapshot is re-applied here.  What the player equipped simply
+        -- survives the crossing.
         -- ...and it resets Yellow's own options with them, AUTO RUN included.
         self:applyAutorun()
         -- ...and it resets the UGPS switch and its list with them too.
@@ -494,45 +495,6 @@ function Travel:initialize(world, scope)
     R.playerBridge:withDefaults(function()
         return R:script(name, R:scope(scope))
     end)
-end
-
--- The two extra equipment slots. Frisk keeps Undertale's own weapon and
--- armour globals untouched; Clover's ammunition (Yellow's weapon modifier)
--- and accessories (Yellow's armour modifier) ride beside them, equipped in
--- Yellow's world through Yellow's own pause menu, which swaps the slot with
--- global.item_slot and re-runs its own determine script. scr_initialize
--- resets both slots to new-game state on every crossing, so a merged save
--- re-applies what the player actually equipped afterwards - the same job
--- scr_loadgame's Save1 read does for Yellow alone.
-function Travel:applyEquipment(scope)
-    local R, B = self.runtime, self.runtime.builtins
-    B.ini_open(nil, Travel.SAVE_FILE)
-    local slots = {
-        {global = "player_weapon_modifier", key = "ammo", script = "scr_determine_weapon_modifier_attack",
-         derived = "player_weapon_modifier_attack"},
-        {global = "player_armor_modifier", key = "accessory", script = "scr_determine_armor_modifier_defense",
-         derived = "player_armor_modifier_defense"},
-    }
-    for _, slot in ipairs(slots) do
-        local value = B.ini_read_string(nil, "merge", slot.key, "")
-        -- An empty record means "never equipped in this save", not "a value
-        -- was invented"; leave whatever Yellow's own initializer chose.
-        if value ~= "" and R.global[slot.global] ~= value then
-            if type(R.global[slot.global]) ~= "string" then
-                R:warn("travel-equipment:" .. slot.key,
-                    "Yellow's initializer did not create global." .. slot.global .. "; the equipped " .. slot.key .. " was not restored.")
-            else
-                R.global[slot.global] = value
-                if (R.manifest.scripts or {})[slot.script] then
-                    -- Yellow's determine scripts return the stat; the merged
-                    -- globals that hold it are assigned exactly where
-                    -- scr_initialize assigns them for its own defaults.
-                    R.global[slot.derived] = R:script(slot.script, R:scope(scope))
-                end
-            end
-        end
-    end
-    B.ini_close()
 end
 
 -- AUTO RUN, as the pause menu's setting. Nil means "whatever the game itself

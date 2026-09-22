@@ -120,6 +120,8 @@ function Runtime.new(manifest,input,options)
     -- Bind progression before either game's initializer can create globals.
     -- Single-game manifests keep their original global tables untouched.
     require("port.player").install(self)
+    -- One shared inventory/equipment with numeric/string adapters (piece 5b).
+    require("port.inventory").install(self)
     -- Only a merged manifest has two worlds to travel between.
     require("port.travel").install(self)
     -- Merged builds draw Yellow's player as Frisk (see port/frisk.lua); a

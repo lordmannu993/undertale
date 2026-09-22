@@ -761,11 +761,19 @@ is claimed.
 
 Still pending, explicitly:
 
-- **Inventory and primary equipment remain the legacy implementations.** The
-  shared item catalog, numeric-ID/string-name adaptation, item actions, boxes,
-  key items and four equipment slots are piece **5b**. Yellow's initializer
-  still resets its inventory on re-entry; this sub-piece does not claim to fix
-  that, or the STAT panel's hard-coded `"Clover"` heading and gear labels.
+- **Inventory and primary equipment are unified as piece 5b** (merged after 5a):
+  `port/inventory.lua` holds one shared 8-slot inventory and one four-slot
+  equipment set on `R.player`; `global.item`/`global.item_slot` and the
+  weapon/armor/modifier globals are live views with working numeric/string
+  adapters (paired ids 1/7/13/41/58 resolve per spelling, empty = 0 in
+  Undertale's view and `"Nothing"` in Yellow's), and `generated/merged/items.lua`
+  (`tools/item_catalog.py`, written by `tools/merge.py`) carries both games'
+  extracted item rows - 64 Undertale items (repaired switch labels), 78 Yellow
+  items (GMS2 sources), 5 name pairs; nothing hand-typed. Foreign items run the
+  catalog's use/equip/desc/name/value/stat actions in either content set;
+  Yellow's initializer can fill empty slots (its Missing Poster starter) but no
+  longer resets the shared inventory or equipment on re-entry. Still not
+  claimed: the STAT panel's hard-coded `"Clover"` heading and gear labels.
 - **The world entities/controllers are still replaced on crossing.** Shared
   movement, running in Undertale, combined abilities and battle consumers are
   piece **5c**. The source level-up calculations have not been normalized (for
