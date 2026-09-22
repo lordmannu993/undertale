@@ -752,7 +752,12 @@ mutates HP/EXP/gold through Yellow's aliases, and asserts the same record and
 values on return. `tools/native_smoke.sh` requires its
 `native-unified-player.txt` / `CORE PLAYER PASS` evidence. It is a state probe
 after the scripted opening, not a played-through Yellow battle or an Android
-certification.
+certification. [PR #41](https://github.com/lordmannu993/undertale/pull/41) merged
+as `33ae6c9` after [CI run 35708911107](https://github.com/lordmannu993/undertale/actions/runs/35708911107)
+passed the suite, merged packaging and native gate on source `68eecca`.
+GitHub's checks/step statuses confirm the pass; sandbox downloads of its log
+and artifacts were blocked by TLS EOF, so no independent screenshot inspection
+is claimed.
 
 Still pending, explicitly:
 
