@@ -559,7 +559,7 @@ def test_merged_save_is_versioned_and_a_foreign_version_is_a_named_stop(vm):
         local world=R.builtins.ini_read_string(nil,"merge","world","")
         local room=R.builtins.ini_read_real(nil,"merge","last_room",-1)
         R.builtins.ini_close()
-        if version~=1 then return "version="..tostring(version) end
+        if version~=2 then return "version="..tostring(version) end
         if crossings~=1 then return "crossings="..tostring(crossings) end
         if world~="yellow" then return "world="..tostring(world) end
         if room~=R.vars.room then return "last_room="..tostring(room) end

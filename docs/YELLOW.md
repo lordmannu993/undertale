@@ -289,16 +289,19 @@ Two documented deviations are reported on every run instead of being silent:
   the bridge adds three dock entries to that list with `ds_list_add` and fills the
   same three globals; Yellow's own whale code performs the trip. Frisk lands beside
   the dock room's own boat or player instance.
-- **Initialization at both ends.** Crossing into Yellow runs Yellow's own
-  `scr_initialize()` before the room loads (its room creation code registers fast
-  travel points, which needs the globals it creates), then makes sure exactly one
-  `obj_controller` and one `obj_pl` exist. Persistent instances of the world being
-  left are destroyed, so there is never a second player. Undertale needs no
-  equivalent: the merged build boots through Undertale's own title flow.
-- **Versioned merged saves.** `merge.sav` carries `version`, `crossings`,
-  `last_room` and `world`. It is additive: each game keeps the save files it
-  already writes, so a single-game save is never rewritten. A file with an unknown
-  version is a named stop, not a guess.
+- **Initialization at both ends.** The first crossing into Yellow runs Yellow's
+  own `scr_initialize()` before the room loads (its room creation code registers
+  fast travel points, which needs the globals it creates), then makes sure exactly
+  one `obj_controller` and one `obj_pl` exist. A later entry does not run that
+  script again (piece 5d): it is a new-game reset. Persistent instances of the
+  world being left are destroyed, so there is never a second player. Undertale
+  needs no equivalent: the merged build boots through Undertale's own title flow.
+- **Versioned merged saves.** Since piece 5d, `merge.sav` version 2 is the
+  Player+World document (`docs/PORTING.md`). `[merge]` still carries `version`,
+  `crossings`, `last_room`, `world`, `ammo` and `accessory`. `file0` and
+  `Save.sav` stay as projections. A file with an unknown version is a named stop,
+  not a guess. Version 1 is copied to `merge.sav.v1` and migrated; the copy is
+  not deleted.
 - **Packaging gate.** `tools/package.py --merged` refuses to build unless the
   Yellow conversion reached its rooms stage with no compile errors, and never
   regenerates Yellow itself.
@@ -420,9 +423,11 @@ earlier note said 20; the pinned source places it in 19).
   its ammunition (weapon modifier) and accessories (armour modifier) through
   `scr_item_use`, swapping with `global.item_slot` and re-running Yellow's own
   determine scripts — the merged runtime adds nothing to that flow.
-  `port/travel.lua` carries the loadout in `merge.sav` (`ammo`, `accessory`)
-  and re-applies it after every crossing, because `scr_initialize` resets both
-  slots to new-game state; the derived `player_weapon_modifier_attack` /
+  `port/travel.lua` carries the loadout in `merge.sav` (`ammo`, `accessory`).
+  That release re-applied it after every crossing, because `scr_initialize`
+  reset both slots; piece 5b removed the re-apply (the slots are live shared
+  equipment) and piece 5d skips `scr_initialize` on re-entry. The derived
+  `player_weapon_modifier_attack` /
   `player_armor_modifier_defense` are recomputed through Yellow's own scripts,
   the same assignment `scr_initialize` itself makes.
 - **Native fused-world gates.** `port/smoke.lua` now ends the LÖVE/xvfb gate

@@ -7,7 +7,8 @@
 --
 -- Only aliases with the same meaning are bound here. Inventory and primary
 -- equipment need an item-ID compatibility table (UT numbers / Yellow strings),
--- and movement and the Player+World save format are subsequent pieces. In
+-- Movement is the controller (piece 5c). The Player+World save is port/save.lua
+-- (piece 5d). In
 -- particular, kills (UT's total vs Yellow's remaining regional populations),
 -- battle speed and temporary encounter state are NOT guessed to be synonyms.
 local Player = {}
