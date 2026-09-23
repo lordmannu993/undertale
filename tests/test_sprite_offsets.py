@@ -40,16 +40,19 @@ KEY_OFFSETS = {
 
 
 def test_offsets_are_recorded_with_provenance():
-    assert OFFSETS["format"] == 1
+    # Format 2 adds the second list: a candidate whose canvas is pinned but whose
+    # offset no route proves is recorded under "canvas" and never shifted.
+    assert OFFSETS["format"] == 2
     assert (OFFSETS["upstream"], OFFSETS["ref"]) == (recovery.UPSTREAM, recovery.UPSTREAM_REF)
-    assert "offset = (bbox_left - art_left" in OFFSETS["rule"]
+    assert "symmetric-bbox-edges" in OFFSETS["rule"] and "canvas-span" in OFFSETS["rule"]
     counts = OFFSETS["counts"]
     assert counts == {
-        "candidates": len(OFFSETS["sprites"]) + len(OFFSETS["unresolved"]),
+        "candidates": len(OFFSETS["sprites"]) + len(OFFSETS["canvas"]) + len(OFFSETS["unresolved"]),
         "recovered": len(OFFSETS["sprites"]),
+        "canvas": len(OFFSETS["canvas"]),
         "unresolved": len(OFFSETS["unresolved"]),
     }
-    assert counts["recovered"] > 0 and counts["unresolved"] > 0
+    assert counts["recovered"] > 0 and counts["canvas"] > 0 and counts["unresolved"] > 0
 
 
 @pytest.mark.parametrize("name,expected", sorted(KEY_OFFSETS.items()))
@@ -100,15 +103,17 @@ def test_dogboat_hull_offset_is_the_anchored_derivation():
 def test_every_candidate_is_recovered_or_explained():
     reasons = {entry["reason"] for entry in OFFSETS["unresolved"]}
     assert reasons <= {"two-sided-disagreement", "bbox-differs-from-upstream",
-                       "canvas-too-small", "not-in-upstream", "fetch-failed", "missing-fields"}
+                       "bbox-outside-canvas", "canvas-too-small", "not-in-upstream",
+                       "fetch-failed", "missing-fields", "frame-set-differs-from-upstream"}
     for entry in OFFSETS["unresolved"]:
         assert entry["name"].startswith("spr_")
         assert entry["reason"]
     recovered = set(OFFSETS["sprites"])
+    canvases = set(OFFSETS["canvas"])
     unresolved = {entry["name"] for entry in OFFSETS["unresolved"]}
-    assert not (recovered & unresolved)
+    assert not (recovered & unresolved) and not (recovered & canvases) and not (canvases & unresolved)
     # A candidate that is not in the file at all would be a silent drop.
-    assert recovered | unresolved == set(recovery.candidates())
+    assert recovered | canvases | unresolved == set(recovery.candidates())
 
 
 def test_checked_in_offsets_still_follow_the_rule():

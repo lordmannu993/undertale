@@ -7,9 +7,12 @@ The original-game layering, pinned here from the draw log:
 
 and during the ride the water pillar (depth -1) is in front of everything.
 The room instance depths are the original room data (49330 hull / 49320
-riverman / 49300 player in the water and fire docks, 950000 boat in the
-tundra dock); this piece does not move anything to a different global
-render layer, it repairs two pixel defects inside that layering:
+riverman in the water and fire docks, 950000 boat in the tundra dock); the
+player is placed with no authored depth and takes scr_depth's key, which
+piece 6a moved onto the recovered canvas height (49310 in the dock at y=100,
+was 49300 with the 29px cropped export). This piece does not move anything to
+a different global render layer, it repairs two pixel defects inside that
+layering:
 
 * ``spr_dogboat`` was the one boat sprite whose crop offset never recovered
   (the upstream vertical edges disagree: the export trimmed transparent
@@ -39,8 +42,12 @@ LIVE = (ROOT / "yellow_src").is_dir()
 live = pytest.mark.skipif(not LIVE, reason="needs the pinned Yellow source: tools/fetch_yellow.py")
 
 # Original room data (decompiled rooms), pinned as the layering reference.
-DOCK_DEPTH = {"boat": 49330, "riverman": 49320, "player": 49300}
-TUNDRA_DEPTH = {"boat": 950000, "riverman": 49320, "player": 48280}
+# The boat and riverman depths are authored room data. The player's is the key
+# scripts/scr_depth.gml computes from y and sprite_height: 50000 - 10y + 10h,
+# with h the *canvas* height piece 6a pinned (spr_maincharad 19x29 exported,
+# 20x30 canvas). Before that piece the cropped 29 read as 49300 / 48280 here.
+DOCK_DEPTH = {"boat": 49330, "riverman": 49320, "player": 49310}
+TUNDRA_DEPTH = {"boat": 950000, "riverman": 49320, "player": 48290}
 
 
 @pytest.fixture(scope="session")

@@ -3,6 +3,10 @@
 -- Draw. love.draw only presents the cached canvas; 120 Hz phones must not run
 -- dialogue/battle logic four times faster than 30 Hz GameMaker rooms.
 local Graphics={}
+-- Sprite sizes are reported in original-game (canvas) pixels through one
+-- accessor, so a cropped Undertale export and an uncropped Yellow sprite answer
+-- in the same units (see port/assetcompat.lua and spec section 12).
+local AssetCompat=require("port.assetcompat")
 local function clamp(n,a,b) return math.max(a,math.min(b,n)) end
 local function rgba(color,alpha)
     color=math.floor(color or 16777215)%16777216
@@ -416,8 +420,11 @@ function Graphics.install(R)
     B.draw_sprite_stretched=function(E,index,sub,x,y,w,h)
         local s=R.assets.sprites[index];if s then sprite(E,index,sub,x,y,w/s.width,h/s.height,0,16777215,state.alpha,{0,0,s.width,s.height}) end
     end
-    B.sprite_get_width=function(_,index) local s=R.assets.sprites[index];return s and s.width or 0 end
-    B.sprite_get_height=function(_,index) local s=R.assets.sprites[index];return s and s.height or 0 end
+    -- The original canvas size, not the exported (possibly cropped) pixels:
+    -- Undertale's own events size enemy attacks and reels from these numbers, and
+    -- the canvas is what they were written against (see port/assetcompat.lua).
+    B.sprite_get_width=function(_,index) return AssetCompat.spriteWidth(R,index) end
+    B.sprite_get_height=function(_,index) return AssetCompat.spriteHeight(R,index) end
     B.sprite_get_name=function(_,index) local s=R.assets.sprites[index];return s and s.name or "<undefined>" end
     B.sprite_exists=function(_,index) return R.num(R.assets.sprites[index]~=nil) end
     B.sprite_delete=function(_,index)

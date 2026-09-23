@@ -11,6 +11,9 @@
 --   * GPU state that has no LÖVE equivalent (alpha test, texel repeat, cull
 --     mode, z-test, fog, colour write mask) is recorded and reported. Blend
 --     modes DO have one and are applied.
+-- Sprite sizes and origins answer in original-canvas pixels through the one
+-- accessor both worlds share (port/assetcompat.lua, spec section 12).
+local AssetCompat=require("port.assetcompat")
 local BLEND={
     bm_normal={"alpha","alphamultiply"},
     bm_add={"add","premultiplied"},
@@ -723,10 +726,10 @@ return function(R)
         return text:sub(1,at-1)..tostring(needle)..text:sub(at)
     end)
     reg("sprite_get_number",function(_,index) local sprite=R.assets.sprites[index];return sprite and #sprite.frames or 0 end)
-    reg("sprite_get_xoffset",function(_,index) local sprite=R.assets.sprites[index];return sprite and sprite.xorig or 0 end)
-    reg("sprite_get_yoffset",function(_,index) local sprite=R.assets.sprites[index];return sprite and sprite.yorigin or 0 end)
-    reg("sprite_get_width",function(_,index) local sprite=R.assets.sprites[index];return sprite and sprite.width or 0 end)
-    reg("sprite_get_height",function(_,index) local sprite=R.assets.sprites[index];return sprite and sprite.height or 0 end)
+    reg("sprite_get_xoffset",function(_,index) return AssetCompat.xoffset(R.assets.sprites[index]) end)
+    reg("sprite_get_yoffset",function(_,index) return AssetCompat.yoffset(R.assets.sprites[index]) end)
+    reg("sprite_get_width",function(_,index) return AssetCompat.spriteWidth(R,index) end)
+    reg("sprite_get_height",function(_,index) return AssetCompat.spriteHeight(R,index) end)
     reg("sprite_duplicate",function(_,index)
         local sprite=R.assets.sprites[index]
         if not sprite then return -1 end

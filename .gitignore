@@ -20,3 +20,5 @@ local.properties
 # Undertale Yellow source is fetched from the pinned commit, never committed
 /yellow_src/
 /.yellow-cache/
+# Pinned upstream sprite metadata cache (tools/recover_sprite_offsets.py --refresh)
+/.sprite-cache/
