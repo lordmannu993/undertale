@@ -42,7 +42,7 @@ git merge --no-edit origin/<that-open-PR-branch>   # clean fast-forward from mas
 | most recent merged piece | **#5b Shared inventory and equipment** — [PR #43](https://github.com/lordmannu993/undertale/pull/43), merged to `master` as `8d3e170` on 2026-09-22; [CI 35753638069](https://github.com/lordmannu993/undertale/actions/runs/35753638069) green. Advance this line to **5c** only after that PR merges |
 | in-flight piece | **#5c unified player controller** — implemented on this branch; not merged, so it is not the head a fresh session inherits |
 | next ⬜ piece | **#5d** `Player`+`World` save, after 5c merges. Do not start 5d or piece 6 while 5c is unmerged |
-| in-flight open PR | *(opened with this increment; the URL is recorded here once the PR exists)* |
+| in-flight open PR | **[#44](https://github.com/lordmannu993/undertale/pull/44)** — piece 5c on `arena/01a0ca12-undertale`. Do not start 5d until it merges |
 
 ---
 
