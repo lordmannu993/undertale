@@ -229,6 +229,24 @@ Check whether this is caused by:
 
 Fix the **underlying cause** rather than simply hiding the duplicated features.
 
+> Claim (scoped to what ran, 2026-09-23): the Snowdin shopkeeper renders as
+> intended, and piece **7** pins it. The owner's four-eyes/floating-mouth
+> screenshot was the room's three face layers losing their canvas alignment:
+> the cropped body export drew at `(130, 0)` instead of its recovered canvas
+> position `(131, 9)` (fixed by the crop-offset recovery), and before the
+> instance-array recovery the emotion faces did not draw at all
+> (`Unresolved sprite ID 881`). The draw log now shows, for `faceemotion` 0,
+> exactly one body (`x=130 y=0 ox=1 oy=9`), one blink strip (`x=148 y=40`) and
+> one mouth (`x=157 y=50`), and for `faceemotion` 1–6 exactly one face apiece
+> (`x=150 y=36` with origin `(1, 4)`), the mouth layer swapped out, the face
+> covering the strip's eye band and the body's painted face. Evidence:
+> `tests/test_asset_arrays.py` — `test_shopkeeper_default_face_layers_seat_exactly`
+> fails without the crop carriage, `test_shopkeeper_emotion_faces_cover_the_default_face_and_swap_out_the_mouth`
+> fails without the recovered array IDs — plus the two earlier pieces' tests.
+> Headless draw log only; no pixel-perfect parity against a captured original
+> frame, no blink/talk-rate claim beyond the shared frame selection, and no
+> other shop room swept (`obj_shopmouth1` destroys itself outside room 311).
+
 ## 8. Do Not Duplicate Characters or Sprite Layers
 
 Because this is a fusion project, be especially careful about accidentally rendering the same

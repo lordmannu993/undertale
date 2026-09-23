@@ -188,6 +188,115 @@ def test_shopkeeper_emotion_faces_draw_in_the_shop(lua):
     assert not unresolved, f"shop face draw still unresolved: {unresolved}"
 
 
+def test_shopkeeper_default_face_layers_seat_exactly(lua):
+    """§7 visual sweep, emotion 0: three layers, one pair of eyes, a seated mouth.
+
+    ``obj_shop1``'s Draw paints the body at ``(shx, 0)`` -- a cropped 61x111
+    export whose recovered canvas offset is ``(1, 9)`` -- and the shop adds the
+    blinking eyes at ``(18 + shx, 40)`` (Create) and the mouth at
+    ``(shx + 27, 50)`` (obj_shopmouth1 Create). Those positions were authored
+    against the *original canvas*, so the layers only show one face when the
+    body's exported pixels land at their canvas position ``(shx + 1, 9)``:
+    eyes 17 columns and 31 rows into the body's bitmap, mouth at (26, 41).
+    Without the crop carriage the body's painted eyes and mouth ride 9 rows up
+    and 1 column left of the overlays -- four eyes and a floating mouth, the
+    owner's original screenshot.
+    """
+    lua.execute('''
+        R:start(); tick(5)
+        R:gotoRoom(R.constants.room_shop1); R:applyTransitions(); tick(3)
+        assert(R.roomState.name == "room_shop1")
+        R.global.faceemotion=0
+        R.drawLog={}
+        R:renderFrame()
+        LAYERS={}
+        local n=0
+        for _,e in ipairs(R.drawLog) do
+            if e[1]=="sprite" and tostring(e[2]):find("shopkeeper1") then
+                n=n+1
+                LAYERS[n]={name=tostring(e[2]),x=e[4],y=e[5],ox=e[11],oy=e[12]}
+            end
+        end
+        LAYERS.n=n
+    ''')
+    count = lua.eval("LAYERS.n")
+    layers = [{k: lua.eval(f"LAYERS[{i}].{k}")
+               for k in ("name", "x", "y", "ox", "oy")} for i in range(1, count + 1)]
+    names = [layer["name"] for layer in layers]
+    assert names == ["spr_shopkeeper1", "spr_shopkeeper1eyes", "spr_shopkeeper1mouth"], \
+        f"room 311 must draw body, eyes and mouth exactly once each: {names}"
+    body, eyes, mouth = layers[0], layers[1], layers[2]
+    assert (body["x"], body["y"]) == (130, 0), "obj_shop1 draws the body at (shx, 0), shx=130"
+    assert (body["ox"], body["oy"]) == (1, 9), \
+        "the cropped export must carry its recovered canvas offset (port/sprite_offsets.json)"
+    assert (eyes["x"], eyes["y"]) == (148, 40), "the eyes blink at (18 + shx, 40)"
+    assert (mouth["x"], mouth["y"]) == (157, 50), "the mouth sits at (shx + 27, 50)"
+    bx, by = body["x"] + body["ox"], body["y"] + body["oy"]
+    assert (eyes["x"] - bx, eyes["y"] - by) == (17, 31), \
+        "the eyes strip must sit on the body's painted eye band, not beside it"
+    assert (mouth["x"] - bx, mouth["y"] - by) == (26, 41), \
+        "the mouth must sit on the body's muzzle, not float above it"
+
+
+def test_shopkeeper_emotion_faces_cover_the_default_face_and_swap_out_the_mouth(lua):
+    """§7 visual sweep, emotions 1-6: one face, drawn once, over the default.
+
+    ``obj_shopmouth1``'s Draw swaps the mouth for ``facespr[faceemotion]`` at
+    ``(shx + 20, 36)`` -- so the separate mouth must not draw -- and the face
+    sprites carry origin ``(1, 4)``, putting the 25x25 bitmap at
+    ``(shx + 19, 32)``: 18 columns and 23 rows into the body's bitmap, which
+    covers the body's painted eyes (bitmap rows 31-36), the blinking strip's
+    band (rows 31-37, dark pixels from column 18) and the body's own mouth
+    (rows 42-45). One pair of eyes, the painted mouth seated on the muzzle.
+    """
+    lua.execute('''
+        R:start(); tick(5)
+        R:gotoRoom(R.constants.room_shop1); R:applyTransitions(); tick(3)
+        assert(R.roomState.name == "room_shop1")
+        ROWS={}
+        for emo=1,6 do
+            R.global.faceemotion=emo
+            R.drawLog={}
+            R:renderFrame()
+            local t={}
+            for _,e in ipairs(R.drawLog) do
+                if e[1]=="sprite" and tostring(e[2]):find("shopkeeper1") then
+                    t[#t+1]={name=tostring(e[2]),x=e[4],y=e[5],ox=e[11],oy=e[12],oX=e[17],oY=e[18]}
+                end
+            end
+            ROWS[emo]=t
+        end
+    ''')
+    for emo in range(1, 7):
+        count = lua.eval(f"#ROWS[{emo}]")
+        layers = [{k: lua.eval(f"ROWS[{emo}][{i}].{k}")
+                   for k in ("name", "x", "y", "ox", "oy", "oX", "oY")}
+                  for i in range(1, count + 1)]
+        layers = {layer["name"]: layer for layer in layers}
+        names = list(layers)
+        face = f"spr_shopkeeper1_face{emo}"
+        assert names == ["spr_shopkeeper1", "spr_shopkeeper1eyes", face], \
+            f"emotion {emo}: body, blinking eyes and exactly one face: {names}"
+        assert "spr_shopkeeper1mouth" not in layers, \
+            f"emotion {emo}: the face replaces the mouth layer"
+        body, face_row = layers["spr_shopkeeper1"], layers[face]
+        assert (face_row["x"], face_row["y"]) == (150, 36), \
+            f"emotion {emo}: the face draws at (shx + 20, 36)"
+        assert (face_row["oX"], face_row["oY"]) == (1, 4), \
+            f"emotion {emo}: the face sprites' origin is (1, 4)"
+        bx, by = body["x"] + body["ox"], body["y"] + body["oy"]
+        assert (face_row["x"] - face_row["oX"] - bx, face_row["y"] - face_row["oY"] - by) == (18, 23), \
+            f"emotion {emo}: the face bitmap must cover the body's painted face"
+        left, top = face_row["x"] - face_row["oX"], face_row["y"] - face_row["oY"]
+        assert left <= layers["spr_shopkeeper1eyes"]["x"] + 2, \
+            f"emotion {emo}: the face must cover the strip's dark eye pixels (they start 2 columns in)"
+        strip = layers["spr_shopkeeper1eyes"]
+        assert top <= strip["y"] and top + 25 >= strip["y"] + 7, \
+            f"emotion {emo}: the face must cover the blinking strip's whole band"
+    unresolved = [str(w) for w in lua.eval("R.warningList") if "Unresolved sprite ID" in str(w)]
+    assert not unresolved, f"shop face draw still unresolved: {unresolved}"
+
+
 def test_recovery_check_mode_runs_offline():
     """`--check` is the CI-facing offline re-derivation gate; it must not need the network."""
     result = subprocess.run([sys.executable, str(ROOT / "tools/recover_asset_arrays.py"), "--check"],
