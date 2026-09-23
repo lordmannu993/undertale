@@ -92,7 +92,13 @@ and the run button (**X**) walks instead, exactly as Yellow's own
 `scr_normal_state` decides it. Unlike COLLISION it *is* a setting — off by
 default, saved with the others in `touch-settings-v1.txt`, applied on launch and
 re-applied on every crossing, because Yellow's initialiser resets its options on
-the way in.
+the way in. AUTO RUN does **not** sprint in Undertale areas.
+
+Undertale areas do run, on the same cluster Yellow uses (`keyboard_multicheck(1)`:
+**X** or **Shift**). That is one extra 3px lattice step on top of Undertale's own
+3px walk, drawn as Clover's base run cycle, and only while the shared run ability
+is on. It is not Yellow's +2 speed, and it is not gated by AUTO RUN. Exact
+speeds, origins and run-mask hitboxes are piece 6.
 
 Extra-key panels temporarily cover the game picture; they are not intended to
 replace the large D-pad/Z/X/C controls during normal battles. Very small windows

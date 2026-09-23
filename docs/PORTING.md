@@ -774,11 +774,9 @@ Still pending, explicitly:
   Yellow's initializer can fill empty slots (its Missing Poster starter) but no
   longer resets the shared inventory or equipment on re-entry. Still not
   claimed: the STAT panel's hard-coded `"Clover"` heading and gear labels.
-- **The world entities/controllers are still replaced on crossing.** Shared
-  movement, running in Undertale, combined abilities and battle consumers are
-  piece **5c**. The source level-up calculations have not been normalized (for
-  example, Undertale's LV-20 max HP is 99; Yellow's table says 100). This piece
-  preserves the actual value; it does not silently choose a different rule.
+- **The shared controller is piece 5c**, documented in the next section. 5a
+  did not merge the entities or pick a level-up rule; 5c does the second of
+  those and leaves the entities as the rooms place them.
 - **Persistence is not yet unified.** Existing `file*` / `Save.sav` scripts now
   read/write the live core aliases, but `merge.sav` v1 still only records travel
   and modifier slots. It cannot restore this Player and the whole World in one
@@ -786,3 +784,74 @@ Still pending, explicitly:
   The `Player` + `World` format, legacy migration, world lifecycle and both
   save-point/load paths are piece **5d**. No migration or restart-resume claim
   is made here, and no new downloadable release is published for 5a.
+
+## Shared player controller (spec §3, §15 — unified-fusion piece 5c)
+
+One `R.player.controller`, installed only when `manifest.game == "merged"`,
+after `port/frisk.lua`. `obj_mainchara` and `obj_pl` stay the entities their
+rooms place. Crossing still leaves exactly one of them. There is no third
+player object and no per-room swap of controllers.
+
+**Run.** Yellow's compiled rule is unchanged: `option_autorun` XOR (the run
+button AND `player_can_run`). That button is `keyboard_multicheck(1)` — Shift
+(16) or 120, and physical X once `obj_screen` maps 88 to 16. Undertale does
+not read AUTO RUN. While `player_can_run` is 1, holding that cluster adds one
+extra ±3 lattice step on the Undertale adapter only, and only on an axis whose
+net delta from the frame-start `xprevious`/`yprevious` is already exactly ±3.
+The bonus is the start of End Step (`3:2`), before the camera follows `x`.
+Collision runs with `xprevious` set to the walked spot, then `xprevious` is
+restored to the frame start so a blocked bonus does not look like the walk
+never happened. `image_speed` becomes Yellow's `1/3` after the original End
+Step, and only if the player actually moved and `image_speed` was not already
+0. Yellow gets no extra step; its `is_sprinting` is copied onto
+`R.player.movement`. `player_can_run` is the shared `abilities.run` flag,
+stored as 1/0 (a Lua boolean would fail Yellow's `== true`), default 1.
+`withDefaults` does not replace a value that is already set.
+
+**Draw.** While the live `obj_mainchara` is sprinting, the four base walk
+sprites (`spr_maincharad/u/l/r`) draw `spr_pl_run_down/up/left/right`. The
+mask stays the walk sprite. A nil draw owner is identity, which is what the
+older remap tests pin. Umbrella and other costumes have no Clover run pair;
+none is invented. Yellow's 24 run poses stay out of the walk remap.
+
+**Facing.** Captured on `gotoRoom`, before `scr_initialize` creates `obj_pl`
+at `direction = 270`. Published to `global.facing` before the room's Create
+events, then applied after the load: Undertale 0/1/2/3 is Yellow 270/0/90/180.
+Nil until the first capture, so a fresh game is not forced to face down.
+
+**Abilities.** Menu (17/67/99) and interact (13/90/122/89) are
+`R.player.abilities`, checked through a frame-local `Input.suppressed` that
+is cleared at the end of the step. 88 and 16 are never suppressed, and the
+gate does not call `Input:clear` (that would drop the boat latch and the
+single-game `hold(39, 20)` ⇒ +60 probe).
+
+**Progression.** Yellow's fade alarm still grants EXP and gold. If that write
+changed LV, max HP, AT or DF, the controller snapshots current HP, sets LV to
+-1, calls Undertale's `scr_levelup`, and restores HP (and a leftover -1).
+That script is the shared rule: LV 20 is 99/99/99 and EXP caps at 99999.
+Yellow's `*_next` tables are not a second rule and are not edited. A grant
+that does not change those stats does not call the script, so a custom AT
+survives; the EXP cap still calls it when EXP is already at least 99999,
+without forcing LV to -1. Crossing does not reconcile. Current HP is not a
+level-up output.
+
+**Battle consumers.** Standing views stay what 5b pinned: ammo is not in
+`wstrength` (Real Knife + temy armour is 109, not 112) and accessory defense
+is not in `adef`. For the duration of one script, `battleCompose` adds ammo
+inside Undertale's `scr_attackcalc` / `scr_mercystandard`, the armour's weapon
+bonus inside Yellow's five attacking-damage scripts, and accessory defense
+inside `scr_damagestandard`. The wrappers are injected `R.scripts` entries
+(Undertale by index, Yellow by name). Item, save, init and Martlet scripts
+are not wrapped. Target-bar weak/strong scaling is not honored.
+
+Evidence: `tests/test_unified_controller.py` (5 tests). Uninstalling the
+controller fails all five (no sprint, no solid-probe sprint, no controller,
+LV 2 max HP 20 instead of 24, fight power 119 instead of 122). Skipping only
+the bonus collision check fails the wall test with a 6px step.
+Full local suite: **526 passed, 1 skipped** with
+`PORT_REQUIRE_YELLOW=1 .venv/bin/python -m pytest -q`.
+
+Not claimed: Android, audio, pixel-perfect origins, piece 6's cropped sizes
+and exact speeds, a native X-run (CI still runs the existing
+`CORE PLAYER PASS` crossing probe only), a unified save (`merge.sav` is still
+5d), or that the fusion is complete.
