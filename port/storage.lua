@@ -161,5 +161,13 @@ return function(R)
         B.ini_close()
         for id,h in pairs(handles) do if h.mode=="w" then write(h.name,h.data);handles[id]=nil end end
     end
+    -- The unified save (piece 5d) copies legacy files aside and embeds
+    -- undertale.ini. Both go through the same path checks as GML file_*.
+    function R:readSaveFile(name)
+        return read(name)
+    end
+    function R:writeSaveFile(name, data)
+        return write(name, data)
+    end
     R.saveMemory=memory
 end

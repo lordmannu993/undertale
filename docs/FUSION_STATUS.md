@@ -40,9 +40,9 @@ git merge --no-edit origin/<that-open-PR-branch>   # clean fast-forward from mas
 | field | value |
 | --- | --- |
 | most recent merged piece | **#5c Shared player controller** — [PR #44](https://github.com/lordmannu993/undertale/pull/44), merged to `master` as `bdef72f` on 2026-09-23; [CI + native gate 35810358055](https://github.com/lordmannu993/undertale/actions/runs/35810358055) green |
-| in-flight piece | *(none — 5c merged; parent #5 remains in progress until 5d)* |
-| next ⬜ piece | **#5d** `Player`+`World` save. Do not skip to piece 6 or 7 |
-| in-flight open PR | *(none for implementation — start 5d from master)* |
+| in-flight piece | **#5d Player+World save** — implemented on this branch, not merged. §1 stays on 5c until this PR merges |
+| next ⬜ piece | **#6** after 5d merges. Do not start 6 or 7 while 5d is unmerged |
+| in-flight open PR | this branch (`arena/01a0cc32-undertale`); number filled when the PR is open |
 
 ---
 
@@ -87,7 +87,7 @@ piece may be split into sub-pieces if it is too large for one green increment.
 | 2 | §4, §5 | **Depth / Y-sort** — order the draw list by the sprite's visual bottom point, stable tie-break, keep per-world `scr_depth` routing | ✅ | `tools/convert.py` (canvas carriage), `port/runtime.lua` (canvas reads, depth hook), `port/yellow_layers.lua` (managed layers), `port/graphics.lua` (slot tie-break), `tests/test_depth_sort.py`, `docs/PORTING.md`, `AGENTS.md` | [PR #37](https://github.com/lordmannu993/undertale/pull/37) / `tests/test_depth_sort.py` (11 tests; 10 proven to fail without the fix) |
 | 3 | §6 | River Person boat/water rendering — split into components, not a blanket global layer | ✅ | `tools/recover_sprite_offsets.py` (anchored path), `port/sprite_offsets.json` (448/980), `port/graphics.lua` (fractional sub-index crossfade), `tests/test_boat_water.py`, `tests/test_sprite_offsets.py`, `docs/PORTING.md` (rooms 125/70/140/316 pinned: depths 49330/49320/49300, ride 340→118, pillar −1 in front) | [PR #38](https://github.com/lordmannu993/undertale/pull/38) / `tests/test_boat_water.py` (10 tests; the offset test and the ripple test proven to fail without the change) + the anchored-provenance test in `tests/test_sprite_offsets.py` |
 | 4 | §8 | No duplicated characters/sprite layers — a character is drawn once; the 42 shared asset names resolve per world | ✅ | `port/graphics.lua` (draw provenance + unconverted-shader duplicate drop), `port/merge.lua` (`double_named`), `port/runtime.lua` (`assetName`/`assetOwnerIsYellow`/`reportNameSplit`), `port/yellow_builtins.lua` (world-aware `asset_get_index`), `tools/merge.py` (honest 42), `tests/test_duplicate_draws.py`, `docs/PORTING.md` | `tests/test_duplicate_draws.py` (11 tests; all five changes proven load-bearing by reverting each file: `sprite draw without provenance: spr_regboat`, `the flat collision list disagrees with the audit: 0 vs 32`, `spr_flowey gave 1095, not Yellow's 1000243`, `name collisions with Undertale: 4`) — [PR #39](https://github.com/lordmannu993/undertale/pull/39) |
-| 5 | §1 §3 §9–§11 §13 §14 | **Unified Player state** (split into 5a–5d below): one Player record + shared item table, projected at world boundaries, serialised as `Player` + `World` blocks; crossing zeroes `flag[0..29]` (do not park state there) | 🚧 **5a–5c merged; 5d pending** | `port/player.lua`, `port/inventory.lua`, `port/controller.lua`, `port/runtime.lua`, `port/travel.lua`, `port/storage.lua`, `port/merge.lua`, `port/frisk.lua`, `tools/item_catalog.py`, `tests/test_unified_player_state.py`, `tests/test_unified_inventory.py`, `tests/test_unified_controller.py`, `docs/` | 5a: [PR #41](https://github.com/lordmannu993/undertale/pull/41), 23 targeted tests. 5b: [PR #43](https://github.com/lordmannu993/undertale/pull/43), 13 targeted tests. 5c: [PR #44](https://github.com/lordmannu993/undertale/pull/44), 5 targeted tests. Parent piece is **not complete** (5d, then piece 8) |
+| 5 | §1 §3 §9–§11 §13 §14 | **Unified Player state** (split into 5a–5d below): one Player record + shared item table, projected at world boundaries, serialised as `Player` + `World` blocks; crossing zeroes `flag[0..29]` (do not park state there) | 🚧 **5a–5c merged; 5d implemented, not merged** | `port/player.lua`, `port/inventory.lua`, `port/controller.lua`, `port/save.lua`, `port/runtime.lua`, `port/travel.lua`, `port/storage.lua`, `port/merge.lua`, `port/frisk.lua`, `tools/item_catalog.py`, `tests/test_unified_player_state.py`, `tests/test_unified_inventory.py`, `tests/test_unified_controller.py`, `tests/test_unified_save.py`, `docs/` | 5a: [PR #41](https://github.com/lordmannu993/undertale/pull/41), 23 targeted tests. 5b: [PR #43](https://github.com/lordmannu993/undertale/pull/43), 13 targeted tests. 5c: [PR #44](https://github.com/lordmannu993/undertale/pull/44), 5 targeted tests. 5d: `tests/test_unified_save.py`, 8 tests. Parent piece is **not complete** until 5d merges, then piece 8 |
 | 6 | §12 | Asset compatibility layer — `sprite_get_width/height` return cropped size at ~95 sites; per-frame origins; movement speed (UT 3 px/frame, Yellow +2 autorun); hitboxes/collision; the 980 `unresolved[]` crop offsets (never guess) | ⬜ | `port/graphics.lua`, `port/collision.lua`, `tools/yellow/assets.py`, `tests/`, `docs/PORTING.md` | — |
 | 7 | §7 (visual) | Shopkeeper §7 visual sweep — confirm, via the draw log, exactly one pair of eyes + a correctly-seated mouth for `faceemotion` 0–6 in room 311 (the ID half is piece 1) | ⬜ | `tests/test_asset_arrays.py` (extend), draw-log evidence in PR | — |
 | 8 | §15, §16 | Acceptance matrix + final merge — this file maps every requirement → code path / test / evidence; keep `AGENTS.md` current; then the single final merge | ⬜ | this file, `AGENTS.md`, PR body | — |
@@ -96,8 +96,8 @@ piece may be split into sub-pieces if it is too large for one green increment.
 
 5a is intentionally a small, verifiable increment; it does **not** mark all of
 §1/§3/§9–§11/§13/§14 done. Inventory (5b) and the shared controller (5c) are no
-longer parallel copies. The save path is still a per-world snapshot and must be
-replaced, not papered over.
+longer parallel copies. The save path (5d) is one Player+World document; it is
+not merged yet, and piece 5 is not complete until it is.
 
 | sub-piece | deliverable | state / evidence |
 | --- | --- | --- |

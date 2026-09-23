@@ -26,7 +26,9 @@
 -- player has walked past (see openWhaleService). Neither service invents a
 -- destination: the stops and their landings stay the games' own data.
 local Travel = {}
-Travel.VERSION = 1
+-- merge.sav version 2 is the Player+World document in port/save.lua. Version 1
+-- is travel metadata and is migrated, not read as a save.
+Travel.VERSION = 2
 Travel.SAVE_FILE = "merge.sav"
 
 local RIVER_DESTINATIONS = {
@@ -139,6 +141,8 @@ function Travel.install(R)
         riverDialogue = nil,
         pendingInit = nil,
         world = nil,
+        yellowReady = false,
+        reentryNoted = false,
         ids = {
             undertale = {player = undertaleNames["obj_mainchara"], boat = undertaleNames["obj_dogboat_thing"], controller = nil},
             yellow = {
@@ -391,6 +395,14 @@ function Travel:landingSpot(world, roomId, coordinates)
 end
 
 function Travel:resolve(index)
+    local save = self.runtime.saveBridge
+    -- A unified load places the saved room itself. Treating that goto as a
+    -- crossing would clear scratch flags and run content initialization over
+    -- the document that was just restored.
+    if save and save.restoring then
+        self.world = self:worldOf(index)
+        return index
+    end
     local target = index
     if self.world == "undertale" and self.riverLatch then
         -- A pager selection takes precedence over the old X-held mapping.  If
@@ -423,8 +435,13 @@ end
 function Travel:beginCrossing(world, room)
     local R = self.runtime
     local scope = nil
+    local leavingX, leavingY = nil, nil
     for _, instance in ipairs(R.instances) do
-        if instance.alive then scope = instance break end
+        if instance.alive and scope == nil then scope = instance end
+        local playerId = self.ids[self.world or "undertale"] and self.ids[self.world or "undertale"].player
+        if leavingX == nil and playerId and instance.alive and instance.v.object_index == playerId then
+            leavingX, leavingY = instance.v.x, instance.v.y
+        end
     end
     -- Persistent instances belong to the world they were created in. Leaving
     -- them alive would put a second player and a second set of controllers in
@@ -466,6 +483,10 @@ function Travel:beginCrossing(world, room)
     self.crossings = self.crossings + 1
     self.pendingInit = {world = world, room = room, coordinates = self.pendingCoordinates}
     self.pendingCoordinates = nil
+    -- Before the destination room's Create. Returning to Undertale recreates
+    -- obj_time, and that Create runs SCR_GAMESTART, which would otherwise be
+    -- what got written as the save.
+    self:save(room, leavingX, leavingY)
 end
 
 -- Yellow initialises its own world from a menu with scr_initialize(), which
@@ -474,9 +495,40 @@ end
 -- runs the game's own initializer first - the same call obj_mainmenu_debug makes
 -- before room_goto. Undertale needs no equivalent here: the merged build boots
 -- through Undertale's own title flow, which runs SCR_GAMESTART itself.
+-- Re-entry must not run scr_initialize. That script is a new-game reset:
+-- story, route, regional flags, NPC maps, mail, fast travel and item stock
+-- all go back to their starting values. The first entry still runs it, because
+-- room creation needs the lists it creates. A later entry only recreates a
+-- controller that the crossing destroyed, and puts saveroom/tinypuzzle back
+-- after that object's Create hard-codes them.
+function Travel:ensureYellowController()
+    local R = self.runtime
+    local names = R.manifest.yellow_names and R.manifest.yellow_names.objects or {}
+    local radio = names.obj_radio
+    if radio and not self:exists(radio) then R:create(radio, 0, 0) end
+    local id = self.ids.yellow.controller
+    if not id or self:exists(id) then return end
+    local roomName = rawget(R.global, "saveroom")
+    local puzzle = rawget(R.global, "tinypuzzle")
+    R:create(id, 0, 0)
+    if self.yellowReady then
+        if roomName ~= nil then R.global.saveroom = roomName end
+        if puzzle ~= nil then R.global.tinypuzzle = puzzle end
+    end
+end
+
 function Travel:initialize(world, scope)
     if world ~= "yellow" then return end
     local R = self.runtime
+    if self.yellowReady then
+        self:ensureYellowController()
+        if not self.reentryNoted then
+            self.reentryNoted = true
+            R:warn("travel-reentry",
+                "Re-entering Yellow does not run scr_initialize: story, route, flags, NPC maps and event lists stay. A missing controller is recreated, and saveroom/tinypuzzle are put back after its Create.")
+        end
+        return
+    end
     local name = "scr_initialize"
     if not (R.manifest.scripts or {})[name] then
         R:unsupported("travel:" .. name, "Yellow's world initializer is missing from the merged manifest.")
@@ -495,6 +547,7 @@ function Travel:initialize(world, scope)
     R.playerBridge:withDefaults(function()
         return R:script(name, R:scope(scope))
     end)
+    self.yellowReady = true
 end
 
 -- AUTO RUN, as the pause menu's setting. Nil means "whatever the game itself
@@ -534,12 +587,15 @@ function Travel:saveAutorun()
 end
 
 function Travel:afterLoadRoom(roomId)
+    if self.world == "yellow" or self:worldOf(roomId) == "yellow" then
+        self:ensureYellowController()
+    end
     local pending = self.pendingInit
     if not pending or pending.room ~= roomId then return end
     self.pendingInit = nil
     local R = self.runtime
     local ids = self.ids[pending.world]
-    if ids.controller and not self:exists(ids.controller) then R:create(ids.controller, 0, 0) end
+    self:ensureYellowController()
     if ids.player and not self:exists(ids.player) then
         local x, y = self:landingSpot(pending.world, roomId, pending.coordinates)
         if pending.world == "yellow" then
@@ -564,9 +620,10 @@ function Travel:afterLoadRoom(roomId)
         end
     end
     self:offerWhaleDestinations()
-    -- Saved once the crossing has actually landed, so last_room is the room the
-    -- player is standing in and not the one they left.
-    self:save()
+    -- The Player/World document was written before this room's Create. Landing
+    -- only moves the travel fields, so a reset in that Create is not the save.
+    local save = R.saveBridge
+    if save then save:touch({ area = roomId, world = self.world }) end
 end
 
 function Travel:beforeStep()
@@ -716,43 +773,23 @@ function Travel:openWhaleService()
     self:offerWhaleDestinations()
 end
 
--- A merged save layer of its own. Each game keeps the save files it already
--- writes (Undertale's INIs, Yellow's Save.sav), so an existing save from a
--- single-game build is never rewritten: the merged layer is additive and
--- versioned, and reading a file without a version stamps it as migrated.
+-- Boot reads merge.sav through the unified save. A missing file is not a save
+-- and is not stamped. Version 1 is migrated there; an unknown version stops
+-- by name before anything is rewritten.
 function Travel:loadSave()
-    local R, B = self.runtime, self.runtime.builtins
-    B.ini_open(nil, Travel.SAVE_FILE)
-    local version = B.ini_read_real(nil, "merge", "version", 0)
-    if version == 0 then
-        self.migrated = true
-        B.ini_write_real(nil, "merge", "version", Travel.VERSION)
-        B.ini_write_real(nil, "merge", "crossings", 0)
-    elseif version ~= Travel.VERSION then
-        B.ini_close()
-        R:unsupported("merge.sav version " .. tostring(version),
-            "This build reads merged save version " .. Travel.VERSION .. "; nothing was guessed at.")
+    local save = self.runtime.saveBridge
+    if not save then
+        self.runtime:unsupported("merge.sav", "The unified save is not installed.")
     end
-    self.crossings = B.ini_read_real(nil, "merge", "crossings", 0)
-    self.lastRoom = B.ini_read_real(nil, "merge", "last_room", -1)
-    B.ini_close()
+    save:open()
 end
 
-function Travel:save()
-    local R, B = self.runtime, self.runtime.builtins
-    B.ini_open(nil, Travel.SAVE_FILE)
-    B.ini_write_real(nil, "merge", "version", Travel.VERSION)
-    B.ini_write_real(nil, "merge", "crossings", self.crossings)
-    B.ini_write_real(nil, "merge", "last_room", self.runtime.vars.room)
-    B.ini_write_string(nil, "merge", "world", self.world or "undertale")
-    -- The modifier slots only mean something once Yellow's world created them;
-    -- before that the record stays empty rather than inventing a default.
-    B.ini_write_string(nil, "merge", "ammo",
-        type(R.global.player_weapon_modifier) == "string" and R.global.player_weapon_modifier or "")
-    B.ini_write_string(nil, "merge", "accessory",
-        type(R.global.player_armor_modifier) == "string" and R.global.player_armor_modifier or "")
-    B.ini_close()
-    self.runtime:flushSaves()
+function Travel:save(room, x, y)
+    local save = self.runtime.saveBridge
+    if not save then
+        self.runtime:unsupported("merge.sav", "The unified save is not installed.")
+    end
+    save:write({ reason = "travel", area = room, world = self.world, x = x, y = y })
 end
 
 return Travel

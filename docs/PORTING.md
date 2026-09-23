@@ -140,9 +140,9 @@ original colours.
 A merged build adds `port/merge.lua`, which builds one manifest out of both
 conversions and checks the ID bands instead of assuming them, and `port/travel.lua`,
 which connects Undertale's River Person boat and Yellow's UGPS mail whale,
-initialises each world with its own scripts, carries Frisk's Clover-equipped
-ammunition and accessory slots in a versioned `merge.sav` beside the save files
-each game already writes, and re-applies the loadout after every crossing.
+initialises each world with its own scripts, and (since piece 5d) writes one
+`merge.sav` Player+World document beside the `file0` / `Save.sav` projections
+each continue menu still reads.
 `port/frisk.lua` draws Yellow's player as Frisk (pixels only; run poses, gun
 poses, goggles, the dance and lying poses stay Clover and are reported). The
 native LÖVE/xvfb gate plays the Undertale opening and then crosses into Yellow
@@ -777,13 +777,9 @@ Still pending, explicitly:
 - **The shared controller is piece 5c**, documented in the next section. 5a
   did not merge the entities or pick a level-up rule; 5c does the second of
   those and leaves the entities as the rooms place them.
-- **Persistence is not yet unified.** Existing `file*` / `Save.sav` scripts now
-  read/write the live core aliases, but `merge.sav` v1 still only records travel
-  and modifier slots. It cannot restore this Player and the whole World in one
-  load. Content initialization still recreates Yellow's world data on entry.
-  The `Player` + `World` format, legacy migration, world lifecycle and both
-  save-point/load paths are piece **5d**. No migration or restart-resume claim
-  is made here, and no new downloadable release is published for 5a.
+- **Persistence is piece 5d**, documented after the controller section. 5a did
+  not claim a save format, a migration, or a restart-resume, and no new
+  downloadable release was published for 5a.
 
 ## Shared player controller (spec §3, §15 — unified-fusion piece 5c)
 
@@ -841,8 +837,9 @@ is not in `adef`. For the duration of one script, `battleCompose` adds ammo
 inside Undertale's `scr_attackcalc` / `scr_mercystandard`, the armour's weapon
 bonus inside Yellow's five attacking-damage scripts, and accessory defense
 inside `scr_damagestandard`. The wrappers are injected `R.scripts` entries
-(Undertale by index, Yellow by name). Item, save, init and Martlet scripts
-are not wrapped. Target-bar weak/strong scaling is not honored.
+(Undertale by index, Yellow by name). Item, init and Martlet scripts are not
+wrapped. Save scripts are piece 5d, below. Target-bar weak/strong scaling is
+not honored.
 
 Evidence: `tests/test_unified_controller.py` (5 tests). Uninstalling the
 controller fails all five (no sprint, no solid-probe sprint, no controller,
@@ -853,5 +850,59 @@ Full local suite: **526 passed, 1 skipped** with
 
 Not claimed: Android, audio, pixel-perfect origins, piece 6's cropped sizes
 and exact speeds, a native X-run (CI still runs the existing
-`CORE PLAYER PASS` crossing probe only), a unified save (`merge.sav` is still
-5d), or that the fusion is complete.
+`CORE PLAYER PASS` crossing probe only), or that the fusion is complete.
+The unified save is the next section.
+
+## Player + World save (spec §11 — unified-fusion piece 5d)
+
+One `merge.sav` version 2, installed only when `manifest.game == "merged"`
+(`port/save.lua`, before travel so the boot read is the migration). `[Player]`
+is LV, EXP, current HP, max HP, gold, name, base AT/DF, all eight inventory
+slots, the four equipment slots, run/menu/interact, and the phone and Yellow
+PP/SP/RP globals. `[World]` is the world name, current area, position, facing,
+story (`plot` and Yellow's `story` stay distinct), route, the regional flag
+arrays, NPC and talk maps, and the encounter/steal/fast-travel/box lists.
+`[merge]` keeps the version, crossing count, last room, and the ammo/accessory
+strings the earlier tests read. `file0` and `Save.sav` are projections so each
+continue menu still sees a save; `scr_save`'s own writer still emits `file9`.
+They are not a second structure: when `Player.LV` is present, load does not
+read them.
+
+Save points in either world write that document. `scr_save` still runs
+Undertale's own writer, then one unified write. `scr_savegame` does not run
+Yellow's script: that script deletes `Save.sav` and stops on `ds_grid_write`,
+which this runtime does not implement (a named stop). The save point warns once
+and writes the unified document instead, including `global.story`, which
+Yellow's script never stored. `scr_load` and `scr_loadgame` both restore it and
+`room_goto` the saved room. Injured HP stays injured. Undertale's own `scr_load`
+heals to max HP, and that heal is what a legacy `file0` migration records; a
+version-2 load does not heal.
+
+Version 1 is travel metadata. The bytes are copied to `merge.sav.v1` (one path
+segment; the copy is not deleted) and the file is rewritten as version 2 with
+`migrated_from=1` and the old travel fields. No LV, HP or story is invented.
+A missing file is not stamped. Version 99 stops with `merge.sav version 99`
+and is not rewritten. A `Save.sav` whose encounter or NPC blob is not a list
+this port wrote stops with `Not a save string this port wrote` and is not
+deleted. A legacy `file0` is loaded by the original script (while `obj_time`
+still exists) and the bytes are left in place.
+
+Re-entering Yellow does not run `scr_initialize`. That script is a new-game
+reset. The first entry still runs it. A later entry keeps story, route, flags,
+NPC maps and fast-travel labels, recreates a missing `obj_controller` /
+`obj_radio`, and puts `saveroom` and `tinypuzzle` back after the controller's
+Create hard-codes them. `SCR_GAMESTART` is still an explicit reset. A crossing
+writes the document before the destination room's Create, because returning to
+Undertale recreates `obj_time` and that Create runs `SCR_GAMESTART`. Landing
+then updates only the `[merge]` travel fields, so that reset is not the save.
+
+Evidence: `tests/test_unified_save.py` (8 tests). Without the re-entry guard,
+story, route, item stock, `saveroom`, `tinypuzzle` and the NPC map reset.
+Without the save-point wrapper, `scr_savegame` stops on `ds_grid_write`.
+Without the version check, version 99 is rewritten. Full local suite:
+**534 passed, 1 skipped** with `PORT_REQUIRE_YELLOW=1 .venv/bin/python -m pytest -q`.
+
+Not claimed: Android, audio, a played save-point menu, pixel-perfect original
+parity, piece 6 speeds, or that the fusion is complete. The native gate still
+does not drive a save point; it only asserts `merge.sav` version 2 after its
+existing crossing probe.
