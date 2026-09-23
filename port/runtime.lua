@@ -898,7 +898,11 @@ function Runtime:finishFrame()
         if i.alive and i.active then
             local v=i.v;local sprite=self.assets.sprites[v.sprite_index]
             if sprite and #sprite.frames>0 and v.image_speed~=0 then
-                v.image_index=v.image_index+v.image_speed
+                -- One rule for both worlds (piece 6b): GameMaker 1.4's
+                -- image_speed is frames per step, Studio 2's multiplies the
+                -- sprite's own playback speed. AssetCompat answers 1 for every
+                -- Undertale record, so Undertale's animation is unchanged.
+                v.image_index=v.image_index+v.image_speed*AssetCompat.playbackRate(sprite)
                 if v.image_index>=#sprite.frames or v.image_index<0 then
                     v.image_index=v.image_index%#sprite.frames;self:event(i,7,7)
                 end

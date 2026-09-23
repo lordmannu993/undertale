@@ -75,6 +75,7 @@ function Graphics.install(R)
     local function sprite(E,index,sub,x,y,sx,sy,angle,tint,alpha,crop)
         -- Merged builds draw Yellow's player body as Frisk (port/frisk.lua);
         -- the remap is pixels-only, so gameplay reads stay on the same record.
+        local requested=index
         if R.spriteForDraw then index=R.spriteForDraw(index) end
         local s=R.assets.sprites[index]
         if not s then
@@ -83,16 +84,32 @@ function Graphics.install(R)
         end
         if #s.frames==0 then return end
         if sub<0 then sub=E and E.image_index or 0 end
-        -- GameMaker interpolates a fractional sub-index between the two
-        -- frames (the boat's waterline cover runs cc += 0.1 per draw);
-        -- flooring it would snap the ripple to hard steps, so crossfade
-        -- instead: the base frame, then the next frame at the fractional
-        -- amount. That matches GM's per-pixel lerp except where the frames
-        -- differ in transparency at their edges.
+        -- Render anchor (piece 6b, spec section 12). A pixels-only remap draws
+        -- another game's sprite in place of the requested one, and the two
+        -- games put origins in different places (Frisk's canvas corner,
+        -- Clover's body centre). The replacement stands on the requested
+        -- sprite's feet -- the canvas bottom centre the depth rule already
+        -- sorts by -- and at the same phase of its own animation cycle.
+        local from=requested~=index and R.assets.sprites[requested] or nil
+        local ax,ay=0,0
+        local originX,originY=s.xorig,s.yorigin
+        if from then
+            ax,ay=AssetCompat.anchor(from,s)
+            originX,originY=from.xorig-ax,from.yorigin-ay
+            sub=AssetCompat.remapFrame(from,s,sub)
+        end
+        -- Frame selection (piece 6b, spec section 12): GameMaker draws the
+        -- sub-image the index rounds *down* to -- "The value can have a
+        -- fractional part. In this case it is always rounded down to obtain
+        -- the subimage that is drawn" (GameMaker manual, image_index), and
+        -- YoYo's own runner truncates it the same way in Sprite.Draw. It never
+        -- blends two frames. Piece 3 crossfaded the fraction instead, which
+        -- drew every animating sprite in both worlds as two superimposed
+        -- frames (walk cycles run at image_speed 0.2 or 1/3, so almost every
+        -- step was fractional) and let the boat cover's ever-growing cc paint
+        -- its next frame opaque once cc passed 2. One frame per draw.
         local n=#s.frames
         local base=math.floor(sub)%n
-        local frac=sub-base
-        local blend=frac>0 and (base+1)%n or nil
         local file=s.frames[base+1]
         -- The checkout exported some sprite images cropped to their collision
         -- bbox while events keep drawing in original canvas coordinates, so
@@ -127,7 +144,7 @@ function Graphics.install(R)
             if ext then blendState=tostring(blendState)..":"..tostring(ext[1])..":"..tostring(ext[2]) end
         end
         if R.shaderState and R.shaderState.active and previous
-           and previous.index==index and previous.base==base and previous.frac==frac
+           and previous.index==index and previous.base==base
            and previous.x==x and previous.y==y and previous.sx==sx and previous.sy==sy
            and previous.angle==angle and previous.tint==tint and previous.alpha==alpha
            and previous.owner==owner and previous.blendState==blendState then
@@ -139,20 +156,25 @@ function Graphics.install(R)
                 .. "and is drawn once (spec §8).")
             return
         end
-        state.lastSprite={index=index,base=base,frac=frac,x=x,y=y,sx=sx,sy=sy,angle=angle,
+        state.lastSprite={index=index,base=base,x=x,y=y,sx=sx,sy=sy,angle=angle,
             tint=tint,alpha=alpha,owner=owner,blendState=blendState}
-        log("sprite",s.name,base,x,y,sx,sy,angle,tint,alpha,ox,oy,blend,blend and frac or nil,
-            index,owner and owner.id or -1)
+        -- Fields 13/14 stay nil: they carried piece 3's crossfade frame and
+        -- amount, and GameMaker draws one sub-image (see frame selection
+        -- above). Fields 17/18: the canvas point of the drawn sprite placed at
+        -- (x, y) -- its own origin, or the anchored origin of a remapped draw.
+        log("sprite",s.name,base,x,y,sx,sy,angle,tint,alpha,ox,oy,nil,nil,
+            index,owner and owner.id or -1,originX,originY)
         if not g then return end
         local function layer(file_,alpha_)
-            if crop then part(file_,crop[1]-ox,crop[2]-oy,crop[3],crop[4],x,y,sx,sy,tint,alpha_)
+            -- A part draw names a region of the requested sprite's canvas;
+            -- the anchor moves it onto the replacement's canvas.
+            if crop then part(file_,crop[1]-ax-ox,crop[2]-ay-oy,crop[3],crop[4],x,y,sx,sy,tint,alpha_)
             else
                 local img=image(file_);if not img then return end
-                color(tint,alpha_);g.draw(img,x,y,-math.rad(angle),sx,sy,s.xorig-ox,s.yorigin-oy)
+                color(tint,alpha_);g.draw(img,x,y,-math.rad(angle),sx,sy,originX-ox,originY-oy)
             end
         end
         layer(file,alpha)
-        if blend then layer(s.frames[blend+1],(alpha or state.alpha)*frac) end
     end
     local function backgroundPart(asset,left,top,width,height,x,y,sx,sy,tint,alpha,transform)
         if not asset then return end

@@ -413,11 +413,27 @@ Normalize things such as:
 > `port/recovered_sprite_metadata.json` by a pure function, re-derivable offline with
 > `--check`: 814 offsets proven (366 of them new, `canvas-span`), 553 canvases pinned
 > with the offset left unproven and the sprite *never* shifted, 61 candidates listed by
-> name with their reason. Evidence: `tests/test_asset_sizes.py` (12 tests) plus the
+> name with their reason. Evidence: `tests/test_asset_sizes.py` (13 tests) plus the
 > updated `tests/test_depth_sort.py`/`tests/test_sprite_offsets.py`. Origins,
 > per-frame animation handling, movement speed, collision boxes, scaling and sheet
 > coordinates are the remaining 6b–6d sub-pieces of this requirement, and are **not**
 > claimed by 6a.
+
+> Claim (scoped to what ran, 2026-09-23): piece **6b** implements the *sprite origins*,
+> *animation frame handling* and *render anchors* items as the same layer. The renderer
+> draws one sub-image per draw — the rounded-down `image_index` GameMaker itself draws —
+> instead of crossfading two frames; `Runtime:finishFrame` advances
+> `image_speed × AssetCompat.playbackRate(sprite)`, so Studio 2's per-sprite playback
+> speed and GameMaker 1.4's frames-per-step `image_speed` are one rule (the rate is 1
+> for every Undertale record); and a pixels-only remap between the games (Frisk over
+> Clover, Clover's run over Frisk's walk) stands on the requested sprite's canvas bottom
+> centre (`AssetCompat.anchor`) at the same phase of its own cycle
+> (`AssetCompat.remapFrame`). Evidence: `tests/test_asset_frames.py` (6 tests), each
+> failing without its part of the change, plus the updated ripple pin in
+> `tests/test_boat_water.py` and sprint-rate pin in `tests/test_unified_controller.py`.
+> Headless + draw log only: no pixel-perfect parity, Android, or played-through claim.
+> Movement speed (6c) and collision boxes, hitboxes, scaling and sheet coordinates (6d)
+> are **not** claimed by 6b.
 
 ## 13. Do Not Fix Bugs With Temporary Visual Hacks
 

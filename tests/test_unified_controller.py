@@ -55,8 +55,15 @@ def test_undertale_runs_on_x_and_draws_clovers_cycle(vm):
             return "run changed the mask sprite to "..tostring(runMask)
         end
         if not drewRun then return "Undertale run did not draw spr_pl_run_right" end
-        if math.abs(runSpeed-(1/3))>1e-9 then
-            return "sprint image_speed is "..tostring(runSpeed)..", not Yellow's 1/3"
+        -- Yellow's sprint rate is 1/3 of a frame per step of the run pose.
+        -- The record is the two-frame walk pose the six-frame run pose is
+        -- drawn over at the same phase (piece 6b), so the record advances
+        -- 1/3 * walk/run frames and the drawn pose advances exactly 1/3.
+        local walkFrames=#R.assets.sprites[R.constants.spr_maincharar].frames
+        local runFrames=#R.assets.sprites[R.manifest.yellow_names.sprites.spr_pl_run_right].frames
+        if math.abs(runSpeed*runFrames/walkFrames-(1/3))>1e-9 then
+            return "the drawn run pose advances "..tostring(runSpeed*runFrames/walkFrames)
+                ..", not Yellow's 1/3 frame per step"
         end
         -- AUTO RUN is Yellow's option. It must not turn Undertale's walk into a run.
         R:setAutorun(true)

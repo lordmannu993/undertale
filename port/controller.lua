@@ -259,10 +259,29 @@ function Controller:undertaleEndStep(E)
     end
 end
 
+-- Yellow's sprint rate is 1/3 of a frame per step *of the run pose*
+-- (scr_normal_state on spr_pl_run_*, six frames). Undertale's record is the
+-- walk sprite the run pose is drawn over (port/frisk.lua), and the renderer
+-- draws the run pose at the same phase of its own cycle (piece 6b,
+-- AssetCompat.remapFrame). So the record advances 1/3 * walk/run frames per
+-- step and the drawn pose advances exactly Yellow's 1/3 through all six
+-- frames. A costume with no run pair draws its own frames at 1/3.
+function Controller:runImageSpeed(entity)
+    local R = self.runtime
+    local index = entity.v.sprite_index
+    local runOfWalk = R.friskRemap and R.friskRemap.runOfWalk
+    local walk = R.assets.sprites[index]
+    local run = runOfWalk and runOfWalk[index] and R.assets.sprites[runOfWalk[index]]
+    if walk and run and #walk.frames > 0 and #run.frames > 0 then
+        return Controller.RUN_IMAGE_SPEED * #walk.frames / #run.frames
+    end
+    return Controller.RUN_IMAGE_SPEED
+end
+
 function Controller:finishUndertaleEndStep(entity)
     if not entity or not entity.alive then return end
     if self.sprinting and entity.v.image_speed ~= 0 then
-        entity.v.image_speed = Controller.RUN_IMAGE_SPEED
+        entity.v.image_speed = self:runImageSpeed(entity)
     end
     entity.v.is_sprinting = self.sprinting and 1 or 0
 end

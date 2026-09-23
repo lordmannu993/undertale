@@ -164,7 +164,10 @@ function Frisk.install(R)
         end
         return remap[index] or index
     end
-    R.friskRemap = { remap = remap, walk = mapped, run = #Frisk.RUN_SPRITES }
+    -- runOfWalk is the one run-pose table: the renderer draws it (above) and
+    -- the shared controller reads it to express Yellow's sprint animation
+    -- rate in the run pose's own frames (piece 6b).
+    R.friskRemap = { remap = remap, walk = mapped, run = #Frisk.RUN_SPRITES, runOfWalk = runOfWalk }
     return remap
 end
 

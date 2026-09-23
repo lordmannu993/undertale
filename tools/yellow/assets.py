@@ -124,7 +124,12 @@ class AssetConverter:
             return None
         if not frames:
             self.note("sprite-without-frames", sprite=name)
-        speed = float(sequence.get("playbackSpeed", 1) or 1)
+        # A missing speed defaults to 1; an authored 0 is kept. Nineteen pinned
+        # sprites author playbackSpeed 0 (they only change frame when their
+        # code sets image_index), and coercing that to 1 would animate them
+        # once the runtime honours the rate (piece 6b).
+        raw_speed = sequence.get("playbackSpeed", 1)
+        speed = float(raw_speed if raw_speed is not None else 1)
         speed_type = int(sequence.get("playbackSpeedType", 1) or 0)
         collision_kind = int(data.get("collisionKind", 1))
         layers = data.get("layers") or []

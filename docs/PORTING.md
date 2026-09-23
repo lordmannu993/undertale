@@ -997,3 +997,69 @@ a route proves its offset — deliberate, and they are named rather than nudged.
 (Undertale's 3 px step vs Yellow's +2 autorun), hitboxes/collision boxes, scaling
 and GMS2 sheet coordinates are still open piece-6 sub-pieces, as are pixel-perfect
 parity with the original engine (a CI-only visual claim) and Android.
+
+## Frame selection, animation rate and render anchors (spec §12 — unified-fusion piece 6b)
+
+Spec §12 names sprite origins, animation frame handling and render anchors as
+things one compatibility layer must normalise. Piece 6b found four places where
+the two worlds meant different things by the same animation state, and fixes each
+in the shared system (`port/assetcompat.lua`, `port/graphics.lua`,
+`port/runtime.lua`), with no per-room or per-character branch:
+
+1. **Frame selection.** GameMaker draws the sub-image `image_index` rounds *down*
+   to — the manual's own words for `image_index` are "it is always rounded down to
+   obtain the subimage that is drawn", and YoYo's runner truncates the index the
+   same way in `Sprite.Draw`. Piece 3 had replaced that with a crossfade of the two
+   neighbouring frames, which drew every animating sprite in *both* worlds as two
+   stacked frames (walk cycles run at `image_speed` 0.2 or 1/3, so almost every
+   step is fractional), and — because the boat cover's `cc += 0.1` never wraps —
+   drew the cover's second frame at a blend "amount" above 1 (4.1 after forty
+   ticks, fully opaque) once `cc` passed 2. The renderer now draws one sub-image;
+   the draw log's blend fields (13/14) stay `nil`. The ripple steps one frame
+   every ten draws, as the original does.
+2. **Animation rate.** Studio 2 made `image_speed` a *multiplier* on the sprite's
+   own playback speed; GameMaker 1.4's `image_speed` is frames per step. The Yellow
+   converter already recorded the per-step rate (`yellow.image_speed`, FPS types
+   divided by Yellow's own 30 FPS game speed), but the runtime advanced every
+   instance by the bare `image_speed`: of Yellow's 2,039 multi-frame sprites, 1,265
+   author one frame per step and were right by coincidence, 772 author a slower
+   rate (10 fps at 30 steps/s is 1/3 frame per step, 5 fps is 1/6) and animated
+   up to six times too fast, and 2 author a faster one. `Runtime:finishFrame` now advances
+   `image_speed × AssetCompat.playbackRate(sprite)`; the rate is 1 for every
+   Undertale record, so Undertale is unchanged. The converter also stops coercing
+   an authored `playbackSpeed` of 0 to 1 (19 pinned sprites hold their frame until
+   code sets `image_index`).
+3. **Render anchor.** Frisk's sprites put the origin at the canvas corner (0,0),
+   Clover's at his body (`spr_pl_down` 9,16). The Frisk-only remap
+   (`port/frisk.lua`) drew the replacement at its *own* origin, so Yellow's player
+   was drawn 9px right and 15px down of Clover's body — away from the collision
+   mask it walks with — and Undertale's running Frisk (Clover's run cycle) 10px
+   left and 15px up of the walk pose. A remapped draw now stands on the requested
+   sprite's feet: `AssetCompat.anchor` aligns the two canvases' bottom centres —
+   the point the depth rule already sorts by — and part draws move their source
+   rectangle by the same amount. The draw log records the anchored origin
+   (fields 17/18).
+4. **Frame count.** A remap draws the replacement at the same *phase* of its own
+   cycle (`AssetCompat.remapFrame`). Clover's six-frame run over Frisk's two-frame
+   side walk used to show frames 0 and 1 only; it now shows all six. The shared
+   controller's run rate is expressed in the run pose's own frames
+   (`runImageSpeed`: 1/3 × walk frames / run frames on the record), so the drawn
+   pose advances exactly Yellow's 1/3 frame per step (`scr_normal_state`).
+
+Evidence: `tests/test_asset_frames.py` (6 tests). Reverting the renderer fails
+four of them (the fractional draw logs `0/1/0.5 1/2/0.7 0/1/4.1`, the Frisk and
+run-pose anchors, the identity check); reverting the runtime rate fails the Yellow
+rate test (`spr_mail_station_steamworks`, 10 fps, advances 3 frames in 3 steps
+instead of 1); reverting the controller's run rate fails the run-cycle test (each
+run frame shows for 1 step, not 3). Two earlier pins were updated with the
+rationale in their docstrings: piece 3's
+`test_cover_ripple_interpolates_between_frames` became
+`test_cover_ripple_steps_one_frame_every_ten_draws` (30 draws, 3 frame changes,
+no blend — it fails on the crossfade renderer), and piece 5c's sprint-rate check
+now measures the drawn pose's rate (1/3) instead of the record's. Full local suite
+553 passed, 1 skipped (`PORT_REQUIRE_YELLOW=1`).
+
+Not claimed: pixel-perfect parity with either engine (a CI-only visual claim),
+Android, or a played-through scene. The anchor aligns canvas bottom centres; it
+does not claim the two artists drew the feet at the same pixel inside their
+canvases. Sprites the offset recovery could not pin keep their exported frames.
