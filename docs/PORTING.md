@@ -395,15 +395,17 @@ Regenerate with `python3 tools/recover_sprite_offsets.py --cache <upstream metad
 (offline `--check` re-derives every row from the local tree alone; the recovery
 tools fetch nothing at test time).
 
-Recorded limitations for this piece:
+Recorded limitations for this piece (the size half is **superseded** by
+"Sprite canvas and size compatibility" below — piece 6a, which pins 553 more
+canvases and points every size read at the canvas):
 
-- the 980 unresolved sprites are still drawn with their exported origin, so any of
-  them with a cropped canvas keeps a cosmetic offset (63 of them would qualify
-  for the anchored offset but have no pinned sibling canvas to gate it, so they
-  stay unresolved rather than guessed at);
-- `sprite_get_width`/`sprite_get_height`/`image_width` report the **exported** image
-  dimensions, not the original canvas (95 call sites), which is what the original
-  1.4 semantics would have returned;
+- the candidates no route can shift are still drawn with their exported origin, so
+  a cropped one keeps a cosmetic offset. They are now named individually under
+  `canvas` with the axis that is unproven (553 of them) instead of all 980 being
+  listed as unresolved — the reason they are not nudged is unchanged;
+- `sprite_get_width`/`sprite_get_height` reported the **exported** image
+  dimensions, not the original canvas (95 call sites). Piece 6a replaces this with
+  one accessor that answers in canvas pixels for both games;
 - this is the asset-compatibility half of spec requirement 12 (origins, sheet
   coordinates, render anchors). Per-frame origins, movement speed, collision boxes
   and Yellow's GMS2 sprites are separate pieces and are not claimed here.
@@ -501,14 +503,15 @@ without the change, verified by stash). Live pins: the Waterfall statue
 gramophone, behind to front. Per-world `scr_depth` routing is still pinned by
 `tests/test_yellow_merge.py::test_shared_script_names_resolve_to_each_worlds_own_copy`.
 
-Recorded limitations for this piece:
+Recorded limitations for this piece (updated by piece 6a, which landed the
+builtins and pinned 553 more canvases):
 
-- `sprite_get_width`/`sprite_get_height`/`image_width` still report the
-  *exported* size (95 call sites): piece 6 owns the builtins, so until it
-  lands the builtins and the instance reads temporarily disagree on the 448
-  recovered sprites.
-- the 980 unresolved sprites sort from their exported dims too, for the same
-  no-guessing rule;
+- `sprite_get_width`/`sprite_get_height` now report the same canvas the instance
+  reads do, through `port/assetcompat.lua`: the two no longer disagree, and both
+  answer in original-canvas pixels for the 1,367 candidates whose canvas is
+  pinned;
+- the 61 candidates with no pinned canvas sort from their exported dims, for the
+  same no-guessing rule (the 553 canvas-only ones now sort from their canvas);
 - the cross-layer tie rule (room list order) is best-available: GameMaker
   Studio 2 draws by depth and its exact-tie order is undocumented. Distinct
   depths — the common case — never reach the tie-break.
@@ -516,11 +519,13 @@ Recorded limitations for this piece:
 
 Spec §6 asks for the River Person's boat and water to render as separate visual
 components with the original layering — not a blanket global render layer. The
-merged build already carried the original layering (room instance depths 49330
-hull / 49320 riverman / 49300 player in the water and fire docks, 950000 boat in
-the tundra dock, 900000 during the ride, the water pillar at −1 in front of
-everything); this piece pins that reference from the draw log and repairs the
-two pixel defects inside it:
+merged build already carried the original layering (authored room depths 49330
+hull / 49320 riverman in the water and fire docks, 950000 boat in the tundra
+dock, 900000 during the ride, the water pillar at −1 in front of everything —
+and the player, which no room authors, at `scr_depth`'s key: 49310 in the dock
+at y=100 once piece 6a pinned the 30px canvas its cropped export read as 29);
+this piece pins that reference from the draw log and repairs the two pixel
+defects inside it:
 
 1. **The dog boat hull floated above its waterline.** `spr_dogboat` was the one
    boat sprite whose crop offset never recovered: the upstream vertical edges
@@ -562,10 +567,11 @@ Recorded limitations for this piece:
   fractional amount), not GM's exact per-pixel lerp: where the two frames
   differ in transparency at their edges the result can differ by a fraction of
   a pixel's alpha;
-- the anchored path currently corroborates one sprite (the dog boat hull).
-  63 other unresolved candidates satisfy the anchored geometry but have no
-  pinned sibling canvas, so they stay unresolved until upstream metadata (or a
-  new sibling corroboration) can gate them;
+- the anchored path currently corroborates one sprite (the dog boat hull), and
+  the candidates the anchored geometry alone cannot gate are listed by name
+  rather than nudged: piece 6a pins their canvases from the pinned upstream
+  metadata (553 of them) and leaves the unprovable axes unproven, so their drawn
+  position is unchanged until a route proves it;
 - the boat's depth is event-assigned in every state (the original room data
   carries no instance depth), so the recovered 91×40 canvas cannot move it;
   the sprite's own draw uses the canvas origin, not `scr_depth`.
@@ -906,3 +912,88 @@ Not claimed: Android, audio, a played save-point menu, pixel-perfect original
 parity, piece 6 speeds, or that the fusion is complete. The native gate still
 does not drive a save point; it only asserts `merge.sav` version 2 after its
 existing crossing probe.
+
+## Sprite canvas and size compatibility (spec §12 — unified-fusion piece 6a)
+
+Spec §12 asks for a compatibility layer wherever the two games' asset
+conventions differ, instead of two separate frameworks. Sprite **size** was the
+clearest case. Undertale's checkout exported many PNGs *cropped*, so
+`sprite_get_width`/`sprite_get_height` and the `sprite_width`/`sprite_height`
+instance reads answered with the cropped pixels — while every event that reads
+them, and `scripts/scr_depth.gml`, which turns the height into Undertale's Y-sort
+key, was written against the original canvas. Yellow's GMS2 records are not
+cropped, so the same call meant the canvas there. One game, two meanings for the
+same number.
+
+**One accessor.** `port/assetcompat.lua` answers in original-canvas pixels for
+both worlds: `port/graphics.lua`'s size builtins, `port/yellow_studio.lua`'s
+copies of them, the `sprite_width`/`sprite_height`/origin instance reads in
+`port/runtime.lua`, and the `sprite_get_xoffset`/`sprite_get_yoffset` builtins all
+go through it. A cropped Undertale export and an uncropped Yellow sprite now
+answer in the same units, and a sprite whose canvas is not pinned answers with its
+exported size — never a guess.
+
+**The recovery had stopped reproducing itself.** `tools/recover_sprite_offsets.py`
+read the pinned upstream record with GameMaker 1.4 GMX (XML) patterns, but the
+pinned ref serves GameMaker Studio 2 `.yy` files (and those carry trailing commas,
+so they do not load as JSON either). A re-run therefore fetched nothing: every
+candidate came back `missing-fields`, so the checked-in 448 offsets could not be
+re-derived by the tool that claims to own them. The pinned numbers are now fetched
+once (`--refresh`, `GITHUB_TOKEN`) into `port/recovered_sprite_metadata.json` —
+1,427 of the 1,428 candidates, with `spr_pressz` genuinely absent upstream (HTTP
+404, named as such) — and `port/sprite_offsets.json` is derived from that metadata
+plus this checkout by a pure function, so `--check` re-derives the **whole file**
+offline instead of re-checking rows against numbers embedded beside them.
+
+**Three lists and a proof per axis.** The file (format 2) separates:
+
+- `sprites` — 814 records whose crop offset is *proven*. The 448 earlier records
+  are unchanged (their `symmetric-bbox-edges` route, plus the sibling-pinned dog
+  boat), and 366 are new: their export **is** the canvas (`canvas-span`), so their
+  offset is exactly (0, 0) — a proven no-op instead of a guess.
+- `canvas` — 553 records whose original canvas is pinned while at least one axis
+  of the offset is not provable. They are **never shifted** (the exported position
+  stays, exactly as before) and carry the canvas so every size read is right:
+  Frisk's walk sprite `spr_maincharad` 19×29 → canvas 20×30, which moves the
+  player's own `scr_depth` key by 10; `spr_5_coffeeline` 8×7 → 13×10;
+  `spr_adate_arm` 48×31 → 77×71 (491 of the 553 change height).
+- `unresolved` — 61 candidates with no pinned canvas (54 whose pinned bbox does
+  not fit the pinned canvas, 6 whose bbox disagrees with this checkout's, 1 absent
+  upstream). They keep the exported size for every read and stay named with their
+  reason.
+
+The routes, and why each is evidence rather than a guess: `canvas-span` (the
+export spans the whole canvas on that axis, so a crop of that size starts at 0);
+`bbox-interval` (the art fills the export and the export's span equals the pinned
+bbox's span on that axis — with an *automatic* bbox, `bboxmode` 0, the art must
+then start at the bbox edge; a manual box is a collision rectangle and proves
+nothing about where the art sits, so those stay unproven); the earlier
+`symmetric-bbox-edges` rule and the `sibling-pinned` anchored path are kept as
+they were. Upstream contributes numbers only — no artwork is fetched or imported,
+and every gate is re-derived offline.
+
+Evidence: `tests/test_asset_sizes.py` (12 tests). `sprite_get_width` answering
+14×15 for `spr_5_mouth2` rather than 13×14, the canvas-only sprite answering 13×10
+rather than 8×7, `sprite_width`/`sprite_height` following the instance scale, and
+Frisk's `scr_depth` key using 30 rather than 29 each fail without their part of the
+change (accessor, recovery, converter carry, instance read).
+`test_canvas_only_sprites_are_never_shifted` and
+`test_sprite_with_no_pinned_canvas_keeps_its_exported_size` pin the no-guess side;
+`test_one_accessor_backs_every_size_read` walks all 2,203 sprite records that carry
+a canvas; `test_recovery_tool_re_derives_everything_offline` runs `--check` with an
+empty environment. `tests/test_depth_sort.py` and `tests/test_sprite_offsets.py`
+were updated for the stronger evidence (Frisk's canvas is now pinned and still not
+shifted; the offsets file now has three lists), and piece 3's two dock pins in
+`tests/test_boat_water.py` moved by exactly one canvas pixel (+10 depth units) for
+the player — the boat and riverman pins, whose canvases were already pinned, did
+not move. Regenerate with
+`python3 tools/recover_sprite_offsets.py` (offline, from the checked-in metadata)
+or renew the metadata with `--refresh`.
+
+Not claimed: the 553 canvas-only sprites are still **drawn** at their exported
+position, so one whose art was trimmed by the crop can sit a pixel or two off until
+a route proves its offset — deliberate, and they are named rather than nudged. The
+61 unresolved candidates keep cropped sizes. Per-frame origins, movement speed
+(Undertale's 3 px step vs Yellow's +2 autorun), hitboxes/collision boxes, scaling
+and GMS2 sheet coordinates are still open piece-6 sub-pieces, as are pixel-perfect
+parity with the original engine (a CI-only visual claim) and Android.

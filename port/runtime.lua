@@ -7,6 +7,8 @@ Runtime.SWITCH_BREAK = {}
 -- is_undefined() meaningful without making Lua's nil erase array members.
 Runtime.UNDEFINED = setmetatable({}, {__tostring=function() return "undefined" end})
 Runtime.bit = require("bit")
+-- Sprite canvas sizes live in one compatibility layer (see port/assetcompat.lua).
+local AssetCompat = require("port.assetcompat")
 local atan2 = math.atan2
 local unpack = unpack
 

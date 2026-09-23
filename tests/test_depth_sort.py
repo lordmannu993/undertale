@@ -51,15 +51,24 @@ def sprite_record(name):
 
 
 def test_canvas_dimensions_reach_the_sprite_record(converted):
-    """Recovered sprites carry their pinned canvas size; unresolved ones do not."""
+    """Pinned canvases reach the record; a sprite with no pin keeps its export size."""
     keeper = sprite_record("spr_shopkeeper1")
     assert '["width"]=61' in keeper and '["height"]=111' in keeper
     assert '["cw"]=64' in keeper and '["ch"]=120' in keeper, \
         "spr_shopkeeper1 lost its pinned 64x120 canvas on the way into the record"
+    # Frisk's walk sprite: the canvas is pinned (20x30) but the crop offset is
+    # not provable, so it carries the size and no shift (piece 6a).
     mainchara = sprite_record("spr_maincharad")
     assert '["width"]=19' in mainchara and '["height"]=29' in mainchara
-    assert '["cw"]' not in mainchara and '["ch"]' not in mainchara, \
-        "spr_maincharad is unresolved (two-sided-disagreement): its canvas must not be guessed"
+    assert '["cw"]=20' in mainchara and '["ch"]=30' in mainchara, \
+        "spr_maincharad lost the 20x30 canvas the pinned upstream metadata proves"
+    assert '["ox"]' not in mainchara and '["oy"]' not in mainchara, \
+        "spr_maincharad's unprovable crop offset must never be guessed"
+    # A sprite whose pinned record disagrees about the canvas keeps its export size.
+    unpinned = sprite_record("spr_6hope")
+    assert '["width"]=29' in unpinned and '["height"]=11' in unpinned
+    assert '["cw"]' not in unpinned and '["ch"]' not in unpinned, \
+        "spr_6hope's canvas is not pinned (bbox-outside-canvas): it must not be guessed"
 
 
 def test_sprite_height_reads_canvas_where_recovered(lua):
@@ -67,9 +76,11 @@ def test_sprite_height_reads_canvas_where_recovered(lua):
     lua.execute("""
         HA = R:create(18000, 50, 100); HA.v.sprite_index = R.manifest.names["spr_shopkeeper1"]
         HB = R:create(18001, 50, 100); HB.v.sprite_index = R.manifest.names["spr_maincharad"]
+        HC = R:create(18001, 50, 100); HC.v.sprite_index = R.manifest.names["spr_6hope"]
     """)
     assert lua.eval('R:instanceGet(HA, "sprite_height")') == 120
-    assert lua.eval('R:instanceGet(HB, "sprite_height")') == 29
+    assert lua.eval('R:instanceGet(HB, "sprite_height")') == 30   # pinned canvas, no offset proof
+    assert lua.eval('R:instanceGet(HC, "sprite_height")') == 11   # no pinned canvas: exported size
 
 
 def test_scr_depth_sorts_from_the_visual_bottom_point(lua):

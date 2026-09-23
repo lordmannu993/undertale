@@ -40,9 +40,9 @@ git merge --no-edit origin/<that-open-PR-branch>   # clean fast-forward from mas
 | field | value |
 | --- | --- |
 | most recent merged piece | **#5d Player+World save** — [PR #46](https://github.com/lordmannu993/undertale/pull/46), merged to `master` as `9a3bbae` on 2026-09-23; [CI + native gate 35815755848](https://github.com/lordmannu993/undertale/actions/runs/35815755848) green |
-| in-flight piece | *(none — 5d merged; parent #5's sub-pieces are done. Piece 8 still certifies the final fusion)* |
-| next ⬜ piece | **#6** Asset compatibility layer. Do not skip to piece 7 |
-| in-flight open PR | *(none for implementation — start 6 from master)* |
+| in-flight piece | **#6a sprite canvas + size compatibility** (`arena/01a0cd14-undertale`) — one size accessor for both worlds, the recovery tool re-derives the whole offsets file offline from pinned metadata, canvases pinned for 1,367 of 1,428 candidates. Parent #6 keeps 6b+ (per-frame origins, movement speed, hitboxes) pending |
+| next ⬜ piece | **#6b** — the rest of §12 (per-frame origins, movement speed, hitboxes/collision, scaling), then **#7** the shopkeeper visual sweep. Do not skip to piece 7 |
+| in-flight open PR | this branch's 6a PR (opened by the session that wrote it) |
 
 ---
 
@@ -88,9 +88,21 @@ piece may be split into sub-pieces if it is too large for one green increment.
 | 3 | §6 | River Person boat/water rendering — split into components, not a blanket global layer | ✅ | `tools/recover_sprite_offsets.py` (anchored path), `port/sprite_offsets.json` (448/980), `port/graphics.lua` (fractional sub-index crossfade), `tests/test_boat_water.py`, `tests/test_sprite_offsets.py`, `docs/PORTING.md` (rooms 125/70/140/316 pinned: depths 49330/49320/49300, ride 340→118, pillar −1 in front) | [PR #38](https://github.com/lordmannu993/undertale/pull/38) / `tests/test_boat_water.py` (10 tests; the offset test and the ripple test proven to fail without the change) + the anchored-provenance test in `tests/test_sprite_offsets.py` |
 | 4 | §8 | No duplicated characters/sprite layers — a character is drawn once; the 42 shared asset names resolve per world | ✅ | `port/graphics.lua` (draw provenance + unconverted-shader duplicate drop), `port/merge.lua` (`double_named`), `port/runtime.lua` (`assetName`/`assetOwnerIsYellow`/`reportNameSplit`), `port/yellow_builtins.lua` (world-aware `asset_get_index`), `tools/merge.py` (honest 42), `tests/test_duplicate_draws.py`, `docs/PORTING.md` | `tests/test_duplicate_draws.py` (11 tests; all five changes proven load-bearing by reverting each file: `sprite draw without provenance: spr_regboat`, `the flat collision list disagrees with the audit: 0 vs 32`, `spr_flowey gave 1095, not Yellow's 1000243`, `name collisions with Undertale: 4`) — [PR #39](https://github.com/lordmannu993/undertale/pull/39) |
 | 5 | §1 §3 §9–§11 §13 §14 | **Unified Player state** (split into 5a–5d below): one Player record + shared item table, projected at world boundaries, serialised as `Player` + `World` blocks; crossing zeroes `flag[0..29]` (do not park state there) | ✅ **5a–5d merged** | `port/player.lua`, `port/inventory.lua`, `port/controller.lua`, `port/save.lua`, `port/runtime.lua`, `port/travel.lua`, `port/storage.lua`, `port/merge.lua`, `port/frisk.lua`, `tools/item_catalog.py`, `tests/test_unified_player_state.py`, `tests/test_unified_inventory.py`, `tests/test_unified_controller.py`, `tests/test_unified_save.py`, `docs/` | 5a: [PR #41](https://github.com/lordmannu993/undertale/pull/41). 5b: [PR #43](https://github.com/lordmannu993/undertale/pull/43). 5c: [PR #44](https://github.com/lordmannu993/undertale/pull/44). 5d: [PR #46](https://github.com/lordmannu993/undertale/pull/46), 8 tests. Piece 8 still certifies the final fusion |
-| 6 | §12 | Asset compatibility layer — `sprite_get_width/height` return cropped size at ~95 sites; per-frame origins; movement speed (UT 3 px/frame, Yellow +2 autorun); hitboxes/collision; the 980 `unresolved[]` crop offsets (never guess) | ⬜ | `port/graphics.lua`, `port/collision.lua`, `tools/yellow/assets.py`, `tests/`, `docs/PORTING.md` | — |
+| 6 | §12 | Asset compatibility layer — `sprite_get_width/height` return cropped size at ~95 sites; per-frame origins; movement speed (UT 3 px/frame, Yellow +2 autorun); hitboxes/collision; the 980 `unresolved[]` crop offsets (never guess) | 🚧 **6a ✅, 6b–6d ⬜** | `port/assetcompat.lua`, `port/graphics.lua`, `port/runtime.lua`, `port/yellow_studio.lua`, `tools/recover_sprite_offsets.py`, `port/recovered_sprite_metadata.json`, `port/sprite_offsets.json`, `tools/convert.py`, `tests/test_asset_sizes.py`, `docs/PORTING.md` | 6a: `tests/test_asset_sizes.py` (12 tests) — see the sub-piece table below |
 | 7 | §7 (visual) | Shopkeeper §7 visual sweep — confirm, via the draw log, exactly one pair of eyes + a correctly-seated mouth for `faceemotion` 0–6 in room 311 (the ID half is piece 1) | ⬜ | `tests/test_asset_arrays.py` (extend), draw-log evidence in PR | — |
 | 8 | §15, §16 | Acceptance matrix + final merge — this file maps every requirement → code path / test / evidence; keep `AGENTS.md` current; then the single final merge | ⬜ | this file, `AGENTS.md`, PR body | — |
+
+### Piece 6 sub-pieces (finish these before #7)
+
+Piece 6 is the asset-compatibility layer of spec §12, and it is larger than one
+green increment: it covers sprite size reporting, per-frame origins, movement
+speed, hitboxes/collision boxes, scaling and sheet coordinates. 6a (size) is done;
+6b–6d are pending and must be finished before piece 7.
+
+| sub-piece | deliverable | state / evidence |
+| --- | --- | --- |
+| **6a** | One asset-size compatibility layer. `sprite_get_width/height` (Undertale's and Yellow's builtins), the `sprite_width`/`sprite_height`/origin instance reads, and the origin builtins answer in original-canvas pixels for both worlds through `port/assetcompat.lua`. The recovery tool reads the pinned upstream's real format (GMS2 `.yy`) again and re-derives the whole offsets file offline from `port/recovered_sprite_metadata.json`; 366 more offsets are proven (`canvas-span`), 553 candidates get a pinned canvas with no provable offset (never shifted), 61 stay unresolved with reasons. | ✅ this branch (`arena/01a0cd14-undertale`). `tests/test_asset_sizes.py` (12 tests; `sprite_get_width` 13→14 for `spr_5_mouth2`, canvas-only 8×7→13×10, Frisk's `scr_depth` key 29→30 and the no-guess cases all fail without their part of the change), `tests/test_depth_sort.py` and `tests/test_sprite_offsets.py` updated for the stronger evidence, `--check` re-derives offline. Scoped: 553 sprites are still drawn at the exported position; per-frame origins, speeds, hitboxes and scaling stay open. |
+| **6b–6d** | Per-frame origins; movement speed (Undertale's 3 px step vs Yellow's +2 autorun) as one shared layer; hitboxes/collision boxes and scaling; GMS2 sheet coordinates. | ⬜ |
 
 ### Piece 5 sub-pieces (finish these before #6)
 

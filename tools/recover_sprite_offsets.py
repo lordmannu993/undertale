@@ -1,13 +1,17 @@
 #!/usr/bin/env python3
-"""Recover the original canvas offsets of this checkout's cropped sprite images.
+"""Recover the original canvas of this checkout's cropped sprite images.
 
-The decompiled Undertale tree in this checkout exports every sprite image
-*cropped to its collision bounding box*: ``sprites/spr_riverman.sprite.gmx``
-declares ``width`` 27 and ``bbox_left`` 1, ``bbox_right`` 27, so the PNG holds
-the 27x42 art while the original canvas was 29x42 with the art one pixel in.
-Events keep drawing with the original canvas coordinates and origins
-(``draw_sprite(sprite_index, image_index, x, y)`` with ``xorig`` = 0), so every
-cropped sprite lands ``(bbox_left, bbox_top)`` pixels off its intended place.
+The decompiled Undertale tree in this checkout exports sprite images *cropped*:
+``sprites/spr_riverman.sprite.gmx`` declares ``width`` 27 and ``bbox_left`` 1,
+``bbox_right`` 27, so the PNG holds the 27x42 art while the original canvas was
+29x42 with the art one pixel in. Events keep drawing with the original canvas
+coordinates and origins (``draw_sprite(sprite_index, image_index, x, y)`` with
+``xorig`` = 0), so every cropped sprite lands ``(bbox_left, bbox_top)`` pixels
+off its intended place, and every size read (``sprite_width``,
+``sprite_height`` -- which
+``scripts/scr_depth.gml`` turns into the Y-sort key -- and
+``sprite_get_width/height``) reports the cropped pixels instead of the original
+canvas.
 
 That misplacement is what made the Snowdin shopkeeper show a second pair of
 eyes and a floating mouth (its body is cropped 9 rows above the separate eyes
@@ -19,41 +23,54 @@ What counts as evidence, so this stays auditable:
 
   * A sprite is a candidate when its own export is self-inconsistent: the bbox
     cannot fit inside the exported image, or the art does not start at the
-    bbox corner. Imported offsets are never invented for sprites that are not
-    candidates.
-  * The offset comes from the pinned upstream project's frame metadata (same
+    bbox corner. Imported offsets are never invented for other sprites.
+  * The canvas comes from the pinned upstream project's sprite metadata (same
     repository and commit as ``tools/recover_parts.py``), and only when the
-    upstream bbox equals this checkout's bbox *and* both edges agree:
-    ``bbox_left - art_left == bbox_right - art_right`` (and the same for the
-    vertical axis), with the canvas large enough to contain the image.
-  * Every candidate that fails those checks is listed in the file's
-    ``unresolved`` list with the reason, so nothing is silently dropped and a
-    later revision can extend the rule deliberately.
+    upstream bbox equals this checkout's bbox, the upstream frame count equals
+    this checkout's frame count, the canvas contains every exported frame and
+    the bbox -- so the canvas provably belongs to the same sprite state.
+    Upstream imported no art: only numbers are read, never pixels.
+  * The offset (the export's position inside that canvas) is accepted per axis
+    and only where it is provable:
 
-  * Anchored path (added for the River Person's dog boat, piece 3): when the
-    export's crop keeps the art pinned to its top-left corner, spans the crop
-    full width, and the crop spans the bbox width exactly, both horizontal
-    edges agree without any upstream metadata, so
-    ``offset = (bbox_left, bbox_top)`` follows from the local export alone.
-    The vertical component additionally uses the no-trim invariant: the
-    export never trims transparent rows *above* the art (true for every one
-    of the upstream-verified records), so the crop top equals the bbox top.
-    Because there is no upstream bbox to check against, this path accepts
-    only when a canvas can be pinned from ``CANVAS_CORROBORATION``: records
-    already in this file, verified upstream, that share the sprite's draw
-    call site. The record carries ``canvas_source: "sibling-pinned"`` and
-    ``up_bbox: null`` so its provenance is auditable.
+      - ``canvas-span``: the export spans the whole canvas on that axis, so a
+        crop of that size must start at 0.
+      - ``bbox-interval``: with an *automatic* bbox (``bboxmode`` 0) whose span
+        equals the art's span on that axis, the art fills the bbox, so it must
+        start at the bbox edge. A manual box (``bboxmode`` 2) is a collision
+        rectangle and proves nothing about where the art sits, so this route
+        requires the automatic mode.
+      - ``symmetric-bbox-edges``: both bbox edges agree on the gap to the art
+        (the rule the earlier pinned records rest on; it does not require an
+        automatic bbox, and eight of those records are manual boxes kept as
+        pinned baselines).
+      - ``sibling-pinned`` (anchored): the art is pinned to the crop's top-left
+        corner, spans the crop's full width and the crop spans the bbox width
+        exactly, so both horizontal edges agree without upstream metadata; the
+        vertical component uses the no-trim invariant (the export never trims
+        transparent rows *above* the art, true for every upstream-verified
+        record) and the canvas must be pinned by a ``CANVAS_CORROBORATION``
+        sibling that was itself verified upstream.
 
-Build model: records already pinned in ``port/sprite_offsets.json`` are kept
-as the baseline (``--check`` re-verifies them offline against the local
-tree); the build extends the file for new candidates, upstream metadata
-first, the anchored path second.
+    A sprite is only shifted when *both* axes are proven. Otherwise it keeps
+    its exported position and its canvas is recorded beside the reason the
+    offset is not proven -- a sprite is never nudged on a guess.
+  * Every candidate that fails those checks is listed with the reason, and a
+    candidate with a canvas but no provable offset is listed in ``canvas``
+    (not ``sprites``), so nothing is silently dropped and a later revision can
+    extend the rule deliberately.
+
+Build model: the pinned upstream numbers live in
+``port/recovered_sprite_metadata.json`` (fetched by ``--refresh``, checked in,
+never hand-typed). Deriving the offset file from that metadata plus this
+checkout is a pure function, so ``--check`` re-derives the whole file offline
+and fails on any drift.
 
 Usage::
 
-    python3 tools/recover_sprite_offsets.py                 # write port/sprite_offsets.json
-    python3 tools/recover_sprite_offsets.py --check         # verify the checked-in file, no network
-    python3 tools/recover_sprite_offsets.py --cache FILE    # reuse/renew fetched upstream metadata
+    python3 tools/recover_sprite_offsets.py                 # derive from the checked-in metadata
+    python3 tools/recover_sprite_offsets.py --check         # re-derive, compare, no network
+    python3 tools/recover_sprite_offsets.py --refresh       # fetch upstream metadata (network + token)
 """
 from __future__ import annotations
 
@@ -74,6 +91,7 @@ from pngalpha import alpha_bbox, png_size  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]
 OUTPUT = ROOT / "port/sprite_offsets.json"
+METADATA = ROOT / "port/recovered_sprite_metadata.json"
 
 UPSTREAM = "kittibyte/UndertaleDecomp"
 # The same immutable commit already pinned by tools/recover_parts.py,
@@ -81,17 +99,24 @@ UPSTREAM = "kittibyte/UndertaleDecomp"
 UPSTREAM_REF = "249ffa27ee7e7eee0d7ce84b736c294458b38685"
 API = "https://api.github.com"
 
+#: The per-sprite numbers the metadata file carries, in order.
+METADATA_FIELDS = ("width", "height", "bbox_left", "bbox_top", "bbox_right", "bbox_bottom", "frames")
+
 RULE = (
-    "offset = (bbox_left - art_left, bbox_top - art_top) from the original canvas, "
-    "accepted only when this checkout's bbox equals the pinned upstream frame bbox, "
-    "both canvas edges agree on the offset, and the canvas contains the exported image; "
-    "anchored: when the art is pinned to the crop's top-left corner, spans the crop's "
-    "full width, and the crop spans the bbox width exactly, the same offset is accepted "
-    "from this checkout's own export (both horizontal edges agree without upstream "
-    "metadata; the vertical component uses the no-trim invariant, i.e. the export never "
-    "trims transparent rows above the art, as in every upstream-verified record) and "
-    "only when a pinned sibling canvas (CANVAS_CORROBORATION) contains every frame at "
-    "that offset"
+    "canvas = the pinned upstream sprite's width/height, accepted only when the upstream bbox "
+    "equals this checkout's bbox, the upstream frame count equals this checkout's frame count, and "
+    "the canvas contains every exported frame and the bbox; offset = the export's position in that "
+    "canvas, accepted per axis and only where provable: canvas-span (the export spans the whole "
+    "canvas on that axis, so the crop starts at 0); bbox-interval (with an automatic bbox "
+    "(bboxmode 0) whose span equals the art's span on that axis the art fills the bbox, so the axis "
+    "starts at the bbox edge); symmetric-bbox-edges (both bbox edges agree on the gap to the art, "
+    "the rule the earlier pinned records rest on, which does not require an automatic bbox); "
+    "anchored (the art is pinned to the crop's top-left corner, spans the crop's full width and the "
+    "crop spans the bbox width exactly, so both horizontal edges agree without upstream metadata; "
+    "the vertical component uses the no-trim invariant, i.e. the export never trims transparent "
+    "rows above the art, as in every upstream-verified record) and only when a pinned sibling "
+    "canvas (CANVAS_CORROBORATION) contains every frame at that offset; a sprite is shifted only "
+    "when both axes are proven, never on a guess"
 )
 
 # Sibling records that pin a canvas for a sprite the anchored path derives.
@@ -107,15 +132,29 @@ CANVAS_CORROBORATION = {
 }
 
 GMX_FIELD = re.compile(r"<{0}>(-?\d+)</{0}>")
+JSON_FIELD = re.compile(r'"{0}"\s*:\s*(-?\d+(?:\.\d+)?)')
+#: ``.yy`` files are not strict JSON (GameMaker writes trailing commas), so the
+#: numbers are read by name rather than by parsing the document.
+SPRITE_FRAME_TAG = '"$GMSpriteFrame"'
+FRAME_PATH = re.compile(r'<frame index="\d+">images\\([^<]+)</frame>')
 
 
 def field(text: str, key: str) -> int | None:
+    """One GMX (XML) field of this checkout's own sprite file."""
     match = GMX_FIELD = re.compile(r"<%s>(-?\d+)</%s>" % (key, key)).search(text)
     return int(match.group(1)) if match else None
 
 
+def json_field(text: str, key: str) -> int | None:
+    """One number of a pinned upstream ``.yy`` document, read by name."""
+    match = JSON_FIELD = re.compile(r'"%s"\s*:\s*(-?\d+(?:\.\d+)?)' % key).search(text)
+    if not match:
+        return None
+    return int(float(match.group(1)))
+
+
 def frame_paths(text: str) -> list[str]:
-    return [m.replace("\\", "/") for m in re.findall(r'<frame index="\d+">images\\([^<]+)</frame>', text)]
+    return [m.replace("\\", "/") for m in FRAME_PATH.findall(text)]
 
 
 def local_sprite(name: str) -> dict | None:
@@ -125,7 +164,7 @@ def local_sprite(name: str) -> dict | None:
         return None
     text = path.read_text(errors="replace")
     record = {key: field(text, key) for key in
-              ("width", "height", "bbox_left", "bbox_right", "bbox_top", "bbox_bottom")}
+              ("width", "height", "bboxmode", "bbox_left", "bbox_right", "bbox_top", "bbox_bottom")}
     if any(record[key] is None for key in record):
         return None
     frames = frame_paths(text)
@@ -164,8 +203,22 @@ def candidates() -> dict[str, dict]:
     return found
 
 
+def parse_upstream(text: str) -> dict | None:
+    """The pinned upstream numbers of one sprite, or None when incomplete."""
+    values = {key: json_field(text, key) for key in
+              ("width", "height", "bbox_left", "bbox_right", "bbox_top", "bbox_bottom")}
+    if values["width"] is None:
+        values["width"] = json_field(text, "seqWidth")
+    if values["height"] is None:
+        values["height"] = json_field(text, "seqHeight")
+    values["frames"] = text.count(SPRITE_FRAME_TAG)
+    if any(values[key] is None for key in METADATA_FIELDS):
+        return None
+    return values
+
+
 def fetch_upstream(name: str, attempts: int = 4) -> dict | str:
-    """Frame metadata of the pinned upstream project for one sprite."""
+    """The pinned upstream metadata of one sprite (numbers only, never art)."""
     url = f"{API}/repos/{UPSTREAM}/contents/sprites/{name}/{name}.yy?ref={UPSTREAM_REF}"
     request = urllib.request.Request(url, headers={
         "Accept": "application/vnd.github+json",
@@ -177,10 +230,10 @@ def fetch_upstream(name: str, attempts: int = 4) -> dict | str:
     for attempt in range(attempts):
         try:
             with urllib.request.urlopen(request, timeout=60) as response:
-                text = base64.b64decode(json.loads(response.read().decode("utf-8"))["content"]).decode("utf-8", "replace")
-            values = {key: field(text, key) for key in
-                      ("width", "height", "bbox_left", "bbox_right", "bbox_top", "bbox_bottom")}
-            if any(values[key] is None for key in values):
+                payload = json.loads(response.read().decode("utf-8"))
+            text = base64.b64decode(payload["content"]).decode("utf-8", "replace")
+            values = parse_upstream(text)
+            if values is None:
                 return "missing-fields"
             return values
         except urllib.error.HTTPError as error:
@@ -195,8 +248,15 @@ def fetch_upstream(name: str, attempts: int = 4) -> dict | str:
     return "fetch-failed"
 
 
+def upstream_values(entry) -> dict | None:
+    """A metadata entry (list of numbers) as named fields."""
+    if not isinstance(entry, list) or len(entry) != len(METADATA_FIELDS):
+        return None
+    return dict(zip(METADATA_FIELDS, entry))
+
+
 def decide(name: str, local: dict, upstream: dict) -> tuple[dict | None, str | None]:
-    """Apply the acceptance gates; return the record or the rejection reason."""
+    """The symmetric-bbox-edges route; return the record or the rejection reason."""
     width, height = local["width"], local["height"]
     left, right, top, bottom = (local["bbox_left"], local["bbox_right"],
                                 local["bbox_top"], local["bbox_bottom"])
@@ -219,6 +279,7 @@ def decide(name: str, local: dict, upstream: dict) -> tuple[dict | None, str | N
     return {
         "ox": ox, "oy": oy,
         "canvas": [canvas[0], canvas[1]],
+        "offset_rule": "symmetric-bbox-edges",
         "gmx_bbox": [left, top, right, bottom],
         "up_bbox": list(up_bbox),
         "png": local["png"],
@@ -272,6 +333,7 @@ def decide_anchored(name: str, local: dict, pinned: dict) -> tuple[dict | None, 
         "canvas": canvas,
         "canvas_source": "sibling-pinned",
         "canvas_siblings": sorted(siblings),
+        "offset_rule": "sibling-pinned",
         "gmx_bbox": [left, top, right, bottom],
         "up_bbox": None,
         "png": local["png"],
@@ -280,158 +342,282 @@ def decide_anchored(name: str, local: dict, pinned: dict) -> tuple[dict | None, 
     }, None
 
 
+def decide_canvas(name: str, local: dict, upstream: dict) -> tuple[dict | None, str | None]:
+    """Pin the canvas and prove each axis' offset independently.
+
+    Returns the record (``sprites`` shape when both axes are proven, ``canvas``
+    shape otherwise) or a rejection reason.
+    """
+    left, right, top, bottom = (local["bbox_left"], local["bbox_right"],
+                                local["bbox_top"], local["bbox_bottom"])
+    up_bbox = (upstream["bbox_left"], upstream["bbox_top"], upstream["bbox_right"], upstream["bbox_bottom"])
+    if (left, top, right, bottom) != up_bbox:
+        return None, "bbox-differs-from-upstream"
+    if len(local["frames"]) != upstream["frames"]:
+        return None, "frame-set-differs-from-upstream"
+    canvas = [upstream["width"], upstream["height"]]
+    png = local["png"]
+    art = local["art"]
+    if upstream["bbox_right"] >= canvas[0] or upstream["bbox_bottom"] >= canvas[1]:
+        return None, "bbox-outside-canvas"
+    for frame in local["frames"]:
+        if frame[0] > canvas[0] or frame[1] > canvas[1]:
+            return None, "frame-exceeds-canvas"
+    if png[0] > canvas[0] or png[1] > canvas[1]:
+        return None, "export-exceeds-canvas"
+    proofs, offsets = {}, {}
+    for axis, (lo, hi, length) in (("x", (left, right, png[0])), ("y", (top, bottom, png[1]))):
+        routes = []
+        if length == canvas[0 if axis == "x" else 1]:
+            routes.append(("canvas-span", 0))
+        if local["bboxmode"] == 0 and length == hi - lo + 1 \
+                and art[0 if axis == "x" else 1] == 0 and art[2 if axis == "x" else 3] == length - 1:
+            routes.append(("bbox-interval", lo))
+        values = {value for _, value in routes}
+        if len(values) == 1:
+            proofs[axis], offsets[axis] = routes[0][0], values.pop()
+        else:
+            proofs[axis], offsets[axis] = None, None
+    if proofs["x"] and proofs["y"]:
+        return {
+            "ox": offsets["x"], "oy": offsets["y"],
+            "canvas": canvas,
+            "offset_rule": f"x: {proofs['x']}, y: {proofs['y']}",
+            "gmx_bbox": [left, top, right, bottom],
+            "up_bbox": list(up_bbox),
+            "png": png,
+            "art": art,
+            "frames": local["frames"],
+        }, None
+    unproven = "".join(axis for axis in "xy" if not proofs[axis])
+    return {
+        "canvas": canvas,
+        "offset_proof": {"x": proofs["x"], "y": proofs["y"]},
+        "offset": None,
+        "reason": f"offset-unproven-on-{'x' if unproven == 'x' else 'y' if unproven == 'y' else 'both-axes'}",
+        "gmx_bbox": [left, top, right, bottom],
+        "up_bbox": list(up_bbox),
+        "png": png,
+        "art": art,
+        "frames": local["frames"],
+    }, None
+
+
 def fetch_reason(metadata: object) -> str:
     """Normalise the fetch layer's wording into stable reason names."""
-    reason = str(metadata or "no-upstream-record")
+    reason = str(metadata or "metadata-missing")
     reason = {"missing": "not-in-upstream", "not-in-upstream": "not-in-upstream"}.get(reason, reason)
     if reason.startswith("error") or reason.startswith("http") or reason == "fetch-failed":
         reason = "fetch-failed"
     return reason
 
 
-def build(cache_path: Path | None) -> dict:
-    pool = candidates()
-    # Pinned records are the baseline: they stay (``--check`` re-verifies
-    # them offline against the local tree); the build extends the file.
-    current: dict[str, dict] = {}
-    current_unresolved: dict[str, str] = {}
-    if OUTPUT.exists():
-        document = json.loads(OUTPUT.read_text())
-        current = document.get("sprites", {})
-        current_unresolved = {entry["name"]: entry["reason"]
-                              for entry in document.get("unresolved", [])}
-    cache: dict[str, dict | str] = {}
-    if cache_path and cache_path.exists():
-        for name, entry in json.loads(cache_path.read_text()).items():
-            if isinstance(entry, dict) and "bbox" in entry:
-                box = entry["bbox"]
-                entry = {"width": entry["width"], "height": entry["height"],
-                         "bbox_left": box[0], "bbox_top": box[1],
-                         "bbox_right": box[2], "bbox_bottom": box[3]}
-            cache[name] = entry
-    todo = sorted(name for name in pool if name not in cache and name not in current)
-    if todo:
-        with ThreadPoolExecutor(max_workers=8) as executor:
-            for name, metadata in zip(todo, executor.map(fetch_upstream, todo)):
-                cache[name] = metadata
-        if cache_path:
-            cache_path.write_text(json.dumps(cache, indent=0, sort_keys=True))
-    sprites, unresolved = {}, []
-    for name in sorted(pool):
-        if name in current:
-            sprites[name] = current[name]
-            continue
-        record = None
-        reason: str | None = None
-        metadata = cache.get(name)
-        if isinstance(metadata, dict):
-            record, reason = decide(name, pool[name], metadata)
-        if not record:
-            anchored, _ = decide_anchored(name, pool[name], current)
-            if anchored:
-                record = anchored
-            elif reason is None:
-                # No usable upstream metadata: keep the reason this candidate
-                # already had, or the normalised fetch failure. When upstream
-                # metadata was available and rejected the sprite, its reason
-                # is kept: it is the stronger evidence.
-                reason = current_unresolved.get(name) or fetch_reason(metadata)
-        if record:
-            sprites[name] = record
+def read_metadata(path: Path = METADATA) -> dict:
+    """The checked-in pinned upstream numbers, or an empty document."""
+    if not path.exists():
+        return {"sprites": {}, "missing": {}}
+    document = json.loads(path.read_text())
+    return {"sprites": document.get("sprites", {}), "missing": document.get("missing", {})}
+
+
+def write_metadata(path: Path, fetched: dict) -> None:
+    sprites, missing = {}, {}
+    for name, entry in sorted(fetched.items()):
+        if isinstance(entry, dict) and all(entry.get(key) is not None for key in METADATA_FIELDS):
+            sprites[name] = [int(entry[key]) for key in METADATA_FIELDS]
         else:
-            unresolved.append({"name": name, "reason": reason or "fetch-failed"})
-    return {
+            missing[name] = fetch_reason(entry)
+    document = {
         "format": 1,
         "upstream": UPSTREAM,
         "ref": UPSTREAM_REF,
-        "source": "sprites/<name>/<name>.yy frame metadata (no art is imported; offsets only)",
-        "rule": RULE,
-        "counts": {"candidates": len(pool), "recovered": len(sprites), "unresolved": len(unresolved)},
+        "source": ("repos/%s/contents/sprites/<name>/<name>.yy at ref %s (GameMaker Studio 2 sprite "
+                   "metadata: width/height, bbox, frame count); fetched by tools/recover_sprite_offsets.py "
+                   "--refresh. No art is imported or used." % (UPSTREAM, UPSTREAM_REF)),
+        "fields": list(METADATA_FIELDS),
+        "counts": {"sprites": len(sprites), "missing": len(missing)},
         "sprites": sprites,
+        "missing": missing,
+    }
+    path.write_text(json.dumps(document, indent=1, sort_keys=True) + "\n")
+
+
+def refresh(pool: dict, cache_path: Path | None = None, all_names: bool = False,
+            workers: int = 8, metadata_path: Path = METADATA) -> dict:
+    """Fetch the pinned upstream metadata and write the checked-in file."""
+    current = read_metadata(metadata_path)
+    fetched = {name: entry for name, entry in current["sprites"].items() if isinstance(entry, list)}
+    fetched.update({name: reason for name, reason in current["missing"].items()})
+    cache = {}
+    if cache_path and cache_path.exists():
+        cache = json.loads(cache_path.read_text())
+    done = set(fetched) if all_names else {name for name, entry in fetched.items() if isinstance(entry, list)}
+    todo = sorted(name for name in pool if name not in done)
+    if todo:
+        def work(name):
+            entry = cache.get(name)
+            if isinstance(entry, dict) and all(entry.get(key) is not None for key in METADATA_FIELDS):
+                return name, entry
+            return name, fetch_upstream(name)
+        with ThreadPoolExecutor(max_workers=workers) as executor:
+            for name, entry in executor.map(work, todo):
+                fetched[name] = entry
+        if cache_path:
+            cache_path.parent.mkdir(parents=True, exist_ok=True)
+            cache_path.write_text(json.dumps(fetched, indent=0, sort_keys=True) + "\n")
+    write_metadata(metadata_path, fetched)
+    return read_metadata(metadata_path)
+
+
+def derive(pool: dict, metadata: dict) -> dict:
+    """The offset file's contents from this checkout plus the pinned metadata.
+
+    Three passes, so the anchored route still sees the sibling canvases the
+    upstream routes verified: (1) upstream routes -- the symmetric-bbox-edges
+    rule and the per-axis proofs; (2) anchored, for the one sprite whose canvas
+    is pinned by siblings; (3) whatever is left is a canvas-only record or an
+    explained refusal.
+    """
+    derived: dict[str, tuple[str, object]] = {}
+    pending: list[tuple[str, dict]] = []
+    for name in sorted(pool):
+        entry = metadata["sprites"].get(name)
+        upstream = upstream_values(entry) if entry is not None else None
+        if upstream is None:
+            reason = "metadata-malformed" if entry is not None \
+                else fetch_reason(metadata["missing"].get(name))
+            derived[name] = ("unresolved", reason)
+        else:
+            pending.append((name, upstream))
+    for name, upstream in pending:
+        local = pool[name]
+        record, reason = decide(name, local, upstream)
+        if not record:
+            record, reason = decide_canvas(name, local, upstream)
+            if record and "ox" not in record:
+                # A canvas with at least one axis unproven: never shifted.
+                derived[name] = ("canvas", record)
+                continue
+        derived[name] = ("offset", record) if record else ("unresolved", reason or "fetch-failed")
+    verified = {name: record for name, (kind, record) in derived.items() if kind == "offset"}
+    for name, _ in pending:
+        kind, value = derived[name]
+        if kind != "canvas":
+            continue
+        anchored, _ = decide_anchored(name, pool[name], verified)
+        if anchored:
+            derived[name] = ("offset", anchored)
+    sprites = {name: record for name, (kind, record) in derived.items() if kind == "offset"}
+    canvas = {name: record for name, (kind, record) in derived.items() if kind == "canvas"}
+    unresolved = [{"name": name, "reason": str(record)}
+                  for name, (kind, record) in sorted(derived.items()) if kind == "unresolved"]
+    return {
+        "format": 2,
+        "upstream": UPSTREAM,
+        "ref": UPSTREAM_REF,
+        "source": ("sprites/<name>/<name>.yy metadata (numbers only, no art) checked in as "
+                   "port/recovered_sprite_metadata.json, plus this checkout's own .sprite.gmx and PNGs"),
+        "rule": RULE,
+        "counts": {
+            "candidates": len(pool),
+            "recovered": len(sprites),
+            "canvas": len(canvas),
+            "unresolved": len(unresolved),
+        },
+        "sprites": sprites,
+        "canvas": canvas,
         "unresolved": unresolved,
     }
 
 
-def check(document: dict) -> list[str]:
-    """Re-derive every recorded offset from the local tree; no network."""
+def check(document: dict, pool: dict | None = None, metadata: dict | None = None) -> list[str]:
+    """Re-derive every recorded canvas and offset from the local tree; no network."""
     problems: list[str] = []
     if document.get("upstream") != UPSTREAM or document.get("ref") != UPSTREAM_REF:
         problems.append("provenance changed: upstream/ref do not match this tool's pins")
-    pool = candidates()
-    recorded = document.get("sprites", {})
-    unresolved = {entry["name"]: entry["reason"] for entry in document.get("unresolved", [])}
-    for name, record in sorted(recorded.items()):
-        local = pool.get(name)
-        if not local:
-            problems.append(f"{name}: recorded offset but the sprite is no longer a candidate")
-            continue
-        if local["png"] != record["png"] or local["art"] != record["art"]:
-            problems.append(f"{name}: exported image changed (png {local['png']} art {local['art']})")
-            continue
-        gmx_bbox = [local["bbox_left"], local["bbox_top"], local["bbox_right"], local["bbox_bottom"]]
-        if gmx_bbox != record["gmx_bbox"]:
-            problems.append(f"{name}: gmx bbox changed to {gmx_bbox}")
-            continue
-        if record.get("canvas_source") == "sibling-pinned":
-            if "frames" in record and local["frames"] != record["frames"]:
-                problems.append(f"{name}: frame set changed to {local['frames']}")
-                continue
-            rebuilt, reason = decide_anchored(name, local, recorded)
-            if not rebuilt or (rebuilt["ox"], rebuilt["oy"]) != (record["ox"], record["oy"]) \
-                    or rebuilt["canvas"] != record["canvas"]:
-                problems.append(f"{name}: anchored offset no longer follows the rule ({reason})")
-            continue
-        rebuilt, reason = decide(name, local, {
-            "width": record["canvas"][0], "height": record["canvas"][1],
-            "bbox_left": record["up_bbox"][0], "bbox_top": record["up_bbox"][1],
-            "bbox_right": record["up_bbox"][2], "bbox_bottom": record["up_bbox"][3],
-        })
-        if not rebuilt or (rebuilt["ox"], rebuilt["oy"]) != (record["ox"], record["oy"]):
-            problems.append(f"{name}: offset no longer follows the rule ({reason})")
-    for name, reason in sorted(unresolved.items()):
-        local = pool.get(name)
-        if not local:
-            problems.append(f"{name}: listed unresolved but is no longer a candidate")
-            continue
-        if name in recorded:
-            problems.append(f"{name}: listed both recovered and unresolved")
-        if not reason:
-            problems.append(f"{name}: unresolved without a reason")
-    missing = sorted(set(pool) - set(recorded) - set(unresolved))
-    if missing:
-        problems.append(f"candidates neither recovered nor explained: {missing[:8]}{'...' if len(missing) > 8 else ''}")
-    if document.get("counts") != {"candidates": len(pool), "recovered": len(recorded), "unresolved": len(unresolved)}:
-        problems.append("counts do not match the recorded lists")
+    pool = candidates() if pool is None else pool
+    metadata = read_metadata() if metadata is None else metadata
+    if not metadata["sprites"] and not metadata["missing"]:
+        problems.append(f"{METADATA.name} is missing: run --refresh to fetch the pinned upstream metadata")
+        return problems
+    expected = derive(pool, metadata)
+    for section in ("sprites", "canvas"):
+        recorded, rebuilt = document.get(section, {}), expected[section]
+        for name in sorted(set(recorded) | set(rebuilt)):
+            if name not in rebuilt:
+                problems.append(f"{name}: recorded in {section} but the rule no longer derives it")
+            elif name not in recorded:
+                problems.append(f"{name}: the rule derives a {section} record that is not in the file")
+            elif recorded[name] != rebuilt[name]:
+                if section == "sprites" and (recorded[name].get("ox"), recorded[name].get("oy")) \
+                        != (rebuilt[name].get("ox"), rebuilt[name].get("oy")):
+                    problems.append(f"{name}: offset no longer follows the rule "
+                                    f"({recorded[name].get('ox')}, {recorded[name].get('oy')}) -> "
+                                    f"({rebuilt[name].get('ox')}, {rebuilt[name].get('oy')})")
+                else:
+                    problems.append(f"{name}: {section} record no longer follows the rule")
+    for name, record in sorted(document.get("canvas", {}).items()):
+        if "ox" in record or "oy" in record:
+            problems.append(f"{name}: a canvas-only record must never carry an offset")
+    recorded_unresolved = {entry["name"]: entry.get("reason") for entry in document.get("unresolved", [])}
+    rebuilt_unresolved = {entry["name"]: entry["reason"] for entry in expected["unresolved"]}
+    for name in sorted(set(recorded_unresolved) | set(rebuilt_unresolved)):
+        if name not in rebuilt_unresolved:
+            problems.append(f"{name}: listed unresolved but the rule now derives a record")
+        elif name not in recorded_unresolved:
+            problems.append(f"{name}: the rule cannot recover it but it is not listed as unresolved")
+        elif recorded_unresolved[name] != rebuilt_unresolved[name]:
+            problems.append(f"{name}: unresolved reason {recorded_unresolved[name]!r} is no longer "
+                            f"{rebuilt_unresolved[name]!r}")
+    if document.get("counts") != expected["counts"]:
+        problems.append(f"counts do not match: {document.get('counts')} vs {expected['counts']}")
     return problems
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--check", action="store_true", help="verify the checked-in file without network")
-    parser.add_argument("--cache", type=Path, default=None, help="reuse/renew fetched upstream metadata")
+    parser.add_argument("--refresh", action="store_true",
+                        help="fetch the pinned upstream metadata (needs GITHUB_TOKEN), then derive")
+    parser.add_argument("--all", action="store_true", help="with --refresh: refetch every candidate")
+    parser.add_argument("--cache", type=Path, default=None,
+                        help="with --refresh: reuse/renew fetched upstream metadata in this file")
+    parser.add_argument("--workers", type=int, default=8, help="with --refresh: parallel fetches")
     parser.add_argument("--output", type=Path, default=OUTPUT)
+    parser.add_argument("--metadata", type=Path, default=METADATA)
     arguments = parser.parse_args()
+    pool = candidates()
     if arguments.check:
         if not arguments.output.exists():
             print(f"{arguments.output} is missing; run the recovery first")
             return 2
-        problems = check(json.loads(arguments.output.read_text()))
+        problems = check(json.loads(arguments.output.read_text()), pool)
         for problem in problems:
             print("FAIL " + problem)
         if problems:
             return 1
         document = json.loads(arguments.output.read_text())
-        print(f"OK {arguments.output.name}: {document['counts']['recovered']} offsets verified against the local tree")
+        counts = document["counts"]
+        print(f"OK {arguments.output.name}: {counts['recovered']} offsets "
+              f"verified against the local tree ({counts['canvas']} more canvases, "
+              f"{counts['unresolved']} candidates explained without one)")
         return 0
-    document = build(arguments.cache)
+    if arguments.refresh:
+        refresh(pool, arguments.cache, arguments.all, arguments.workers, arguments.metadata)
+    metadata = read_metadata(arguments.metadata)
+    if not metadata["sprites"] and not metadata["missing"] and not arguments.refresh:
+        print(f"{arguments.metadata} is missing; run --refresh to fetch the pinned upstream metadata")
+        return 2
+    document = derive(pool, metadata)
     arguments.output.write_text(json.dumps(document, indent=1, sort_keys=True) + "\n")
     counts = document["counts"]
     print(f"wrote {arguments.output.relative_to(ROOT)}: {counts['recovered']} offsets, "
-          f"{counts['candidates']} candidates, {counts['unresolved']} unresolved")
+          f"{counts['canvas']} canvases, {counts['candidates']} candidates, "
+          f"{counts['unresolved']} unresolved")
     for name, record in sorted(document["sprites"].items()):
         if name in ("spr_shopkeeper1", "spr_dogboat", "spr_dogboat_cover",
                     "spr_regboat", "spr_riverman", "spr_shopkeeper2_body"):
-            source = " anchored" if record.get("canvas_source") == "sibling-pinned" else ""
+            source = "" if record.get("offset_rule") == "symmetric-bbox-edges" else " " + record["offset_rule"]
             print(f"   {name}: offset ({record['ox']}, {record['oy']}) of canvas {record['canvas']}{source}")
     return 0
 

@@ -154,11 +154,18 @@ class Converter:
         self.evidence[name] = why
 
     def load_sprite_offsets(self):
-        """Canvas offsets for sprite images this checkout exported cropped.
+        """Canvas and crop offset for sprite images this checkout exported cropped.
 
-        The export cropped each PNG to its collision bbox while events keep
-        drawing in original canvas coordinates, so the renderer has to add the
-        crop back (see tools/recover_sprite_offsets.py for the evidence rule).
+        The export cropped some PNGs while events keep drawing in original canvas
+        coordinates, so the renderer has to add the crop back and every size read
+        has to answer in canvas pixels (see tools/recover_sprite_offsets.py for
+        the evidence rule and each route's proof).
+
+        Two lists: ``sprites`` are records whose offset is proven, ``canvas``
+        are sprites whose original canvas is pinned but whose position inside it
+        is not, so they are *never* shifted -- they only carry the canvas size
+        the game's own arithmetic (scr_depth's Y-sort key, sprite_get_width) was
+        written against.
         """
         offsets_file = self.root / "port/sprite_offsets.json"
         if not offsets_file.exists():
@@ -167,18 +174,26 @@ class Converter:
         sprites = self.resources.get("sprites", {})
         offsets = {}
         canvas = {}
+
+        def canvas_size(name, record):
+            size = record.get("canvas") or []
+            if len(size) != 2 or not all(isinstance(v, int) and v > 0 for v in size):
+                raise CompileError(f"sprite offset has no verified canvas size: {name}")
+            return size[0], size[1]
+
         for name, record in sorted(document.get("sprites", {}).items()):
             if name not in sprites:
                 raise CompileError(f"sprite offset names an unknown sprite: {name}")
             offsets[name] = (int(record["ox"]), int(record["oy"]))
-            # The same pinned record carries the original canvas size the game's
-            # own arithmetic (notably scr_depth's Y-sort key) assumes. Carried
-            # only where the recovery rule verified it; unresolved sprites keep
-            # their exported size and are never guessed at (piece 6 owns them).
-            size = record.get("canvas") or []
-            if len(size) != 2 or not all(isinstance(v, int) and v > 0 for v in size):
-                raise CompileError(f"sprite offset has no verified canvas size: {name}")
-            canvas[name] = (size[0], size[1])
+            canvas[name] = canvas_size(name, record)
+        for name, record in sorted(document.get("canvas", {}).items()):
+            if name not in sprites:
+                raise CompileError(f"sprite canvas names an unknown sprite: {name}")
+            if name in offsets:
+                raise CompileError(f"sprite canvas repeats a recovered offset: {name}")
+            if record.get("ox") is not None or record.get("oy") is not None:
+                raise CompileError(f"sprite canvas carries an offset it cannot prove: {name}")
+            canvas[name] = canvas_size(name, record)
         self.sprite_offsets = offsets
         self.sprite_canvas = canvas
         self.report["sprite_offsets"] = {
@@ -187,14 +202,18 @@ class Converter:
             "counts": document.get("counts"),
             "applied": {name: {"ox": ox, "oy": oy, "canvas": list(canvas[name])}
                         for name, (ox, oy) in sorted(offsets.items())},
+            "canvas_only": {name: {"canvas": list(canvas[name]), "reason": record.get("reason"),
+                                   "offset_proof": record.get("offset_proof")}
+                            for name, record in sorted(document.get("canvas", {}).items())},
             "unresolved": len(document.get("unresolved", [])),
             "limitations": [
-                "Sprites whose export cannot be tied back to the original canvas are left unshifted "
-                "and listed in port/sprite_offsets.json under unresolved.",
-                "sprite_get_width/height and image_width report the exported image size, not the "
-                "original canvas size the game's own arithmetic assumes.",
-                "sprite_width/sprite_height instance reads use the recovered canvas size where it "
-                "verified (447 sprites) and the exported size elsewhere.",
+                "A candidate sprite whose crop offset no route proves keeps its exported position, "
+                "is never shifted, and carries its pinned canvas size only; it is listed by name in "
+                "port/sprite_offsets.json under canvas with the axis that is unproven.",
+                "A candidate whose upstream record is missing or disagrees with this checkout keeps "
+                "the exported size for every read and is listed under unresolved with its reason.",
+                "Layering parity with the original engine is a CI-only visual claim: the removed "
+                "art is restored from the pinned canvas, not re-rendered from the original binary.",
             ],
         }
 

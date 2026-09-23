@@ -402,8 +402,22 @@ Normalize things such as:
 - Scaling.
 - Sprite-sheet coordinates.
 
-Do not assume that two sprites with visually similar dimensions have identical origins or
-collision geometry.
+> Claim (scoped to what ran, 2026-09-23): piece **6a** implements the *size* half of this
+> requirement as one layer. `port/assetcompat.lua` is the single place that answers
+> "how big is this sprite in the original game": `sprite_get_width`/`sprite_get_height`
+> for both worlds' builtins, the `sprite_width`/`sprite_height` and origin instance
+> reads, and `sprite_get_xoffset`/`sprite_get_yoffset` all go through it, so a cropped
+> Undertale export and an uncropped Yellow GMS2 record answer in the same units — the
+> original canvas. `tools/recover_sprite_offsets.py` reads the pinned upstream's real
+> (GMS2 `.yy`) metadata again and derives `port/sprite_offsets.json` from the checked-in
+> `port/recovered_sprite_metadata.json` by a pure function, re-derivable offline with
+> `--check`: 814 offsets proven (366 of them new, `canvas-span`), 553 canvases pinned
+> with the offset left unproven and the sprite *never* shifted, 61 candidates listed by
+> name with their reason. Evidence: `tests/test_asset_sizes.py` (12 tests) plus the
+> updated `tests/test_depth_sort.py`/`tests/test_sprite_offsets.py`. Origins,
+> per-frame animation handling, movement speed, collision boxes, scaling and sheet
+> coordinates are the remaining 6b–6d sub-pieces of this requirement, and are **not**
+> claimed by 6a.
 
 ## 13. Do Not Fix Bugs With Temporary Visual Hacks
 
