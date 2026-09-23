@@ -127,6 +127,9 @@ function Runtime.new(manifest,input,options)
     -- Merged builds draw Yellow's player as Frisk (see port/frisk.lua); a
     -- single-game manifest leaves every sprite exactly as converted.
     require("port.frisk").install(self)
+    -- One controller over both player adapters (piece 5c). After frisk so the
+    -- draw remap can read the movement flag this controller publishes.
+    require("port.controller").install(self)
     return self
 end
 

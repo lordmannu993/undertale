@@ -162,13 +162,34 @@ function Inventory.install(R)
         return 0
     end
 
+    -- Ordinary reads stay the piece 5b views: ammo is not folded into
+    -- wstrength, and accessory defense is not folded into adef. Piece 5c's
+    -- battle consumers set state.battleCompose for the duration of one script
+    -- so each game's formula sees the slot the other game already adds.
     local function derived(name)
         local equipment = state.equipment
-        if name == "weaponAttack" then return statOf(equipment.weapon, "weapon") end
-        if name == "weaponStrength" then
-            return statOf(equipment.weapon, "weapon") + statOf(equipment.armor, "bonus")
+        local compose = state.battleCompose
+        if name == "weaponAttack" then
+            local attack = statOf(equipment.weapon, "weapon")
+            if compose == "yellow-attack" then
+                attack = attack + statOf(equipment.armor, "bonus")
+            end
+            return attack
         end
-        if name == "armorDefense" then return statOf(equipment.armor, "armor") end
+        if name == "weaponStrength" then
+            local strength = statOf(equipment.weapon, "weapon") + statOf(equipment.armor, "bonus")
+            if compose == "ut-attack" then
+                strength = strength + statOf(equipment.ammo, "ammo")
+            end
+            return strength
+        end
+        if name == "armorDefense" then
+            local defense = statOf(equipment.armor, "armor")
+            if compose == "ut-defense" then
+                defense = defense + statOf(equipment.accessory, "accessory")
+            end
+            return defense
+        end
         if name == "ammoAttack" then return statOf(equipment.ammo, "ammo") end
         if name == "accessoryDefense" then return statOf(equipment.accessory, "accessory") end
         return 0

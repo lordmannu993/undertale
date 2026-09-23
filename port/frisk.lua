@@ -122,17 +122,46 @@ function Frisk.install(R)
         kept[#kept + 1] = name
     end
     table.sort(kept)
+    -- Undertale has no run cycle. While the shared controller says the live
+    -- obj_mainchara is sprinting, the four base walk poses draw Clover's run
+    -- cycle. The call is still pixels-only: sprite_index (the mask) is not
+    -- changed. Alternate costumes have no Clover run pair and are not invented.
+    -- A missing run id keeps the walk sprite; the run poses themselves are
+    -- already required to exist above.
+    local runOfWalk = {}
+    local walkToRun = {
+        [names.spr_maincharad] = "spr_pl_run_down",
+        [names.spr_maincharau] = "spr_pl_run_up",
+        [names.spr_maincharal] = "spr_pl_run_left",
+        [names.spr_maincharar] = "spr_pl_run_right",
+    }
+    for walkId, runName in pairs(walkToRun) do
+        local runId = yellowSprites[runName]
+        if walkId and runId then runOfWalk[walkId] = runId end
+    end
+    local mainchara = names.obj_mainchara
+
     R:warn("frisk-remap",
         ("Frisk-only rendering: %d of Yellow's %d walk poses draw Undertale's Frisk; "
             .. "running swaps to Clover (%d run poses, none remapped). %d poses stay Clover "
-            .. "for lack of a Frisk equivalent: %s.")
+            .. "for lack of a Frisk equivalent: %s. Undertale's base walk poses draw that "
+            .. "same run cycle while the shared controller is sprinting; alternate costumes "
+            .. "with no Clover run pair are not invented.")
             :format(mapped, #Frisk.BODY_SPRITES, #Frisk.RUN_SPRITES, #kept, table.concat(kept, ", ")))
 
     -- Draw-time hook consumed by port/graphics.lua. Sprite records, masks,
     -- image_number and every gameplay lookup keep resolving to Clover; only
-    -- the pixels change. Undertale's own sprite IDs are never in the table,
-    -- so Undertale rooms render exactly as they always did.
+    -- the pixels change. Undertale's own sprite IDs are never in the walk
+    -- table. A direct call with no sprinting draw owner is identity for them,
+    -- which is what the merged tests pin.
     function R.spriteForDraw(index)
+        local movement = R.player and R.player.movement
+        local owner = R.drawOwner
+        if movement and movement.sprinting and owner and owner.v
+            and owner.v.object_index == mainchara then
+            local runId = runOfWalk[index]
+            if runId then return runId end
+        end
         return remap[index] or index
     end
     R.friskRemap = { remap = remap, walk = mapped, run = #Frisk.RUN_SPRITES }
