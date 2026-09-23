@@ -1097,3 +1097,74 @@ Full local suite 556 passed, 1 skipped (`PORT_REQUIRE_YELLOW=1`).
 Not claimed: a played-through route, input latency, or Android. Undertale's
 diagonal wall-slide objects (`obj_sur` and friends) still slide in their own ±3
 steps once a run touches them, which is the original's own behaviour for a walk.
+
+## Collision boxes, hitboxes, scaling and sheet coordinates (spec §12 — unified-fusion piece 6d)
+
+The last sub-piece of spec §12. Five places where the two worlds answered a
+collision or size question differently, each fixed in the shared system
+(`port/collision.lua`, `port/graphics.lua`, `port/yellow_studio.lua`,
+`tools/yellow/assets.py`), with no per-room or per-character branch:
+
+1. **Precise masks in canvas pixels.** `R:maskPoint` transforms the probe point
+   into *canvas* coordinates, then read the exported PNG at those coordinates.
+   A cropped Undertale export starts at its recovered offset (the renderer
+   draws it at `ox, oy`), so every cropped sprite's pixel hitbox sat
+   `(ox, oy)` away from its art — 448 recovered sprites have a non-zero offset,
+   and 136 objects collide with one of them (`spr_adate_body` is 10px right and
+   17px down of its crop corner). The mask is now read at `canvas - (ox, oy)`,
+   through one `R:maskPixel`.
+2. **Composite vs per-frame masks.** GameMaker's *Precise* mask is "a composite
+   of the edges of all the sub-images placed over each other" (GameMaker manual,
+   Sprite Editor); only separate masks (1.4 `sepmasks`, Studio 2 *Precise (per
+   frame)*) follow the current frame. The runtime used frame 0 as the whole
+   mask when masks were not separate; it now takes the union of every frame.
+3. **Studio 2's `collisionKind` 4 is Precise (per frame).** The GMS2 sprite
+   schema numbers the kinds 0 Precise, 1 Rectangle, 2 Ellipse, 3 Diamond,
+   4 PrecisePerFrame, 5 RectangleWithRotation (the `SpriteCollisionKind` enum in
+   bscotch/stitch's `YySprite.ts` and NPC-Studio's `yy-typings` agree). The
+   converter read 4 as a rotated rectangle and hard-coded `sepmasks` 0, so the
+   74 per-frame masks (every one of them multi-frame: Big Frog's knight, Ceroba's
+   bullets, Flowey's hands) collided as composites. Kind 4 now converts to
+   GameMaker 1.4's precise `colkind` 0 with `sepmasks` 1; kind 0 stays one
+   composite mask; kind 5 (none in the pinned source) is reported by name. The
+   conversion report's finding is now `precise-per-frame-mask: 74`.
+4. **`place_meeting`/`instance_place` test the caller's collision box.**
+   GameMaker moves the caller to (x, y), checks *its mask* against the target,
+   and moves it back — precise only when both masks are (GameMaker manual,
+   `place_meeting`). The port checked the single point (x, y), so Yellow's 313
+   `place_meeting` and 34 `instance_place` calls (the diagonal wall slides in
+   `scr_normal_state`, battle hitboxes, platforms) missed anything the caller's
+   origin had not reached. `R:placeMeeting` is the one test behind both, and
+   `instance_place_list` collects every instance the same test meets.
+5. **Scaling and sheet coordinates in canvas pixels.** `draw_sprite_stretched`,
+   Yellow's `draw_sprite_stretched_ext` and `draw_sprite_tiled(_ext)` scaled or
+   stepped by the *exported* size, so a cropped sprite stretched past the
+   rectangle it was asked to fill (`spr_adate_body` over 154×142 drew at
+   2.30×2.63 instead of 2×2). They now go through `AssetCompat.width/height`.
+   `sprite_get_uvs` — a named compatibility stop that four *placed* Yellow
+   reflection objects hit every draw (`rm_snowdin_04_yellow`,
+   `rm_snowdin_10_yellow`, `rm_hotland_complex_1`/`1c`) plus four spawned
+   backgrounds — now answers from the frame: in this port every frame is its own
+   texture (UVs 0..1), and the trim fields are exactly the recovered crop
+   (`[4]/[5]` = `ox, oy`, `[6]/[7]` = exported/canvas size), so an uncropped
+   Yellow frame answers `0, 0, 1, 1, 0, 0, 1, 1`.
+
+Evidence: `tests/test_asset_collision.py` (6 tests), with mask pixels supplied by
+a stand-in `love.image` so the headless run exercises the precise path.
+Reverting `port/collision.lua` fails three (the cropped mask hits
+`00000` instead of `11000` at canvas (10,17)/(76,70); the composite reads
+`1000` instead of `1001`; `place_meeting` answers 0 for a box whose edge crosses
+the target); reverting `port/graphics.lua` fails the stretch (`2.2985, 2.6296`
+instead of `2, 2`); reverting the Yellow builtins fails `sprite_get_uvs`
+(`Compatibility stop: sprite_get_uvs`); reverting the converter fails the
+kind-4 test (`spr_attack_thorns` converted wrongly). Piece 1's Yellow-assets pin
+`test_a_rotated_rectangle_mask_keeps_its_original_value_and_is_counted` became
+`test_a_per_frame_precise_mask_is_precise_with_separate_masks_and_counted`, with
+the schema reference in its docstring. Full local suite 562 passed, 1 skipped
+(`PORT_REQUIRE_YELLOW=1`).
+
+Not claimed: pixel-perfect parity with either engine (a CI-only visual claim),
+Android, or a played-through battle. Particle sprites keep drawing at their
+exported origin (a cropped particle sprite can sit its crop offset away, as
+before); Studio 2's nine-slice drawing and rotated-rectangle masks (kind 5, none
+in the pinned source) stay reported rather than emulated.

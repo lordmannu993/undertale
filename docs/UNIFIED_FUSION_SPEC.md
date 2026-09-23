@@ -444,6 +444,22 @@ Normalize things such as:
 > Headless distances only: no played-through route, input latency or Android claim.
 > Collision boxes, hitboxes, scaling and sheet coordinates (6d) are **not** claimed by 6c.
 
+> Claim (scoped to what ran, 2026-09-23): piece **6d** implements *collision boxes*,
+> *hitboxes*, *scaling* and *sprite-sheet coordinates* as the same layer. Precise masks are
+> read in canvas pixels (a cropped export's pixels start at its recovered offset) and
+> composite every frame unless masks are separate; Studio 2's `collisionKind` 4 — *Precise
+> (per frame)* in the GMS2 sprite schema — converts to GameMaker 1.4's precise mask with
+> separate masks; `place_meeting`, `instance_place` and `instance_place_list` test the
+> caller's collision box instead of one point; stretched and tiled draws scale from the
+> canvas; and `sprite_get_uvs` answers from the frame (UVs 0..1, the recovered crop as the
+> trim) instead of stopping. Evidence: `tests/test_asset_collision.py` (6 tests), each
+> failing without its part of the change. Headless + draw log, with mask pixels from a
+> stand-in `love.image`: no pixel-perfect parity, Android or played-through-battle claim;
+> particle sprites keep their exported origin; nine-slice drawing and rotated-rectangle
+> masks (collisionKind 5, none in the pinned source) stay reported. With 6d, every item this
+> requirement lists has a scoped claim; the requirement is certified only by piece 8's
+> acceptance matrix.
+
 ## 13. Do Not Fix Bugs With Temporary Visual Hacks
 
 Avoid solutions such as:

@@ -52,16 +52,39 @@ function C.install(R)
             local ny=(py-cy)/math.max(0.5,(s.bbox_bottom-s.bbox_top+1)/2)
             return s.colkind==2 and nx*nx+ny*ny<=1 or s.colkind==3 and math.abs(nx)+math.abs(ny)<=1
         end
-        local index=(s.sepmasks~=0 and math.floor(v.image_index) or 0)%#s.frames+1
-        local file=s.frames[index]
-        if not file then return false end
-        if self.options.headless and not (love and love.image) then return true end
+        -- Precise mask (piece 6d, spec section 12). px/py are canvas pixels;
+        -- a cropped export's pixels start at its recovered offset (ox, oy),
+        -- the same offset the renderer draws with, so the mask is read there.
+        -- Reading the exported image at canvas coordinates shifted every
+        -- cropped sprite's hitbox by its crop.
+        --
+        -- Which frames make the mask: one frame when the sprite has separate
+        -- masks (GameMaker 1.4 sepmasks, Studio 2 "Precise (per frame)",
+        -- collisionKind 4); otherwise the composite of every frame -- "If the
+        -- sprite has multiple sub-images, then this will be a composite of
+        -- the edges of all the sub-images placed over each other" (GameMaker
+        -- manual, Sprite Editor: Precise).
+        local cx,cy=math.floor(px)-(s.ox or 0),math.floor(py)-(s.oy or 0)
+        if s.sepmasks~=0 then
+            local file=s.frames[math.floor(v.image_index)%#s.frames+1]
+            return file~=nil and self:maskPixel(file,cx,cy,s.coltolerance)
+        end
+        for _,file in ipairs(s.frames) do
+            if self:maskPixel(file,cx,cy,s.coltolerance) then return true end
+        end
+        return false
+    end
+    -- One pixel of one exported frame: is it solid at the mask's tolerance?
+    -- A headless run without love.image keeps the bbox answer, as before.
+    function R:maskPixel(file,x,y,tolerance)
         local data=self.maskData[file]
-        if not data then data=love.image.newImageData(file);self.maskData[file]=data end
-        px,py=math.floor(px),math.floor(py)
-        if px<0 or py<0 or px>=data:getWidth() or py>=data:getHeight() then return false end
-        local _,_,_,a=data:getPixel(px,py)
-        return a>(s.coltolerance or 0)/255
+        if not data then
+            if self.options.headless and not (love and love.image) then return true end
+            data=love.image.newImageData(file);self.maskData[file]=data
+        end
+        if x<0 or y<0 or x>=data:getWidth() or y>=data:getHeight() then return false end
+        local _,_,_,a=data:getPixel(x,y)
+        return a>(tolerance or 0)/255
     end
     function R:overlap(a,b,precise)
         if not self:mask(a) or not self:mask(b) then return false end
@@ -83,6 +106,32 @@ function C.install(R)
         local list=R:select(object,E)
         if not R.truth(notme) then return list end
         local out={};for _,inst in ipairs(list) do if inst~=E._self then out[#out+1]=inst end end;return out
+    end
+    -- The caller's collision box at (x, y) against `object` (piece 6d, spec
+    -- section 12 "collision boxes"). GameMaker's place_meeting/instance_place
+    -- "move the instance to the new position, check for a collision, move
+    -- back" with the caller's own mask, precise only when both masks are
+    -- (GameMaker manual, place_meeting). Checking the single point (x, y)
+    -- instead let a 20px-wide player walk its whole body into anything its
+    -- origin had not reached. Returns the first instance met, or nil.
+    function R:placeMeeting(E,x,y,object)
+        local self_=E and E._self
+        if not self_ or not self:mask(self_) then return nil end
+        local ox,oy=self_.v.x,self_.v.y
+        self_.v.x,self_.v.y=x,y
+        local found
+        local precise=self:mask(self_).colkind==0
+        for _,inst in ipairs(candidates(E,object,1)) do
+            local other=self:mask(inst)
+            if other and self:overlap(self_,inst,precise and other.colkind==0) then found=inst;break end
+        end
+        self_.v.x,self_.v.y=ox,oy
+        return found
+    end
+    B.place_meeting=function(E,x,y,object) return R.num(R:placeMeeting(E,x,y,object)~=nil) end
+    B.instance_place=function(E,x,y,object)
+        local found=R:placeMeeting(E,x,y,object)
+        return found and found.id or -4
     end
     B.collision_point=function(E,x,y,object,precise,notme)
         for _,inst in ipairs(candidates(E,object,notme)) do

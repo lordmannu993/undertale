@@ -141,8 +141,9 @@ def stage_assets(registry: Registry, provenance: dict, writer: Writer, root: Pat
         "generated_files": sorted(writer.written + ["conversion-report.json"]),
         "limitations": [
             "Piece 1 converts assets only: no Yellow script, object or room is executable yet.",
-            "collisionKind 4 (rotated rectangle) has no GameMaker 1.4 mask; those sprites keep a precise mask "
-            "and the original value stays in the record's yellow.collision_kind.",
+            "collisionKind 4 is Studio 2's Precise (per frame) mask: GameMaker 1.4's precise colkind 0 with "
+            "sepmasks 1. collisionKind 5 (rectangle with rotation) has no 1.4 mask and is reported; the original "
+            "value stays in the record's yellow.collision_kind.",
             "playbackSpeedType 0 (frames per second) is converted to image_speed with Yellow's own 30 FPS game speed.",
             "Nine-slice sprites are converted as ordinary sprites; the runtime has no nine-slice drawing.",
             "Pinned IDs with no folder upstream are listed as unrecoverable and are not converted; a reference to "

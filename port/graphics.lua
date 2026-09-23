@@ -439,9 +439,17 @@ function Graphics.install(R)
     B.draw_sprite_ext=function(E,index,sub,x,y,sx,sy,angle,tint,alpha) sprite(E,index,sub,x,y,sx,sy,angle,tint,alpha) end
     B.draw_sprite_part=function(E,index,sub,l,t,w,h,x,y) sprite(E,index,sub,x,y,1,1,0,16777215,state.alpha,{l,t,w,h}) end
     B.draw_sprite_part_ext=function(E,index,sub,l,t,w,h,x,y,sx,sy,tint,alpha) sprite(E,index,sub,x,y,sx,sy,0,tint,alpha,{l,t,w,h}) end
-    B.draw_sprite_stretched=function(E,index,sub,x,y,w,h)
-        local s=R.assets.sprites[index];if s then sprite(E,index,sub,x,y,w/s.width,h/s.height,0,16777215,state.alpha,{0,0,s.width,s.height}) end
+    -- Stretching scales the *canvas* over w x h (piece 6d, spec section 12
+    -- "scaling"): GameMaker stretches the whole sub-image, whose size is the
+    -- original canvas, with the origin ignored. The canvas region is a part
+    -- draw, so a cropped export's recovered offset still places its pixels.
+    local function stretched(E,index,sub,x,y,w,h,tint,alpha)
+        local s=R.assets.sprites[index]
+        local cw,ch=AssetCompat.width(s),AssetCompat.height(s)
+        if s and cw>0 and ch>0 then sprite(E,index,sub,x,y,w/cw,h/ch,0,tint,alpha,{0,0,cw,ch}) end
     end
+    R.drawSpriteStretched=stretched
+    B.draw_sprite_stretched=function(E,index,sub,x,y,w,h) stretched(E,index,sub,x,y,w,h,16777215,state.alpha) end
     -- The original canvas size, not the exported (possibly cropped) pixels:
     -- Undertale's own events size enemy attacks and reels from these numbers, and
     -- the canvas is what they were written against (see port/assetcompat.lua).

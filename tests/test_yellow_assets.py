@@ -150,11 +150,23 @@ def test_frames_per_second_animation_is_converted_with_yellows_own_game_speed(fi
     assert per_step["yellow"]["image_speed"] == per_step["yellow"]["playback_speed"]
 
 
-def test_a_rotated_rectangle_mask_keeps_its_original_value_and_is_counted(fixture):
+def test_a_per_frame_precise_mask_is_precise_with_separate_masks_and_counted(fixture):
+    """Studio 2's collisionKind 4 is *Precise (per frame)* (piece 6d).
+
+    The GMS2 sprite schema numbers the kinds 0 Precise, 1 Rectangle, 2 Ellipse,
+    3 Diamond, 4 PrecisePerFrame, 5 RectangleWithRotation. GameMaker 1.4 says
+    "precise per frame" as colkind 0 with sepmasks 1; before piece 6d this test
+    pinned kind 4 as a rotated rectangle with sepmasks 0, which composited every
+    frame into one mask.
+    """
     record = sprite(fixture, "spr_rotated")
     assert record["yellow"]["collision_kind"] == 4, "the Studio 2 fact must survive"
-    assert record["colkind"] == 0, "GameMaker 1.4 has no rotated-rectangle mask; keep the precise one"
-    assert fixture.report["assets"]["findings"]["rotated-rectangle-mask"] == 1
+    assert (record["colkind"], record["sepmasks"]) == (0, 1), \
+        "Precise (per frame) is GameMaker 1.4's precise mask with separate masks"
+    assert fixture.report["assets"]["findings"]["precise-per-frame-mask"] == 1
+    assert "rotated-rectangle-mask" not in fixture.report["assets"]["findings"]
+    # Precise (composite) stays one mask for every frame; Rectangle stays a box.
+    assert (sprite(fixture, "spr_a")["colkind"], sprite(fixture, "spr_a")["sepmasks"]) == (1, 0)
 
 
 def test_nine_slice_sprites_are_reported_rather_than_quietly_flattened(fixture):

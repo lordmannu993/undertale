@@ -111,9 +111,6 @@ return function(R)
             local instance=R:create(R:resolveObjectIndex(object,E),x,y);instance.v.depth=depth;return instance.id
         end
     end
-    if B.instance_place == nil and not has_script("instance_place") then
-        B.instance_place=function(E,x,y,object) return B.collision_point(E,x,y,object,1,0) end
-    end
     if B.instance_position == nil and not has_script("instance_position") then
         B.instance_position=function(E,x,y,object) return B.collision_point(E,x,y,object,1,0) end
     end
@@ -181,7 +178,7 @@ return function(R)
         "path_add", "path_add_point", "path_delete",
         "path_set_closed", "path_set_kind", "room_get_camera", "room_set_camera", "room_set_viewport",
         "sprite_add",
-        "sprite_get_uvs", "sprite_prefetch", "sprite_prefetch_multi",
+        "sprite_prefetch", "sprite_prefetch_multi",
         "sprite_save", "sprite_set_alpha_from_sprite", "timeline_add", "timeline_clear",
         "timeline_exists", "vertex_begin", "vertex_colour", "vertex_create_buffer_from_buffer",
         "vertex_delete_buffer", "vertex_end", "vertex_format_add_colour", "vertex_format_add_normal",
