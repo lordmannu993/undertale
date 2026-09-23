@@ -21,10 +21,13 @@ layering:
   recovery path in tools/recover_sprite_offsets.py now pins (3, 3),
   corroborated by the sibling hull and cover, whose canvases are the
   upstream-verified 91x40 of the same draw call.
-* The cover animates with a fractional sub-index (``cc += 0.1`` per draw);
-  the renderer floored it, snapping the ripple to hard steps. It now
-  crossfades the two frames (base frame, then next frame at the fractional
-  amount), and the draw log records the blend.
+* The cover animates with a fractional sub-index (``cc += 0.1`` per draw).
+  Piece 3 crossfaded the two frames by the fraction; piece 6b replaced that
+  with GameMaker's own rule -- the sub-image drawn is the index rounded down
+  (manual, ``image_index``), never a blend -- because the crossfade drew every
+  animating sprite as two stacked frames and, once ``cc`` passed 2, painted the
+  cover's next frame at an "amount" above 1. The ripple therefore steps one
+  frame every ten draws, exactly as the original does.
 
 Scope: headless converted flow plus the draw log, with native rendering
 evidence from CI. No Android GPU or pixel-perfect parity claim.
@@ -119,8 +122,9 @@ def draw_entries(vm, name):
     """Every sprite entry for one name in the current R.drawLog, oldest first.
 
     Field layout of a sprite entry: kind,name,frame,x,y,sx,sy,angle,tint,alpha,
-    ox,oy[,blendFrame,blendT]. The helper serializes on the Lua side because
-    lupa hands back Lua tables, not Python lists.
+    ox,oy,blendFrame,blendT,index,owner,originX,originY. blendFrame/blendT are
+    always nil since piece 6b (one sub-image per draw). The helper serializes on
+    the Lua side because lupa hands back Lua tables, not Python lists.
     """
     raw = vm.eval(f"""(function()
         local out = {{}}
@@ -264,14 +268,12 @@ def test_dogboat_generated_record_carries_offset_and_canvas(converted, boat):
 
 
 def cover_blend_state(vm):
-    """The cover's logged blend next to the expectation computed from the
-    boat's own cc, exactly as the renderer derives it.
+    """The cover's logged frame and blend fields next to the boat's own cc.
 
     The cover (spr_dogboat_cover, 2 frames) is drawn with sub-index cc, and
-    the boat's draw event advances cc by 0.1 on every draw. GameMaker
-    interpolates the fractional part between the two frames; the expected
-    values are computed here with the same operations on the same cc, so a
-    floored renderer (frame only, no blend) cannot satisfy this.
+    the boat's draw event advances cc by 0.1 on every draw. GameMaker draws
+    the sub-image cc rounds down to (manual, ``image_index``), so the expected
+    frame is floor(cc) % 2 and there is no blend.
     """
     return vm.eval("""(function()
         local boat
@@ -298,34 +300,29 @@ def cover_blend_state(vm):
 
 
 @live
-def test_cover_ripple_interpolates_between_frames(boat):
-    """cc += 0.1 per draw must blend the two frames, not floor to a hard step."""
+def test_cover_ripple_steps_one_frame_every_ten_draws(boat):
+    """cc += 0.1 per draw: the cover shows floor(cc) % 2 and never blends.
+
+    Piece 3 pinned a crossfade here (test_cover_ripple_interpolates_between_
+    frames); piece 6b replaced it with GameMaker's rule (the sub-image drawn is
+    the index rounded down). Thirty more draws take cc across three integers:
+    the cover must alternate frames exactly there, one entry per draw, with no
+    blend fields -- the crossfade logged a blend "amount" above 1 once cc > 2.
+    """
     dock(boat, reg=0, ticks=11)
-    logged_frame, logged_t, logged_blend, base, frac, expected_blend = cover_blend_state(boat)
+    logged_frame, logged_t, logged_blend, base, _, _ = cover_blend_state(boat)
     assert logged_frame is not None, "the waterline cover is not drawn in the dock"
     assert logged_frame == base, "the cover must draw the floor frame of cc"
-    if expected_blend is None:
-        assert logged_t in (None, 0) and logged_blend is None, \
-            "an integral cc must not carry a blend"
-    else:
-        assert logged_t is not None, "fractional cc was not blended (renderer floored it)"
-        assert abs(logged_t - frac) < 1e-9, "the blend amount must be cc's fraction"
-        assert logged_blend == expected_blend
-        assert 0 < logged_t < 1
-
-    # One more draw advances cc by 0.1 and the renderer must follow it.
-    vm = boat
-    vm.execute("R.drawLog = {}; R:renderFrame()")
-    _, t2, blend2, base2, frac2, expected2 = cover_blend_state(vm)
-    assert base2 is not None
-    value1 = (logged_frame or 0) + (logged_t or 0)
-    value2 = base2 + (t2 or 0)
-    delta = (value2 - value1) % 2
-    assert abs(delta - 0.1) < 1e-6, f"cover sub-index advanced by {delta}, want 0.1"
-    if expected2 is None:
-        assert blend2 is None
-    else:
-        assert blend2 == expected2
+    assert logged_t is None and logged_blend is None, "the cover must not blend two frames"
+    frames = []
+    for _ in range(30):
+        boat.execute("R.drawLog = {}; R:renderFrame()")
+        frame, t, blend, expected, _, _ = cover_blend_state(boat)
+        assert t is None and blend is None, "the cover must not blend two frames"
+        assert frame == expected, f"cover drew frame {frame}, floor(cc) % 2 is {expected}"
+        frames.append(frame)
+    changes = sum(1 for a, b in zip(frames, frames[1:]) if a != b)
+    assert changes == 3, f"30 draws of cc += 0.1 must step the ripple 3 times, not {changes}"
 
 
 @live

@@ -413,11 +413,52 @@ Normalize things such as:
 > `port/recovered_sprite_metadata.json` by a pure function, re-derivable offline with
 > `--check`: 814 offsets proven (366 of them new, `canvas-span`), 553 canvases pinned
 > with the offset left unproven and the sprite *never* shifted, 61 candidates listed by
-> name with their reason. Evidence: `tests/test_asset_sizes.py` (12 tests) plus the
+> name with their reason. Evidence: `tests/test_asset_sizes.py` (13 tests) plus the
 > updated `tests/test_depth_sort.py`/`tests/test_sprite_offsets.py`. Origins,
 > per-frame animation handling, movement speed, collision boxes, scaling and sheet
 > coordinates are the remaining 6b–6d sub-pieces of this requirement, and are **not**
 > claimed by 6a.
+
+> Claim (scoped to what ran, 2026-09-23): piece **6b** implements the *sprite origins*,
+> *animation frame handling* and *render anchors* items as the same layer. The renderer
+> draws one sub-image per draw — the rounded-down `image_index` GameMaker itself draws —
+> instead of crossfading two frames; `Runtime:finishFrame` advances
+> `image_speed × AssetCompat.playbackRate(sprite)`, so Studio 2's per-sprite playback
+> speed and GameMaker 1.4's frames-per-step `image_speed` are one rule (the rate is 1
+> for every Undertale record); and a pixels-only remap between the games (Frisk over
+> Clover, Clover's run over Frisk's walk) stands on the requested sprite's canvas bottom
+> centre (`AssetCompat.anchor`) at the same phase of its own cycle
+> (`AssetCompat.remapFrame`). Evidence: `tests/test_asset_frames.py` (6 tests), each
+> failing without its part of the change, plus the updated ripple pin in
+> `tests/test_boat_water.py` and sprint-rate pin in `tests/test_unified_controller.py`.
+> Headless + draw log only: no pixel-perfect parity, Android, or played-through claim.
+> Movement speed (6c) and collision boxes, hitboxes, scaling and sheet coordinates (6d)
+> are **not** claimed by 6b.
+
+> Claim (scoped to what ran, 2026-09-23): piece **6c** implements *movement speed* as one
+> rule. Both games walk 3px a step and Yellow runs `plspd + 2`; the shared controller owns
+> those two numbers (`WALK_STEP`, `RUN_BONUS`, re-read from both pinned sources by the
+> tests), Yellow's own step is untouched, and Undertale's run is its walk plus a collided
+> +2 bonus — 5px a step in both worlds instead of 5 in one and 6 in the other. Evidence:
+> `tests/test_movement_speed.py` (3 tests) and the updated `tests/test_unified_controller.py`.
+> Headless distances only: no played-through route, input latency or Android claim.
+> Collision boxes, hitboxes, scaling and sheet coordinates (6d) are **not** claimed by 6c.
+
+> Claim (scoped to what ran, 2026-09-23): piece **6d** implements *collision boxes*,
+> *hitboxes*, *scaling* and *sprite-sheet coordinates* as the same layer. Precise masks are
+> read in canvas pixels (a cropped export's pixels start at its recovered offset) and
+> composite every frame unless masks are separate; Studio 2's `collisionKind` 4 — *Precise
+> (per frame)* in the GMS2 sprite schema — converts to GameMaker 1.4's precise mask with
+> separate masks; `place_meeting`, `instance_place` and `instance_place_list` test the
+> caller's collision box instead of one point; stretched and tiled draws scale from the
+> canvas; and `sprite_get_uvs` answers from the frame (UVs 0..1, the recovered crop as the
+> trim) instead of stopping. Evidence: `tests/test_asset_collision.py` (6 tests), each
+> failing without its part of the change. Headless + draw log, with mask pixels from a
+> stand-in `love.image`: no pixel-perfect parity, Android or played-through-battle claim;
+> particle sprites keep their exported origin; nine-slice drawing and rotated-rectangle
+> masks (collisionKind 5, none in the pinned source) stay reported. With 6d, every item this
+> requirement lists has a scoped claim; the requirement is certified only by piece 8's
+> acceptance matrix.
 
 ## 13. Do Not Fix Bugs With Temporary Visual Hacks
 

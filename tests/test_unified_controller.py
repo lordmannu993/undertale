@@ -13,10 +13,13 @@ from test_yellow_merge import live, merged, vm, yellow_rooms  # noqa: F401
 
 @live
 def test_undertale_runs_on_x_and_draws_clovers_cycle(vm):
-    """Walking stays 3px. Holding X is one extra lattice step and Clover's run.
+    """Walking stays 3px. Holding X is Yellow's +2 on top of it and Clover's run.
 
-    Without the controller the same probe reports run distance 6, equal to the
-    walk, and the draw log never contains spr_pl_run_right.
+    Piece 6c made the run one shared speed: 3+2 = 5px a step in both worlds
+    (Yellow's scr_normal_state), so two steps run 10 -- piece 5c's extra 3px
+    lattice step ran 12. Without the controller the same probe reports run
+    distance 6, equal to the walk, and the draw log never contains
+    spr_pl_run_right.
     """
     result = vm.execute('''
         R:start(); crossTo(4)
@@ -49,14 +52,21 @@ def test_undertale_runs_on_x_and_draws_clovers_cycle(vm):
         end
         local run, runSpeed, runSprint, runMask, drewRun=probe({39, 88})
         if not R.truth(runSprint) then return "holding X did not sprint in Undertale" end
-        if run~=12 then return "run distance "..tostring(run).." is not 2 steps of 6" end
+        if run~=10 then return "run distance "..tostring(run).." is not 2 steps of Yellow's 3+2" end
         if run<=walk then return "run distance "..run.." <= walk "..walk end
         if runMask~=R.constants.spr_maincharar then
             return "run changed the mask sprite to "..tostring(runMask)
         end
         if not drewRun then return "Undertale run did not draw spr_pl_run_right" end
-        if math.abs(runSpeed-(1/3))>1e-9 then
-            return "sprint image_speed is "..tostring(runSpeed)..", not Yellow's 1/3"
+        -- Yellow's sprint rate is 1/3 of a frame per step of the run pose.
+        -- The record is the two-frame walk pose the six-frame run pose is
+        -- drawn over at the same phase (piece 6b), so the record advances
+        -- 1/3 * walk/run frames and the drawn pose advances exactly 1/3.
+        local walkFrames=#R.assets.sprites[R.constants.spr_maincharar].frames
+        local runFrames=#R.assets.sprites[R.manifest.yellow_names.sprites.spr_pl_run_right].frames
+        if math.abs(runSpeed*runFrames/walkFrames-(1/3))>1e-9 then
+            return "the drawn run pose advances "..tostring(runSpeed*runFrames/walkFrames)
+                ..", not Yellow's 1/3 frame per step"
         end
         -- AUTO RUN is Yellow's option. It must not turn Undertale's walk into a run.
         R:setAutorun(true)
@@ -97,7 +107,7 @@ def test_undertale_runs_on_x_and_draws_clovers_cycle(vm):
 
 @live
 def test_undertale_run_stops_at_a_solid(vm):
-    """The extra lattice step collides. Without that, the bbox crosses the solid."""
+    """The +2 run bonus collides. Without that, the bbox crosses the solid."""
     result = vm.execute('''
         R:start(); crossTo(4)
         local frisk=R:select(playerOf("undertale"))[1]
@@ -109,7 +119,7 @@ def test_undertale_run_stops_at_a_solid(vm):
         frisk.v.movement=1
         local _, _, right=R:bbox(frisk)
         -- Four pixels of air past the real right edge: a 3px step stays clear,
-        -- a 6px step overlaps. obj_solidsmall's origin is its left edge.
+        -- a 5px run step overlaps. obj_solidsmall's origin is its left edge.
         local solid=R:create(R.constants.obj_solidsmall, math.floor(right+0.0001)+4, 139)
         local sl=R:bbox(solid)
         local x0=frisk.v.x

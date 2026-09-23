@@ -9,21 +9,25 @@
 --   * one facing, applied after the destination entity exists (obj_pl's Create
 --     hardcodes direction = 270 and would otherwise forget it)
 --   * one run ability (player_can_run) and one menu/interact gate
---   * Undertale runs on the same X/Shift cluster Yellow uses, as one extra
---     3px lattice step so the existing wall-slide still sees ±3
+--   * one movement speed (piece 6c): both worlds walk 3px a step and run
+--     Yellow's +2 on top of it. Undertale runs on the same X/Shift cluster
+--     Yellow uses, as a collided +2 bonus step after its own walk
 --   * one level-up rule: Undertale's scr_levelup. Yellow's award alarm still
 --     grants EXP and gold; its *_next write is not a second formula
 --
--- Piece 6 owns cropped sizes, origins, and Yellow's exact +2 speed. This
--- file does not change the ±3 step into 5, and it does not invent run sprites
--- for costumes that have no Clover pair.
+-- It does not invent run sprites for costumes that have no Clover pair.
 local Controller = {}
 Controller.__index = Controller
 
--- obj_mainchara's own step. Piece 6 replaces the extra lattice step with
--- Yellow's +2 once a 5px step can collide; until then running is strictly
--- faster than walking and still on the lattice the wall-slide assumes.
-Controller.LATTICE = 3
+-- One movement speed for both worlds (piece 6c, spec section 12). Both games
+-- walk 3px a step: obj_mainchara's own `x+= 3` and obj_pl's `plspd = 3`.
+-- Running is Yellow's compiled rule, `pl_spd = plspd + 2` (scr_normal_state),
+-- so it is 5px a step in either world. Yellow's step already does this;
+-- Undertale's walk is followed by a +2 bonus step that collides through
+-- Undertale's own collision events. tests/test_movement_speed.py re-reads
+-- both numbers from the pinned sources, so they are not a second copy.
+Controller.WALK_STEP = 3
+Controller.RUN_BONUS = 2
 -- scr_normal_state's sprint image_speed, not a new number.
 Controller.RUN_IMAGE_SPEED = 1 / 3
 
@@ -114,11 +118,10 @@ function Controller.install(R)
 
     R:warn("controller",
         "Shared player controller: one R.player.controller drives both adapters. " ..
-        "Undertale runs on X/Shift (one extra 3px lattice step, Clover's run cycle) while " ..
-        "player_can_run is set; Yellow's scr_normal_state still owns Yellow's 3+2 step. " ..
-        "AUTO RUN stays Yellow's option. Level-up is Undertale's scr_levelup " ..
-        "(LV 20 is 99/99/99, EXP caps at 99999); current HP is not a level-up output. " ..
-        "Exact speeds, origins and run-mask hitboxes are piece 6.")
+        "Both worlds walk 3px and run Yellow's 3+2: Undertale runs on X/Shift (a collided +2 " ..
+        "bonus step, Clover's run cycle) while player_can_run is set; Yellow's scr_normal_state " ..
+        "owns Yellow's own step. AUTO RUN stays Yellow's option. Level-up is Undertale's " ..
+        "scr_levelup (LV 20 is 99/99/99, EXP caps at 99999); current HP is not a level-up output.")
     return controller
 end
 
@@ -231,20 +234,25 @@ function Controller:afterStep()
 end
 
 -- Undertale's End Step already follows x for the camera and decides moving
--- from xprevious. The extra lattice step has to land before that, with
--- xprevious restored afterwards so a blocked bonus does not look like the
--- walk never happened.
+-- from xprevious. The run bonus has to land before that, with xprevious
+-- restored afterwards so a blocked bonus does not look like the walk never
+-- happened. Only a genuine walk step (exactly WALK_STEP on that axis) earns
+-- the bonus, in the direction it walked; a scripted or debug move does not.
+-- The bonus is not snapped to the 3px lattice: obj_mainchara's Create snaps
+-- before it moves the player to the entrance marker, and 498 of Undertale's
+-- 568 markers are off that lattice, so the original walks off it routinely.
 function Controller:undertaleEndStep(E)
     local entity = E and E._self
     if not entity or not entity.alive or entity.v.object_index ~= self.mainchara then return end
     if not self:runEngaged(entity) then return end
     local frameX, frameY = entity.v.xprevious, entity.v.yprevious
     local dx, dy = entity.v.x - frameX, entity.v.y - frameY
-    local function lattice(delta)
-        if delta == Controller.LATTICE or delta == -Controller.LATTICE then return delta end
+    local function bonus(delta)
+        if delta == Controller.WALK_STEP then return Controller.RUN_BONUS end
+        if delta == -Controller.WALK_STEP then return -Controller.RUN_BONUS end
         return 0
     end
-    local bx, by = lattice(dx), lattice(dy)
+    local bx, by = bonus(dx), bonus(dy)
     if bx ~= 0 or by ~= 0 then
         local walkedX, walkedY = entity.v.x, entity.v.y
         entity.v.xprevious, entity.v.yprevious = walkedX, walkedY
@@ -259,10 +267,29 @@ function Controller:undertaleEndStep(E)
     end
 end
 
+-- Yellow's sprint rate is 1/3 of a frame per step *of the run pose*
+-- (scr_normal_state on spr_pl_run_*, six frames). Undertale's record is the
+-- walk sprite the run pose is drawn over (port/frisk.lua), and the renderer
+-- draws the run pose at the same phase of its own cycle (piece 6b,
+-- AssetCompat.remapFrame). So the record advances 1/3 * walk/run frames per
+-- step and the drawn pose advances exactly Yellow's 1/3 through all six
+-- frames. A costume with no run pair draws its own frames at 1/3.
+function Controller:runImageSpeed(entity)
+    local R = self.runtime
+    local index = entity.v.sprite_index
+    local runOfWalk = R.friskRemap and R.friskRemap.runOfWalk
+    local walk = R.assets.sprites[index]
+    local run = runOfWalk and runOfWalk[index] and R.assets.sprites[runOfWalk[index]]
+    if walk and run and #walk.frames > 0 and #run.frames > 0 then
+        return Controller.RUN_IMAGE_SPEED * #walk.frames / #run.frames
+    end
+    return Controller.RUN_IMAGE_SPEED
+end
+
 function Controller:finishUndertaleEndStep(entity)
     if not entity or not entity.alive then return end
     if self.sprinting and entity.v.image_speed ~= 0 then
-        entity.v.image_speed = Controller.RUN_IMAGE_SPEED
+        entity.v.image_speed = self:runImageSpeed(entity)
     end
     entity.v.is_sprinting = self.sprinting and 1 or 0
 end

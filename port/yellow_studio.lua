@@ -388,26 +388,28 @@ return function(R)
     reg("draw_get_color",function() return state().color end)
     reg("draw_get_colour",function() return state().color end)
     reg("draw_ellipse_colour",function(_,x1,y1,x2,y2,c1,c2,outline) B.draw_ellipse_color(nil,x1,y1,x2,y2,c1,c2,c1,outline) end)
+    -- Scaling and tiling work in canvas pixels (piece 6d): one accessor with
+    -- port/graphics.lua's draw_sprite_stretched, so the two worlds stretch and
+    -- tile a sprite by the same size.
     reg("draw_sprite_stretched_ext",function(E,index,sub,x,y,w,h,tint,alpha)
-        local sprite=R.assets.sprites[index]
-        if sprite and sprite.width>0 and sprite.height>0 then
-            B.draw_sprite_part_ext(E,index,sub,0,0,sprite.width,sprite.height,x,y,w/sprite.width,h/sprite.height,tint,alpha)
-        end
+        R.drawSpriteStretched(E,index,sub,x,y,w,h,tint,alpha)
     end)
     reg("draw_sprite_tiled",function(E,index,sub,x,y)
         local sprite=R.assets.sprites[index]
-        if not sprite or sprite.width<=0 or sprite.height<=0 then return end
+        local cw,ch=AssetCompat.width(sprite),AssetCompat.height(sprite)
+        if not sprite or cw<=0 or ch<=0 then return end
         local view=R:views()[1] or {x=0,y=0,w=R.vars.room_width,h=R.vars.room_height}
-        local startX=x+math.floor((view.x-x)/sprite.width)*sprite.width
-        local startY=y+math.floor((view.y-y)/sprite.height)*sprite.height
-        for yy=startY,view.y+view.h,sprite.height do
-            for xx=startX,view.x+view.w,sprite.width do B.draw_sprite(E,index,sub,xx,yy) end
+        local startX=x+math.floor((view.x-x)/cw)*cw
+        local startY=y+math.floor((view.y-y)/ch)*ch
+        for yy=startY,view.y+view.h,ch do
+            for xx=startX,view.x+view.w,cw do B.draw_sprite(E,index,sub,xx,yy) end
         end
     end)
     reg("draw_sprite_tiled_ext",function(E,index,sub,x,y,sx,sy,tint,alpha)
         local sprite=R.assets.sprites[index]
-        if not sprite or sprite.width<=0 or sprite.height<=0 then return end
-        local w,h=sprite.width*sx,sprite.height*sy
+        local cw,ch=AssetCompat.width(sprite),AssetCompat.height(sprite)
+        if not sprite or cw<=0 or ch<=0 then return end
+        local w,h=cw*sx,ch*sy
         local view=R:views()[1] or {x=0,y=0,w=R.vars.room_width,h=R.vars.room_height}
         local startX=x+math.floor((view.x-x)/w)*w
         local startY=y+math.floor((view.y-y)/h)*h
@@ -516,6 +518,26 @@ return function(R)
         return out
     end)
     reg("background_get_texture",function(_,index) return B.sprite_get_texture(nil,index,0) end)
+    -- Sprite-sheet coordinates (piece 6d, spec section 12). Studio 2 answers
+    -- where a frame sits on its texture page: [0..3] the UV rectangle, [4]/[5]
+    -- the pixels the asset compiler trimmed from the frame's left/top, [6]/[7]
+    -- the fraction of the original width/height kept on the page (GameMaker
+    -- manual, sprite_get_uvs). In this port every frame is its own texture, so
+    -- the UVs are the whole 0..1 range, and the trim is exactly the crop the
+    -- offset recovery pinned: (ox, oy) and exported/canvas size. An uncropped
+    -- Yellow frame answers 0, 0, 1, 1. A frame outside the sprite, or a
+    -- sprite that does not exist, answers -1 like the other queries here.
+    reg("sprite_get_uvs",function(_,index,frame)
+        local sprite=R.assets.sprites[index]
+        if not sprite or #sprite.frames==0 then return -1 end
+        local out=R.defaults(0)
+        local cw,ch=AssetCompat.width(sprite),AssetCompat.height(sprite)
+        out[0],out[1],out[2],out[3]=0,0,1,1
+        out[4],out[5]=sprite.ox or 0,sprite.oy or 0
+        out[6]=cw>0 and sprite.width/cw or 1
+        out[7]=ch>0 and sprite.height/ch or 1
+        return out
+    end)
 
     -- Cameras and viewports ----------------------------------------------
     local cameras={};R.cameras=cameras;local nextCamera=1
@@ -678,13 +700,23 @@ return function(R)
         local instance=E and E._self
         if instance then instance.v.alarm[math.floor(alarm or 0)]=math.floor(value or -1) end
     end)
-    reg("place_meeting",function(E,x,y,object) return N(B.collision_point(E,x,y,object,1,0)~=-4) end)
+    -- place_meeting/instance_place are port/collision.lua's caller-mask test
+    -- (piece 6d); instance_place_list collects every instance the same test meets.
     reg("instance_place_list",function(E,x,y,object,list,ordered)
-        local ids=R:select(object,E);local found=listOf(list)
+        local found=listOf(list)
         for i=#found,1,-1 do found[i]=nil end
-        for _,inst in ipairs(ids) do
-            if R:maskPoint(inst,x,y,true) then found[#found+1]=inst.id end
+        local self_=E and E._self
+        if not self_ or not R:mask(self_) then return 0 end
+        local ox,oy=self_.v.x,self_.v.y
+        self_.v.x,self_.v.y=x,y
+        local precise=R:mask(self_).colkind==0
+        for _,inst in ipairs(R:select(object,E)) do
+            local other=R:mask(inst)
+            if inst~=self_ and other and R:overlap(self_,inst,precise and other.colkind==0) then
+                found[#found+1]=inst.id
+            end
         end
+        self_.v.x,self_.v.y=ox,oy
         return #found
     end)
     reg("position_meeting",function(E,x,y,object) return N(B.collision_point(E,x,y,object,0,0)~=-4) end)

@@ -797,9 +797,10 @@ player object and no per-room swap of controllers.
 **Run.** Yellow's compiled rule is unchanged: `option_autorun` XOR (the run
 button AND `player_can_run`). That button is `keyboard_multicheck(1)` — Shift
 (16) or 120, and physical X once `obj_screen` maps 88 to 16. Undertale does
-not read AUTO RUN. While `player_can_run` is 1, holding that cluster adds one
-extra ±3 lattice step on the Undertale adapter only, and only on an axis whose
-net delta from the frame-start `xprevious`/`yprevious` is already exactly ±3.
+not read AUTO RUN. While `player_can_run` is 1, holding that cluster adds a
+bonus step on the Undertale adapter only, and only on an axis whose net delta
+from the frame-start `xprevious`/`yprevious` is already exactly ±3 (piece 5c
+made that bonus ±3; piece 6c, below, made it Yellow's ±2).
 The bonus is the start of End Step (`3:2`), before the camera follows `x`.
 Collision runs with `xprevious` set to the walked spot, then `xprevious` is
 restored to the frame start so a blocked bonus does not look like the walk
@@ -997,3 +998,173 @@ a route proves its offset — deliberate, and they are named rather than nudged.
 (Undertale's 3 px step vs Yellow's +2 autorun), hitboxes/collision boxes, scaling
 and GMS2 sheet coordinates are still open piece-6 sub-pieces, as are pixel-perfect
 parity with the original engine (a CI-only visual claim) and Android.
+
+## Frame selection, animation rate and render anchors (spec §12 — unified-fusion piece 6b)
+
+Spec §12 names sprite origins, animation frame handling and render anchors as
+things one compatibility layer must normalise. Piece 6b found four places where
+the two worlds meant different things by the same animation state, and fixes each
+in the shared system (`port/assetcompat.lua`, `port/graphics.lua`,
+`port/runtime.lua`), with no per-room or per-character branch:
+
+1. **Frame selection.** GameMaker draws the sub-image `image_index` rounds *down*
+   to — the manual's own words for `image_index` are "it is always rounded down to
+   obtain the subimage that is drawn", and YoYo's runner truncates the index the
+   same way in `Sprite.Draw`. Piece 3 had replaced that with a crossfade of the two
+   neighbouring frames, which drew every animating sprite in *both* worlds as two
+   stacked frames (walk cycles run at `image_speed` 0.2 or 1/3, so almost every
+   step is fractional), and — because the boat cover's `cc += 0.1` never wraps —
+   drew the cover's second frame at a blend "amount" above 1 (4.1 after forty
+   ticks, fully opaque) once `cc` passed 2. The renderer now draws one sub-image;
+   the draw log's blend fields (13/14) stay `nil`. The ripple steps one frame
+   every ten draws, as the original does.
+2. **Animation rate.** Studio 2 made `image_speed` a *multiplier* on the sprite's
+   own playback speed; GameMaker 1.4's `image_speed` is frames per step. The Yellow
+   converter already recorded the per-step rate (`yellow.image_speed`, FPS types
+   divided by Yellow's own 30 FPS game speed), but the runtime advanced every
+   instance by the bare `image_speed`: of Yellow's 2,039 multi-frame sprites, 1,265
+   author one frame per step and were right by coincidence, 772 author a slower
+   rate (10 fps at 30 steps/s is 1/3 frame per step, 5 fps is 1/6) and animated
+   up to six times too fast, and 2 author a faster one. `Runtime:finishFrame` now advances
+   `image_speed × AssetCompat.playbackRate(sprite)`; the rate is 1 for every
+   Undertale record, so Undertale is unchanged. The converter also stops coercing
+   an authored `playbackSpeed` of 0 to 1 (19 pinned sprites hold their frame until
+   code sets `image_index`).
+3. **Render anchor.** Frisk's sprites put the origin at the canvas corner (0,0),
+   Clover's at his body (`spr_pl_down` 9,16). The Frisk-only remap
+   (`port/frisk.lua`) drew the replacement at its *own* origin, so Yellow's player
+   was drawn 9px right and 15px down of Clover's body — away from the collision
+   mask it walks with — and Undertale's running Frisk (Clover's run cycle) 10px
+   left and 15px up of the walk pose. A remapped draw now stands on the requested
+   sprite's feet: `AssetCompat.anchor` aligns the two canvases' bottom centres —
+   the point the depth rule already sorts by — and part draws move their source
+   rectangle by the same amount. The draw log records the anchored origin
+   (fields 17/18).
+4. **Frame count.** A remap draws the replacement at the same *phase* of its own
+   cycle (`AssetCompat.remapFrame`). Clover's six-frame run over Frisk's two-frame
+   side walk used to show frames 0 and 1 only; it now shows all six. The shared
+   controller's run rate is expressed in the run pose's own frames
+   (`runImageSpeed`: 1/3 × walk frames / run frames on the record), so the drawn
+   pose advances exactly Yellow's 1/3 frame per step (`scr_normal_state`).
+
+Evidence: `tests/test_asset_frames.py` (6 tests). Reverting the renderer fails
+four of them (the fractional draw logs `0/1/0.5 1/2/0.7 0/1/4.1`, the Frisk and
+run-pose anchors, the identity check); reverting the runtime rate fails the Yellow
+rate test (`spr_mail_station_steamworks`, 10 fps, advances 3 frames in 3 steps
+instead of 1); reverting the controller's run rate fails the run-cycle test (each
+run frame shows for 1 step, not 3). Two earlier pins were updated with the
+rationale in their docstrings: piece 3's
+`test_cover_ripple_interpolates_between_frames` became
+`test_cover_ripple_steps_one_frame_every_ten_draws` (30 draws, 3 frame changes,
+no blend — it fails on the crossfade renderer), and piece 5c's sprint-rate check
+now measures the drawn pose's rate (1/3) instead of the record's. Full local suite
+553 passed, 1 skipped (`PORT_REQUIRE_YELLOW=1`).
+
+Not claimed: pixel-perfect parity with either engine (a CI-only visual claim),
+Android, or a played-through scene. The anchor aligns canvas bottom centres; it
+does not claim the two artists drew the feet at the same pixel inside their
+canvases. Sprites the offset recovery could not pin keep their exported frames.
+
+## One movement speed (spec §12 — unified-fusion piece 6c)
+
+Spec §12 lists movement speed among the things one compatibility layer
+normalises, and §3 asks for Clover's running to belong to the unified player.
+Both games walk 3px a step — `obj_mainchara`'s own `x+= 3`/`y+= 3` and
+`obj_pl`'s `plspd = 3` — and Yellow runs `pl_spd = plspd + 2`
+(`scr_normal_state`). Piece 5c ran Undertale at an extra 3px lattice step, so the
+same button ran 6px a step in one world and 5px in the other.
+
+The controller now owns one speed (`Controller.WALK_STEP` 3, `Controller.RUN_BONUS`
+2). Yellow's own compiled step already runs 3+2 and is untouched; Undertale's walk
+step is followed by a +2 bonus in the direction it walked, collided through
+Undertale's own collision events exactly as the 5c step was (a blocked bonus rolls
+back to the walked spot, and `xprevious` is restored so the walk still counts).
+The bonus is not snapped to the 3px lattice: `obj_mainchara`'s Create snaps
+*before* it moves the player to the entrance marker, and 498 of Undertale's 568
+markers are off that lattice, so the original already walks off it.
+
+Evidence: `tests/test_movement_speed.py` (3 tests). The constants are re-read
+from both pinned sources (`obj_mainchara`'s Step, `obj_pl`'s Create,
+`scr_normal_state`), so they cannot drift from either game; Undertale runs
+5px a step in every direction (6 without the change) while its walk stays 3 and
+Yellow's own run stays 3+2; and running into room_area1's east wall from each of
+the five 5px phases never enters it (without the bonus collision the phases at
+x=231/232 end inside the wall at x=261/262). Piece 5c's controller pins were
+updated with the rationale in their docstrings: two run steps are 10, not 12,
+and the solid probe's 4px gap now separates a 3px walk from a 5px run.
+Full local suite 556 passed, 1 skipped (`PORT_REQUIRE_YELLOW=1`).
+
+Not claimed: a played-through route, input latency, or Android. Undertale's
+diagonal wall-slide objects (`obj_sur` and friends) still slide in their own ±3
+steps once a run touches them, which is the original's own behaviour for a walk.
+
+## Collision boxes, hitboxes, scaling and sheet coordinates (spec §12 — unified-fusion piece 6d)
+
+The last sub-piece of spec §12. Five places where the two worlds answered a
+collision or size question differently, each fixed in the shared system
+(`port/collision.lua`, `port/graphics.lua`, `port/yellow_studio.lua`,
+`tools/yellow/assets.py`), with no per-room or per-character branch:
+
+1. **Precise masks in canvas pixels.** `R:maskPoint` transforms the probe point
+   into *canvas* coordinates, then read the exported PNG at those coordinates.
+   A cropped Undertale export starts at its recovered offset (the renderer
+   draws it at `ox, oy`), so every cropped sprite's pixel hitbox sat
+   `(ox, oy)` away from its art — 448 recovered sprites have a non-zero offset,
+   and 136 objects collide with one of them (`spr_adate_body` is 10px right and
+   17px down of its crop corner). The mask is now read at `canvas - (ox, oy)`,
+   through one `R:maskPixel`.
+2. **Composite vs per-frame masks.** GameMaker's *Precise* mask is "a composite
+   of the edges of all the sub-images placed over each other" (GameMaker manual,
+   Sprite Editor); only separate masks (1.4 `sepmasks`, Studio 2 *Precise (per
+   frame)*) follow the current frame. The runtime used frame 0 as the whole
+   mask when masks were not separate; it now takes the union of every frame.
+3. **Studio 2's `collisionKind` 4 is Precise (per frame).** The GMS2 sprite
+   schema numbers the kinds 0 Precise, 1 Rectangle, 2 Ellipse, 3 Diamond,
+   4 PrecisePerFrame, 5 RectangleWithRotation (the `SpriteCollisionKind` enum in
+   bscotch/stitch's `YySprite.ts` and NPC-Studio's `yy-typings` agree). The
+   converter read 4 as a rotated rectangle and hard-coded `sepmasks` 0, so the
+   74 per-frame masks (every one of them multi-frame: Big Frog's knight, Ceroba's
+   bullets, Flowey's hands) collided as composites. Kind 4 now converts to
+   GameMaker 1.4's precise `colkind` 0 with `sepmasks` 1; kind 0 stays one
+   composite mask; kind 5 (none in the pinned source) is reported by name. The
+   conversion report's finding is now `precise-per-frame-mask: 74`.
+4. **`place_meeting`/`instance_place` test the caller's collision box.**
+   GameMaker moves the caller to (x, y), checks *its mask* against the target,
+   and moves it back — precise only when both masks are (GameMaker manual,
+   `place_meeting`). The port checked the single point (x, y), so Yellow's 313
+   `place_meeting` and 34 `instance_place` calls (the diagonal wall slides in
+   `scr_normal_state`, battle hitboxes, platforms) missed anything the caller's
+   origin had not reached. `R:placeMeeting` is the one test behind both, and
+   `instance_place_list` collects every instance the same test meets.
+5. **Scaling and sheet coordinates in canvas pixels.** `draw_sprite_stretched`,
+   Yellow's `draw_sprite_stretched_ext` and `draw_sprite_tiled(_ext)` scaled or
+   stepped by the *exported* size, so a cropped sprite stretched past the
+   rectangle it was asked to fill (`spr_adate_body` over 154×142 drew at
+   2.30×2.63 instead of 2×2). They now go through `AssetCompat.width/height`.
+   `sprite_get_uvs` — a named compatibility stop that four *placed* Yellow
+   reflection objects hit every draw (`rm_snowdin_04_yellow`,
+   `rm_snowdin_10_yellow`, `rm_hotland_complex_1`/`1c`) plus four spawned
+   backgrounds — now answers from the frame: in this port every frame is its own
+   texture (UVs 0..1), and the trim fields are exactly the recovered crop
+   (`[4]/[5]` = `ox, oy`, `[6]/[7]` = exported/canvas size), so an uncropped
+   Yellow frame answers `0, 0, 1, 1, 0, 0, 1, 1`.
+
+Evidence: `tests/test_asset_collision.py` (6 tests), with mask pixels supplied by
+a stand-in `love.image` so the headless run exercises the precise path.
+Reverting `port/collision.lua` fails three (the cropped mask hits
+`00000` instead of `11000` at canvas (10,17)/(76,70); the composite reads
+`1000` instead of `1001`; `place_meeting` answers 0 for a box whose edge crosses
+the target); reverting `port/graphics.lua` fails the stretch (`2.2985, 2.6296`
+instead of `2, 2`); reverting the Yellow builtins fails `sprite_get_uvs`
+(`Compatibility stop: sprite_get_uvs`); reverting the converter fails the
+kind-4 test (`spr_attack_thorns` converted wrongly). Piece 1's Yellow-assets pin
+`test_a_rotated_rectangle_mask_keeps_its_original_value_and_is_counted` became
+`test_a_per_frame_precise_mask_is_precise_with_separate_masks_and_counted`, with
+the schema reference in its docstring. Full local suite 562 passed, 1 skipped
+(`PORT_REQUIRE_YELLOW=1`).
+
+Not claimed: pixel-perfect parity with either engine (a CI-only visual claim),
+Android, or a played-through battle. Particle sprites keep drawing at their
+exported origin (a cropped particle sprite can sit its crop offset away, as
+before); Studio 2's nine-slice drawing and rotated-rectangle masks (kind 5, none
+in the pinned source) stay reported rather than emulated.

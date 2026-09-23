@@ -47,7 +47,8 @@ objects → rooms → merged world. Each piece is one PR, merged before the next
    verified by digest, and packaged at build time. Only the converter, its provenance
    record (`port/yellow_source.json`) and the tests live in Git.
 3. **Unsupported means a visible stop.** Shaders, sequences, nine-slice sprites,
-   rotated-rectangle masks, GMLive and the Steamworks/Steam hooks have no GameMaker 1.4
+   rotated-rectangle masks (collisionKind 5; none in the pinned source), GMLive and the
+   Steamworks/Steam hooks have no GameMaker 1.4
    equivalent in this runtime. They are enumerated in the conversion report and must stop
    with their own name, never be silently replaced.
 4. **Undertale stays intact.** Undertale's recovered IDs are untouched; Yellow lives in a
@@ -94,7 +95,7 @@ Known deviations recorded by piece 1 (all reported, none hidden):
 
 | GMS2 fact | merged-game handling |
 | --- | --- |
-| `collisionKind` 4 = rotated rectangle (74 sprites) | no GM 1.4 equivalent; recorded and reported, resolved in piece 3 where the masks are used |
+| `collisionKind` 4 = Precise (per frame) (74 sprites) | GM 1.4's precise `colkind` 0 with `sepmasks` 1 (piece 6d; earlier pieces misread it as a rotated rectangle); `collisionKind` 0 Precise stays one composite mask (`sepmasks` 0) |
 | `nineSlice` on 14 UI sprites | runtime has no nine-slice drawing; reported |
 | `playbackSpeedType` 0 = frames **per second** (1 456 sprites) | converted to a GameMaker 1.4 `image_speed` using Yellow's own 30 FPS game speed, recorded per sprite |
 | `playbackSpeedType` 1 = frames per game frame (2 452 sprites) | `image_speed` = `playbackSpeed`, identical semantics to GM 1.4 |

@@ -95,10 +95,10 @@ re-applied on every crossing, because Yellow's initialiser resets its options on
 the way in. AUTO RUN does **not** sprint in Undertale areas.
 
 Undertale areas do run, on the same cluster Yellow uses (`keyboard_multicheck(1)`:
-**X** or **Shift**). That is one extra 3px lattice step on top of Undertale's own
-3px walk, drawn as Clover's base run cycle, and only while the shared run ability
-is on. It is not Yellow's +2 speed, and it is not gated by AUTO RUN. Exact
-speeds, origins and run-mask hitboxes are piece 6.
+**X** or **Shift**), at the same speed: Yellow's `plspd + 2`, so 5px a step on top
+of the shared 3px walk in either world. It is drawn as Clover's base run cycle
+standing on Frisk's feet, only while the shared run ability is on, and it is not
+gated by AUTO RUN.
 
 Extra-key panels temporarily cover the game picture; they are not intended to
 replace the large D-pad/Z/X/C controls during normal battles. Very small windows

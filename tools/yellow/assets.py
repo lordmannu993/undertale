@@ -16,9 +16,17 @@ Two documented conversions happen here, both arithmetic on Yellow's own numbers:
   (``options/main/options_main.yy``), so the GameMaker 1.4 equivalent is
   ``image_speed = playbackSpeed / 30``. Type 1 already means frames per game
   step, which is GameMaker 1.4's own unit, so it is carried across unchanged.
-* ``collisionKind`` 4 is a *rotated rectangle* mask, which GameMaker 1.4 has no
-  word for. The sprite keeps its precise mask (``colkind`` 0) and the original
-  value is preserved in ``yellow.collision_kind``; the report counts them.
+* ``collisionKind`` is Studio 2's mask kind: 0 Precise, 1 Rectangle, 2 Ellipse,
+  3 Diamond, 4 Precise (per frame), 5 Rectangle with rotation (the GMS2 sprite
+  schema's ``SpriteCollisionKind``; bscotch/stitch's ``YySprite.ts`` and
+  NPC-Studio's ``yy-typings`` agree). GameMaker 1.4 says the same thing with two
+  fields: ``colkind`` 0 is precise, and ``sepmasks`` chooses one mask per frame
+  instead of the composite of every frame. So kind 4 becomes ``colkind`` 0 with
+  ``sepmasks`` 1, kind 0 ``colkind`` 0 with ``sepmasks`` 0 -- piece 6d; the
+  converter used to read kind 4 as a rotated rectangle and hard-code
+  ``sepmasks`` 0, which composited every per-frame mask. Kind 5 (rotated
+  rectangle, none in the pinned source) has no 1.4 word and is reported. The
+  original value stays in ``yellow.collision_kind``.
 
 Frames and audio are referenced where they lie in ``yellow_src/`` rather than
 copied: the pinned fetch already guarantees their bytes, and duplicating 580 MB
@@ -39,6 +47,10 @@ class MissingAsset(GMS2Error):
 ORIGIN = {0: (0.0, 0.0), 1: (0.5, 0.0), 2: (1.0, 0.0), 3: (0.0, 0.5), 4: (0.5, 0.5),
           5: (1.0, 0.5), 6: (0.0, 1.0), 7: (0.5, 1.0), 8: (1.0, 1.0)}
 AUDIO_SUFFIXES = (".ogg", ".wav", ".mp3")
+#: Studio 2 collisionKind -> GameMaker 1.4 (colkind, sepmasks). 1.4's colkind is
+#: 0 precise, 1 rectangle, 2 ellipse (disk), 3 diamond; sepmasks picks one mask
+#: per frame. Kind 5, a rectangle that rotates with image_angle, has no 1.4 word.
+COLLISION_KIND = {0: (0, 0), 1: (1, 0), 2: (2, 0), 3: (3, 0), 4: (0, 1)}
 CHUNK_SIZE = 64
 
 
@@ -124,22 +136,26 @@ class AssetConverter:
             return None
         if not frames:
             self.note("sprite-without-frames", sprite=name)
-        speed = float(sequence.get("playbackSpeed", 1) or 1)
+        # A missing speed defaults to 1; an authored 0 is kept. Nineteen pinned
+        # sprites author playbackSpeed 0 (they only change frame when their
+        # code sets image_index), and coercing that to 1 would animate them
+        # once the runtime honours the rate (piece 6b).
+        raw_speed = sequence.get("playbackSpeed", 1)
+        speed = float(raw_speed if raw_speed is not None else 1)
         speed_type = int(sequence.get("playbackSpeedType", 1) or 0)
         collision_kind = int(data.get("collisionKind", 1))
         layers = data.get("layers") or []
         if len(layers) > 1:
             self.note("multi-layer-sprite", sprite=name, layers=len(layers))
         nine = data.get("nineSlice")
+        colkind, sepmasks = COLLISION_KIND.get(collision_kind, (0, 0))
         record = {
             "name": name,
             "width": width, "height": height,
             "xorig": xorig, "yorigin": yorigin,
-            # Rotated-rectangle masks have no GameMaker 1.4 equivalent; keep the
-            # precise mask and the original value instead of pretending.
-            "colkind": collision_kind if collision_kind in (0, 1, 2, 3) else 0,
+            "colkind": colkind,
             "coltolerance": int(data.get("collisionTolerance", 0) or 0),
-            "sepmasks": 0,
+            "sepmasks": sepmasks,
             "bboxmode": int(data.get("bboxMode", 0) or 0),
             "bbox_left": int(data.get("bbox_left", 0)), "bbox_right": int(data.get("bbox_right", width - 1)),
             "bbox_top": int(data.get("bbox_top", 0)), "bbox_bottom": int(data.get("bbox_bottom", height - 1)),
@@ -160,7 +176,9 @@ class AssetConverter:
             },
         }
         if collision_kind == 4:
-            self.note("rotated-rectangle-mask", sprite=name)
+            self.note("precise-per-frame-mask", sprite=name)
+        elif collision_kind not in COLLISION_KIND:
+            self.note("unsupported-collision-kind", sprite=name, collision_kind=collision_kind)
         if nine:
             self.note("nine-slice-sprite", sprite=name)
         return record
