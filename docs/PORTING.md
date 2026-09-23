@@ -1103,7 +1103,8 @@ steps once a run touches them, which is the original's own behaviour for a walk.
 The last sub-piece of spec §12. Five places where the two worlds answered a
 collision or size question differently, each fixed in the shared system
 (`port/collision.lua`, `port/graphics.lua`, `port/yellow_studio.lua`,
-`tools/yellow/assets.py`), with no per-room or per-character branch:
+`port/yellow_builtins.lua`, `tools/yellow/assets.py`), with no per-room or
+per-character branch:
 
 1. **Precise masks in canvas pixels.** `R:maskPoint` transforms the probe point
    into *canvas* coordinates, then read the exported PNG at those coordinates.
@@ -1155,9 +1156,16 @@ Reverting `port/collision.lua` fails three (the cropped mask hits
 `00000` instead of `11000` at canvas (10,17)/(76,70); the composite reads
 `1000` instead of `1001`; `place_meeting` answers 0 for a box whose edge crosses
 the target); reverting `port/graphics.lua` fails the stretch (`2.2985, 2.6296`
-instead of `2, 2`); reverting the Yellow builtins fails `sprite_get_uvs`
-(`Compatibility stop: sprite_get_uvs`); reverting the converter fails the
-kind-4 test (`spr_attack_thorns` converted wrongly). Piece 1's Yellow-assets pin
+instead of `2, 2`); reverting `port/yellow_studio.lua` alone fails
+`sprite_get_uvs` with `attempt to call field 'sprite_get_uvs' (a nil value)`
+(the builtin is registered there, and 6d removed it from the compatibility-stop
+list in `port/yellow_builtins.lua` — reverting both Yellow files together
+reproduces the quoted `Compatibility stop: sprite_get_uvs`); reverting the
+converter (`tools/yellow/assets.py`, with `tools/yellow_convert.py`'s finding
+count and `port/yellow_studio.lua`'s per-frame reading) fails the kind-4 test —
+all 74 per-frame sprites convert wrongly, the first being
+`spr_battle_flowey_yarn_lhand_1` (the test reports the first of the 74;
+`spr_attack_thorns` is among them). Piece 1's Yellow-assets pin
 `test_a_rotated_rectangle_mask_keeps_its_original_value_and_is_counted` became
 `test_a_per_frame_precise_mask_is_precise_with_separate_masks_and_counted`, with
 the schema reference in its docstring. Full local suite 562 passed, 1 skipped
@@ -1168,3 +1176,54 @@ Android, or a played-through battle. Particle sprites keep drawing at their
 exported origin (a cropped particle sprite can sit its crop offset away, as
 before); Studio 2's nine-slice drawing and rotated-rectangle masks (kind 5, none
 in the pinned source) stay reported rather than emulated.
+
+## Snowdin shopkeeper visual sweep (spec §7 — unified-fusion piece 7)
+
+The owner's original screenshot — four eyes, a floating mouth — was the
+shopkeeper's three face layers losing their alignment. Room 311 composites the
+keeper from three layers whose positions were authored against the *original
+canvas*:
+
+| layer | drawn by | position | pixels land at |
+| --- | --- | --- | --- |
+| `spr_shopkeeper1` body (61×111 in a 64×120 canvas) | `obj_shop1` Draw | `(shx, 0)`, `shx=130` | `(131, 9)` — the recovered crop offset `(1, 9)` |
+| `spr_shopkeeper1eyes` blink strip (26×7, 4 frames) | auto draw of `obj_shopeyes1`, spawned at `(18 + shx, 40)` | `(148, 40)` | `(148, 40)` (uncropped) |
+| `spr_shopkeeper1mouth` (9×7, 2 frames) | `obj_shopmouth1` Draw while `faceemotion == 0` | `(shx + 27, 50)` | `(157, 50)` (uncropped) |
+| `spr_shopkeeper1_face0..6` (25×25, origin `(1, 4)`) | `obj_shopmouth1` Draw while `faceemotion > 0` | `(shx + 20, 36)` | `(149, 32)` |
+
+The body's painted eyes sit at bitmap rows 31–36 and its mouth at rows 42–45.
+With the carriage correct, the eyes strip covers rows 31–37 of those same
+columns, the mouth covers the painted mouth exactly, and an emotion face's
+bitmap (18, 23 into the body's bitmap, 25×25) covers the whole painted face —
+its own eyes band (face rows 9–14) and mouth (rows 19–24) land on the body's,
+so exactly one pair of eyes shows and the painted mouth is seated on the
+muzzle, for `faceemotion` 0–6. The mouth layer does not draw while an emotion
+face is up (the Draw event swaps them), and the blink strip keeps animating
+underneath, as in the original. Before the crop-offset piece drew the body's
+exported pixels at `(130, 0)`, every overlay kept its canvas position, and the
+body's own eyes and mouth rode 9 rows up and 1 column left — the four eyes and
+the floating mouth. Before the instance-array piece the emotion faces did not
+draw at all (`Unresolved sprite ID 881`).
+
+Piece 7 is the sweep that pins the whole composition in the draw log.
+`tests/test_asset_arrays.py` gained two tests:
+`test_shopkeeper_default_face_layers_seat_exactly` (emotion 0 draws body, eyes
+and mouth exactly once each, at the positions above, with the seat equations
+`+17, +31` and `+26, +41` against the body's bitmap) and
+`test_shopkeeper_emotion_faces_cover_the_default_face_and_swap_out_the_mouth`
+(emotions 1–6 each draw exactly one face at `(150, 36)` with origin `(1, 4)`,
+the mouth layer is absent, the face covers the strip's dark eye pixels and its
+whole band, and no `Unresolved sprite ID` warning is raised). The seat test
+fails if the crop carriage is removed (the offset assertion reads `(0, 0)`
+instead of `(1, 9)`, and the seat equations follow); the emotion test fails
+without the recovered array IDs. Draw-log evidence for the PR: emotion 0 draws
+`spr_shopkeeper1 x=130 y=0 ox=1 oy=9`, `spr_shopkeeper1eyes x=148 y=40`,
+`spr_shopkeeper1mouth x=157 y=50`; emotion 3 draws the same body and eyes plus
+`spr_shopkeeper1_face3 x=150 y=36 originX=1 originY=4`; the `faceemotion` 1–6
+sweep draws each face exactly once.
+
+Not claimed: pixel-perfect parity against a captured original frame (a CI-only
+visual claim), the blink/talk animation *rates* beyond the layers' own
+`image_speed` handling (piece 6b's frame selection), or any other shop room —
+`obj_shopmouth1` destroys itself outside room 311, and the other shops were not
+swept.
