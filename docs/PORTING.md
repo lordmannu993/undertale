@@ -797,9 +797,10 @@ player object and no per-room swap of controllers.
 **Run.** Yellow's compiled rule is unchanged: `option_autorun` XOR (the run
 button AND `player_can_run`). That button is `keyboard_multicheck(1)` — Shift
 (16) or 120, and physical X once `obj_screen` maps 88 to 16. Undertale does
-not read AUTO RUN. While `player_can_run` is 1, holding that cluster adds one
-extra ±3 lattice step on the Undertale adapter only, and only on an axis whose
-net delta from the frame-start `xprevious`/`yprevious` is already exactly ±3.
+not read AUTO RUN. While `player_can_run` is 1, holding that cluster adds a
+bonus step on the Undertale adapter only, and only on an axis whose net delta
+from the frame-start `xprevious`/`yprevious` is already exactly ±3 (piece 5c
+made that bonus ±3; piece 6c, below, made it Yellow's ±2).
 The bonus is the start of End Step (`3:2`), before the camera follows `x`.
 Collision runs with `xprevious` set to the walked spot, then `xprevious` is
 restored to the frame start so a blocked bonus does not look like the walk
@@ -1063,3 +1064,36 @@ Not claimed: pixel-perfect parity with either engine (a CI-only visual claim),
 Android, or a played-through scene. The anchor aligns canvas bottom centres; it
 does not claim the two artists drew the feet at the same pixel inside their
 canvases. Sprites the offset recovery could not pin keep their exported frames.
+
+## One movement speed (spec §12 — unified-fusion piece 6c)
+
+Spec §12 lists movement speed among the things one compatibility layer
+normalises, and §3 asks for Clover's running to belong to the unified player.
+Both games walk 3px a step — `obj_mainchara`'s own `x+= 3`/`y+= 3` and
+`obj_pl`'s `plspd = 3` — and Yellow runs `pl_spd = plspd + 2`
+(`scr_normal_state`). Piece 5c ran Undertale at an extra 3px lattice step, so the
+same button ran 6px a step in one world and 5px in the other.
+
+The controller now owns one speed (`Controller.WALK_STEP` 3, `Controller.RUN_BONUS`
+2). Yellow's own compiled step already runs 3+2 and is untouched; Undertale's walk
+step is followed by a +2 bonus in the direction it walked, collided through
+Undertale's own collision events exactly as the 5c step was (a blocked bonus rolls
+back to the walked spot, and `xprevious` is restored so the walk still counts).
+The bonus is not snapped to the 3px lattice: `obj_mainchara`'s Create snaps
+*before* it moves the player to the entrance marker, and 498 of Undertale's 568
+markers are off that lattice, so the original already walks off it.
+
+Evidence: `tests/test_movement_speed.py` (3 tests). The constants are re-read
+from both pinned sources (`obj_mainchara`'s Step, `obj_pl`'s Create,
+`scr_normal_state`), so they cannot drift from either game; Undertale runs
+5px a step in every direction (6 without the change) while its walk stays 3 and
+Yellow's own run stays 3+2; and running into room_area1's east wall from each of
+the five 5px phases never enters it (without the bonus collision the phases at
+x=231/232 end inside the wall at x=261/262). Piece 5c's controller pins were
+updated with the rationale in their docstrings: two run steps are 10, not 12,
+and the solid probe's 4px gap now separates a 3px walk from a 5px run.
+Full local suite 556 passed, 1 skipped (`PORT_REQUIRE_YELLOW=1`).
+
+Not claimed: a played-through route, input latency, or Android. Undertale's
+diagonal wall-slide objects (`obj_sur` and friends) still slide in their own ±3
+steps once a run touches them, which is the original's own behaviour for a walk.

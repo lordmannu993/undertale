@@ -435,6 +435,15 @@ Normalize things such as:
 > Movement speed (6c) and collision boxes, hitboxes, scaling and sheet coordinates (6d)
 > are **not** claimed by 6b.
 
+> Claim (scoped to what ran, 2026-09-23): piece **6c** implements *movement speed* as one
+> rule. Both games walk 3px a step and Yellow runs `plspd + 2`; the shared controller owns
+> those two numbers (`WALK_STEP`, `RUN_BONUS`, re-read from both pinned sources by the
+> tests), Yellow's own step is untouched, and Undertale's run is its walk plus a collided
+> +2 bonus — 5px a step in both worlds instead of 5 in one and 6 in the other. Evidence:
+> `tests/test_movement_speed.py` (3 tests) and the updated `tests/test_unified_controller.py`.
+> Headless distances only: no played-through route, input latency or Android claim.
+> Collision boxes, hitboxes, scaling and sheet coordinates (6d) are **not** claimed by 6c.
+
 ## 13. Do Not Fix Bugs With Temporary Visual Hacks
 
 Avoid solutions such as:
