@@ -4,6 +4,70 @@ This prerelease makes the current `.love` package downloadable from GitHub. It
 contains the converted Lua and the assets supplied for both merged games. **It
 is not a completed or native-device-verified game, and it is not an APK.**
 
+## v1.2.4 — the unified fusion, in the download
+
+This build carries the whole **unified-fusion queue** — the owner's sixteen
+requirements ([docs/UNIFIED_FUSION_SPEC.md](https://github.com/lordmannu993/undertale/blob/master/docs/UNIFIED_FUSION_SPEC.md))
+landed as pieces 1–8 ([docs/FUSION_STATUS.md](https://github.com/lordmannu993/undertale/blob/master/docs/FUSION_STATUS.md),
+PRs #33–#53) after the v1.2.3 archive was packaged. The two games in the
+archive no longer behave as two games in one executable: with one player, one
+shared inventory, one controller and one save, it is **one world with Frisk in
+both halves**.
+
+- **One player state in both worlds.** One live player record (HP, max HP,
+  LV, EXP, gold, name, base attack/defense) is projected at every world
+  crossing; there are no parallel `undertaleLV`/`yellowLV` tracks. Level-up
+  everywhere is Undertale's own `scr_levelup` (LV 20 = 99/99/99)
+  ([PR #41](https://github.com/lordmannu993/undertale/pull/41),
+  [#44](https://github.com/lordmannu993/undertale/pull/44)).
+- **One shared inventory and four equipment slots.** Frisk keeps Undertale's
+  weapons and armours and gains Clover's ammunition (weapon modifier) and
+  accessories (armour modifier); both games' item spellings are live views of
+  one table, so Yellow's own pause menu equips for either content set
+  ([PR #43](https://github.com/lordmannu993/undertale/pull/43)).
+- **One controller and one run.** One shared player controller drives
+  `obj_mainchara` and `obj_pl`; Undertale's world gains the X/Shift run as one
+  extra collided 3px step with Clover's run cycle, and Yellow keeps its own
+  3+2 step — one speed rule, no per-room hacks
+  ([PR #44](https://github.com/lordmannu993/undertale/pull/44)).
+- **One save.** Both worlds' save and load scripts write a single versioned
+  `merge.sav` (version 2, Player + World blocks) recording the player, the
+  loadout and the crossings; an old version 1 save is migrated, never
+  rewritten blindly ([PR #46](https://github.com/lordmannu993/undertale/pull/46)).
+- **The overworld renders as each game drew it.** Depth sorts by the sprite's
+  visual bottom point ([PR #37](https://github.com/lordmannu993/undertale/pull/37)),
+  814 sprite crop offsets are recovered with pinned provenance
+  ([PR #35](https://github.com/lordmannu993/undertale/pull/35)), the asset IDs
+  Undertale keeps inside instance arrays — including the Snowdin shopkeeper's
+  emotion faces — resolve again
+  ([PR #36](https://github.com/lordmannu993/undertale/pull/36)), the 42 asset
+  names both games share resolve per world so no character or sprite layer
+  draws twice ([PR #39](https://github.com/lordmannu993/undertale/pull/39)),
+  and the River Person's boat and water composite as separate layers, pillars
+  in front included ([PR #38](https://github.com/lordmannu993/undertale/pull/38),
+  [#50](https://github.com/lordmannu993/undertale/pull/50)).
+- **One sprite-size and collision model.** Both worlds read sizes through one
+  canvas-compatibility layer; draws show one sub-image at the sprite's own
+  animation rate, Studio 2's per-frame precise masks are real, and stretched
+  draws and `sprite_get_uvs` answer from the frame, not the whole sheet
+  ([PR #48](https://github.com/lordmannu993/undertale/pull/48),
+  [#49](https://github.com/lordmannu993/undertale/pull/49)).
+- **Shared script names route to each world's own copy**
+  ([PR #34](https://github.com/lordmannu993/undertale/pull/34)).
+- **Certified, not assumed.** The §15/§16 acceptance matrix drives one
+  continuous session — Undertale items and EXP into Yellow and back, walk/run
+  poses, a ten-room render sweep, save/load through both worlds' save points —
+  and audits that exactly one player record, inventory, controller and save
+  exist ([PR #52](https://github.com/lordmannu993/undertale/pull/52)). The
+  native LÖVE gate now requires the `ACCEPTANCE PASS` probe alongside
+  `NATIVE SMOKE PASS` and `CORE PLAYER PASS`.
+- **A fresh, versioned fusion archive**, published only after the automated
+  suite, merged packaging checks and native Linux LÖVE gate pass. Android
+  device validation and full-game compatibility remain unclaimed, exactly as
+  the older sections below state: Yellow's battles and deeper story systems,
+  palette shaders (reported and skipped) and the 25 named-stop rooms stay
+  unclaimed in this build too.
+
 ## v1.2.3 — the four phone fixes
 
 - **The dialogue box draws over the world.** `obj_dialoguer` sat at depth 0 while

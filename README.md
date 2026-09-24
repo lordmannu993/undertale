@@ -20,13 +20,13 @@ workspace. See [port status](docs/PORTING.md) and [validation](docs/VALIDATION.m
 
 ## Download the newest experimental `.love` file
 
-**Newest build: v1.2.3**, published 2026-09-19 — tag
-`love-v1.2.3-fusion-experimental`, source commit `6d59f5d`, SHA-256 in the
+**Newest build: v1.2.4**, published 2026-09-24 — tag
+`love-v1.2.4-fusion-experimental`, source commit `3c3da8a`, SHA-256 in the
 release notes.
 
-[**Download `undertale-yellow-fusion-v1.2.3-experimental.love` (~390 MB)**](https://github.com/lordmannu993/undertale/releases/download/love-v1.2.3-fusion-experimental/undertale-yellow-fusion-v1.2.3-experimental.love)
+[**Download `undertale-yellow-fusion-v1.2.4-experimental.love` (~390 MB)**](https://github.com/lordmannu993/undertale/releases/download/love-v1.2.4-fusion-experimental/undertale-yellow-fusion-v1.2.4-experimental.love)
 
-- [Release notes, SHA-256 checksum, and both conversion reports](https://github.com/lordmannu993/undertale/releases/tag/love-v1.2.3-fusion-experimental)
+- [Release notes, SHA-256 checksum, and both conversion reports](https://github.com/lordmannu993/undertale/releases/tag/love-v1.2.4-fusion-experimental)
 - [All releases, newest first](https://github.com/lordmannu993/undertale/releases) —
   every older build stays downloadable; each is retitled “Superseded — …” when a
   newer one replaces it.
@@ -43,11 +43,28 @@ release notes). The large archive is hosted as a GitHub Release asset rather
 than committed to Git. To regenerate it yourself, follow the build instructions
 below.
 
-**Merged after this archive was built:** the shared-script routing, rendering
-and unified-Player work tracked in [the fusion queue](docs/FUSION_STATUS.md)
-is newer source work, **not included in the v1.2.3 download**. The unified
-Player work is still being completed in small, tested sub-pieces; no new
-release is claimed for those changes yet.
+### Added in v1.2.4 — the unified fusion
+
+From the owner's sixteen-requirement [unified-fusion spec](docs/UNIFIED_FUSION_SPEC.md),
+merged as pieces 1–8 of [the fusion queue](docs/FUSION_STATUS.md) after the
+v1.2.3 archive was packaged; this build carries all of it:
+
+- **One player, one world, not two games in one executable.** One live player
+  record (HP, LV, EXP, gold, name, stats) crosses both travel services;
+  level-up is Undertale's own script in both worlds.
+- **One inventory and four equipment slots.** Frisk keeps Undertale's weapons
+  and armours and gains Clover's ammunition and accessories; both pause menus
+  equip from one shared table.
+- **One run rule.** Undertale's world gains the X/Shift run — one extra
+  collided 3px step with Clover's run cycle — beside Yellow's own 3+2 step.
+- **One save.** Both worlds' save points write a single versioned `merge.sav`
+  recording player, loadout and crossings.
+- **The overworld renders as each game drew it.** Depth sorts by each sprite's
+  visual bottom point, 814 crop offsets and the instance-array asset IDs
+  (including the Snowdin shopkeeper's emotion faces) are recovered with pinned
+  provenance, the 42 asset names both games share resolve per world so nothing
+  draws twice, and Studio 2's per-frame precise masks, animation rates and sheet
+  coordinates are honoured.
 
 ### Added in v1.2.3 — the four phone fixes
 

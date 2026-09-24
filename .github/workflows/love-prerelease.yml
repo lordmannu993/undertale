@@ -3,9 +3,9 @@ name: Experimental LOVE download
 on:
   # Bootstrap publication from this unmerged branch without changing master.
   # Ordinary source pushes do not republish the immutable prerelease.
-  # This workflow file is touched for the v1.2.3 fusion bootstrap after its draft exists.
+  # This workflow file is touched for the v1.2.4 fusion bootstrap after its draft exists.
   push:
-    branches: [arena/01a0b9dd-undertale]
+    branches: [arena/01a0d251-undertale]
     paths: [.github/workflows/love-prerelease.yml]
   workflow_dispatch:
 
@@ -13,16 +13,16 @@ permissions:
   contents: read
 
 concurrency:
-  group: love-v1.2.3-fusion-experimental-publication
+  group: love-v1.2.4-fusion-experimental-publication
   cancel-in-progress: false
 
 env:
-  RELEASE_TAG: love-v1.2.3-fusion-experimental
-  ASSET_BASE: undertale-yellow-fusion-v1.2.3-experimental
+  RELEASE_TAG: love-v1.2.4-fusion-experimental
+  ASSET_BASE: undertale-yellow-fusion-v1.2.4-experimental
 
 jobs:
   publish:
-    if: github.ref == 'refs/heads/arena/01a0b9dd-undertale'
+    if: github.ref == 'refs/heads/arena/01a0d251-undertale'
     runs-on: ubuntu-latest
     # The merged archive carries ~19,400 pinned Yellow asset files on top of
     # Undertale's, and the native gate plays both worlds; keep the headroom.
@@ -103,7 +103,7 @@ jobs:
           checksum = (Path('artifacts') / (base+'.love.sha256')).read_text().strip()
           notes = Path('docs/RELEASE_NOTES.md').read_text()
           notes += '\n## Build record\n\n'
-          notes += f'- Source commit: `{os.environ["GITHUB_SHA"]}` on `{os.environ["GITHUB_REF_NAME"]}` (v1.2.3, Undertale + Undertale Yellow fusion).\n'
+          notes += f'- Source commit: `{os.environ["GITHUB_SHA"]}` on `{os.environ["GITHUB_REF_NAME"]}` (v1.2.4, Undertale + Undertale Yellow fusion).\n'
           notes += f'- **{count} automated tests passed** on GitHub Actions, the Yellow live gates included.\n'
           notes += f'- Undertale: **{report["converted_code_units"]:,} source units** translated without parse failures; **{len(report["missing_paths"])} missing movement paths**, **{len(report["unresolved_numeric_references"])} unresolved static numeric asset references**, **{len(report["missing_external_files"])} missing literal external file paths** and **{len(report.get("missing_rooms", []))} missing original room** remain.\n'
           notes += f'- Undertale Yellow: **{yellow["rooms"]["converted"]} rooms** and **{yellow["rooms"]["paths"]} paths** with **{yellow["rooms"]["counts"]["drawables"]:,} layer drawables** convert without compile errors; **{len(yellow["rooms"]["unsupported"])} named room-feature stops** (layer effects and physics worlds with no GameMaker 1.4 equivalent) stay blocked rather than rendered without them.\n'
@@ -128,10 +128,10 @@ jobs:
         run: |
           gh release edit "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" \
             --target "$GITHUB_SHA" --prerelease --latest=false \
-            --title 'LOVE v1.2.3 — Undertale + Undertale Yellow fusion (experimental)' \
+            --title 'LOVE v1.2.4 — Undertale + Undertale Yellow fusion (experimental)' \
             --notes-file build/release-notes.md
           gh release upload "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --clobber \
-            "artifacts/$ASSET_BASE.love#LOVE v1.2.3 fusion (experimental)" \
+            "artifacts/$ASSET_BASE.love#LOVE v1.2.4 fusion (experimental)" \
             "artifacts/$ASSET_BASE.love.sha256#SHA-256 checksum" \
             "artifacts/$ASSET_BASE.conversion-report.json#Undertale conversion report and missing resources" \
             "artifacts/$ASSET_BASE.yellow-conversion-report.json#Undertale Yellow conversion report and named stops"
