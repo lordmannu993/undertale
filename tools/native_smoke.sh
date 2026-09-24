@@ -41,3 +41,6 @@ grep -q 'fused boat ride' port-test-output/native.log || {
 }
 # Piece 5a's packaged-runtime state probe is required, not merely logged.
 grep -q 'CORE PLAYER PASS' port-test-output/native-unified-player.txt
+# Piece 8's acceptance probe: the carried item and equipped gear crossed with
+# the player through the packaged archive's own River Person and whale rides.
+grep -q 'ACCEPTANCE PASS' port-test-output/native-acceptance.txt

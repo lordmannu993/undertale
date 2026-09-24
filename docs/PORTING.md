@@ -1227,3 +1227,51 @@ visual claim), the blink/talk animation *rates* beyond the layers' own
 `image_speed` handling (piece 6b's frame selection), or any other shop room —
 `obj_shopmouth1` destroys itself outside room 311, and the other shops were not
 swept.
+
+## Acceptance matrix (spec §15, §16 — unified-fusion piece 8)
+
+Piece 8 is the last piece of the fusion: spec §15's test list and §16's
+acceptance criteria, run as **one suite** rather than as more per-piece probes,
+and the matrix that maps every requirement to its code path, its test and its
+evidence (`docs/FUSION_STATUS.md` §7).
+
+`tests/test_acceptance_matrix.py` (7 tests) drives §15 as one continuous
+session — Undertale, then Undertale Yellow, then home — instead of separate
+fixtures per feature:
+
+| §15 checklist | test | what it drives |
+| --- | --- | --- |
+| Player state | `test_spec15_one_journey_keeps_inventory_equipment_and_progression` | `scr_itemget` grants a weapon, `scr_weaponeq` equips it (swapping the Stick back into the slot), a Monster Candy stays carried, `scr_levelup` sets LV 8 / 48 max HP / AT 24 / DF 11, HP is left injured; the crossing into `rm_hotland_02` must keep every slot, the equipped weapon (Yellow reads it as "Toy Knife"), LV/EXP/HP/stats/gold/name and the shared `run`/`menu`/`interact` abilities; Yellow's own pause menu equips Silver Ammo (slot swap back to Rubber Ammo) and a Yellow-only Lemonade rides in a slot; the whale crossing home keeps both — proved through Undertale's `global.item` spelling of the same slot |
+| Inventory (one inventory, no Clover/Frisk inventory) | same test + `test_spec16_one_player_one_inventory_one_controller_one_save` | both spellings are live views of `R.player.inventory[1..8]` in both directions of a write; `global.item[8]` stays Undertale's own scratch |
+| Movement | `test_spec15_movement_and_its_animations_match_in_both_worlds` | 3px/step walking in both worlds, 5px/step running in both (Undertale's collided +2), and the drawn pose per frame: walk poses while walking, `spr_pl_run_right` — Clover's run cycle — while sprinting in **either** world (spec §3) |
+| Rendering | `test_spec15_rendering_sweep_keeps_every_scene_coherent`, `test_spec15_named_scenes_keep_their_original_layering` | ten rooms (five Undertale, five Yellow) rendered after a real crossing: no instance draws the same sprite twice in a frame, every owned draw belongs to a live instance, and the sweep covers the player in both worlds, 2260+ particle draws, 500+ background draws and the shopkeeper's multi-layer composite; then the three named scenes — the dock's water < hull < cover < riverman < player order, room 311's body/eyes/mouth exactly once each, and the Snowdin forest drawing the visiting Frisk (never Clover's walk sprites) with its snow |
+| Save/load | `test_spec15_both_worlds_save_points_write_and_load_the_one_document` | `scr_save` in Undertale, mangled, restored by `scr_load`; `scr_savegame` at a Yellow save point, mangled, restored by **Undertale's** loader while standing in the Yellow room (injured HP kept, room kept); `merge.sav` version 2 with `n:8`/`s:Lemonade` in the `Player` block, and `R.saveMemory` holding no third `.sav` document |
+| §16 one system | `test_spec16_no_duplicated_player_state_exists_in_the_port`, `test_spec16_one_player_one_inventory_one_controller_one_save` | the port and both conversions are scanned for the separate-state spellings spec §9 forbids (`cloverInventory`, `friskInventory`, `undertaleLV`, `yellowLV`, …) and for a second `*.install` of the shared systems; then identities: `R.player` (and `R.playerBridge.state`, `R.inventoryBridge.state`) is one record across two crossings, one controller object, one inventory/equipment table, every progression spelling round-trips through the other, and `merge.sav` stays version 2 |
+
+Each mechanism the suite relies on was reverted one at a time (file edited
+back, the acceptance test run, the file restored) so the tests are known to
+fail without the pieces they certify:
+
+| reverted mechanism | observed failure |
+| --- | --- |
+| `port/inventory.lua`: the content-initialization slot guard (`if guarding() and normalize(state.inventory[index]) ~= UT_EMPTY`) | `inventory after crossing: Missing Poster,0` — Yellow's own `scr_initialize` wipes the carried slot |
+| `port/player.lua`: the alias write guard `if bridge.defaultsDepth == 0 or owner[field.key] == nil` | `LV/EXP lost` — destination defaults replace the live record |
+| `port/controller.lua`: `RUN_BONUS = 2` → `0` | `Undertale run distance: 3,3,3,3` |
+| `port/frisk.lua`: the sprint remap condition `movement and movement.sprinting and owner and owner.v` | `Undertale run drew spr_maincharar` — the run cycle stops being Clover's |
+| `port/graphics.lua`: the draw-list comparison `a.depth > b.depth` reversed | the dock draws `spr_maincharad, spr_riverman, spr_dogboat, spr_dogboat_cover, bg_watertiles_supplement, …` — the water in front of the hull |
+
+The native gate carries the same inventory/equipment claim through the
+**packaged** archive: `port/smoke.lua` now puts a Yellow-only item in slot 3 and
+equips Silver Ammo before the River Person crossing, asserts both on arrival in
+`rm_hotland_02` through Yellow's and Undertale's spellings, asserts them again
+after the whale has carried the player home, requires `merge.sav`'s `ammo` to be
+that same "Silver Ammo", and writes `port-test-output/native-acceptance.txt`
+with an `ACCEPTANCE PASS` line — which `tools/native_smoke.sh` now requires
+rather than merely logging (the same shape as piece 5a's `CORE PLAYER PASS`).
+
+This certifies the fusion's *systems* headlessly plus the packaged crossings in
+the native gate. Not claimed by piece 8: Android behaviour, audio fidelity,
+touch latency, a played-through route or battle, pixel-perfect parity with
+either original engine, or the Yellow rooms that still stop by name (25 rooms
+have no converted source data; piece 8 does not add any). The room-specific
+exemptions §13 allows stay listed where they were listed; piece 8 adds none.
