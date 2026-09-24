@@ -595,6 +595,25 @@ Specifically verify:
 - Confirm inventory, equipment, LV, EXP, abilities, and other persistent state remain
   consistent.
 
+> Claim (scoped to what ran, 2026-09-24): piece **8** runs these checklists as
+> one continuous session, `tests/test_acceptance_matrix.py`
+> (`test_spec15_one_journey_keeps_inventory_equipment_and_progression` — items
+> granted and equipped through Undertale's own `scr_itemget`/`scr_weaponeq`, EXP
+> through `scr_levelup`, a crossing into `rm_hotland_02`, Yellow's own pause
+> menu equipping Yellow-only gear, a Yellow-only item carried in a slot, and the
+> whale crossing home with both; `…movement_and_its_animations_match_in_both_worlds`
+> — 3px walk and 5px run in both worlds with the drawn pose per frame;
+> `…rendering_sweep_keeps_every_scene_coherent` and
+> `…named_scenes_keep_their_original_layering` — ten rooms plus the dock, the
+> Snowdin shop and the Snowdin forest; `…both_worlds_save_points_write_and_load_the_one_document`).
+> Each mechanism was reverted one at a time to show the tests fail without it
+> (the five reverts and their failure strings are tabulated in
+> `docs/PORTING.md`). The packaged archive repeats the inventory/equipment claim
+> in the CI native gate (`native-acceptance.txt`, `ACCEPTANCE PASS`). Headless
+> converted flow + draw log + that gate: no Android, audio, played-through
+> route/battle, or pixel-perfect parity claim, and the 25 Yellow rooms without
+> converted source data still stop by name.
+
 ## 16. Final Acceptance Criteria
 
 Do not consider this task complete merely because both games can be accessed from the same
@@ -635,6 +654,17 @@ independently functioning games.**
 This version completes the cutoff and also makes the **architecture requirement much more
 explicit**, especially around preventing separate `undertaleLV`, `yellowLV`,
 `cloverInventory`, etc. from continuing to exist underneath the UI.
+
+> Claim (scoped to what ran, 2026-09-24): piece **8** audits this section rather
+> than asserting it. `tests/test_acceptance_matrix.py::test_spec16_no_duplicated_player_state_exists_in_the_port`
+> scans `port/` and both conversions for the separate-state spellings §9 forbids
+> and for a second installer of any shared system; `…test_spec16_one_player_one_inventory_one_controller_one_save`
+> proves one `R.player` record (and one inventory/equipment table, one
+> controller, one `merge.sav`) survives two crossings by identity, with every
+> progression spelling round-tripping through its twin. The room-scoped
+> exemptions §13 permits are the ones already listed in `docs/PORTING.md`;
+> piece 8 adds none, and the matrix below maps each requirement of this document
+> to its code path, test and evidence.
 
 ---
 

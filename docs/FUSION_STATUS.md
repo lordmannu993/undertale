@@ -40,9 +40,9 @@ git merge --no-edit origin/<that-open-PR-branch>   # clean fast-forward from mas
 | field | value |
 | --- | --- |
 | most recent merged piece | **#7 the shopkeeper §7 visual sweep** (with 6d's evidence write-up corrected) — [PR #50](https://github.com/lordmannu993/undertale/pull/50), merged to `master` as `8bc1f89` on 2026-09-23; [CI + native gate 35893553410](https://github.com/lordmannu993/undertale/actions/runs/35893553410) green. Piece 6 before it: 6a [PR #48](https://github.com/lordmannu993/undertale/pull/48) merge `fedae36`, 6b–6d [PR #49](https://github.com/lordmannu993/undertale/pull/49) merge `ee9b693` |
-| in-flight piece | none |
-| next ⬜ piece | **#8** the acceptance matrix + final merge — the last piece; the *final fusion* is certified **only** once it is green |
-| in-flight open PR | none |
+| in-flight piece | **#8** the acceptance matrix + final merge — the last piece; branch `arena/01a0d208-undertale`, tests green locally (571 passed, 1 skipped) |
+| next ⬜ piece | **none** — with piece 8 green and merged, all 16 requirements and the §15/§16 acceptance matrix are done and the fusion is certified |
+| in-flight open PR | [#52](https://github.com/lordmannu993/undertale/pull/52) (piece 8) |
 
 ---
 
@@ -90,7 +90,7 @@ piece may be split into sub-pieces if it is too large for one green increment.
 | 5 | §1 §3 §9–§11 §13 §14 | **Unified Player state** (split into 5a–5d below): one Player record + shared item table, projected at world boundaries, serialised as `Player` + `World` blocks; crossing zeroes `flag[0..29]` (do not park state there) | ✅ **5a–5d merged** | `port/player.lua`, `port/inventory.lua`, `port/controller.lua`, `port/save.lua`, `port/runtime.lua`, `port/travel.lua`, `port/storage.lua`, `port/merge.lua`, `port/frisk.lua`, `tools/item_catalog.py`, `tests/test_unified_player_state.py`, `tests/test_unified_inventory.py`, `tests/test_unified_controller.py`, `tests/test_unified_save.py`, `docs/` | 5a: [PR #41](https://github.com/lordmannu993/undertale/pull/41). 5b: [PR #43](https://github.com/lordmannu993/undertale/pull/43). 5c: [PR #44](https://github.com/lordmannu993/undertale/pull/44). 5d: [PR #46](https://github.com/lordmannu993/undertale/pull/46), 8 tests. Piece 8 still certifies the final fusion |
 | 6 | §12 | Asset compatibility layer — `sprite_get_width/height` return cropped size at ~95 sites; per-frame origins; movement speed (UT 3 px/frame, Yellow +2 autorun); hitboxes/collision; the 980 `unresolved[]` crop offsets (never guess) | ✅ **6a–6d done** | `port/assetcompat.lua`, `port/graphics.lua`, `port/runtime.lua`, `port/controller.lua`, `port/frisk.lua`, `port/collision.lua`, `port/yellow_studio.lua`, `port/yellow_builtins.lua`, `tools/recover_sprite_offsets.py`, `tools/yellow/assets.py`, `port/recovered_sprite_metadata.json`, `port/sprite_offsets.json`, `tools/convert.py`, `tests/test_asset_sizes.py`, `tests/test_asset_frames.py`, `tests/test_movement_speed.py`, `tests/test_asset_collision.py`, `docs/PORTING.md` | 6a: `tests/test_asset_sizes.py` (13 tests). 6b: `tests/test_asset_frames.py` (6 tests). 6c: `tests/test_movement_speed.py` (3 tests). 6d: `tests/test_asset_collision.py` (6 tests) — see the sub-piece table below |
 | 7 | §7 (visual) | Shopkeeper §7 visual sweep — confirm, via the draw log, exactly one pair of eyes + a correctly-seated mouth for `faceemotion` 0–6 in room 311 (the ID half is piece 1) | ✅ | `tests/test_asset_arrays.py` (extended), `docs/PORTING.md`, draw-log evidence in PR | [PR #50](https://github.com/lordmannu993/undertale/pull/50), merge `8bc1f89`, [CI + native gate 35893553410](https://github.com/lordmannu993/undertale/actions/runs/35893553410). `test_shopkeeper_default_face_layers_seat_exactly` (fails without the crop carriage: the offset pin reads `(0, 0)` instead of `(1, 9)`) + `test_shopkeeper_emotion_faces_cover_the_default_face_and_swap_out_the_mouth` (fails without piece 1's recovered array IDs; each emotion 1–6 draws exactly one face at `(150, 36)` with origin `(1, 4)`, the mouth layer swapped out, the strip's eye band covered); draw-log rows quoted in the PR. Full local suite **564 passed, 1 skipped** |
-| 8 | §15, §16 | Acceptance matrix + final merge — this file maps every requirement → code path / test / evidence; keep `AGENTS.md` current; then the single final merge | ⬜ | this file, `AGENTS.md`, PR body | — |
+| 8 | §15, §16 | Acceptance matrix + final merge — every requirement mapped → code path / test / evidence (§7 below); keep `AGENTS.md` current; then the single final merge | ✅ | `tests/test_acceptance_matrix.py`, `port/smoke.lua`, `tools/native_smoke.sh`, `docs/PORTING.md`, `docs/UNIFIED_FUSION_SPEC.md` (§15/§16 claims), this file, `AGENTS.md` | [PR #52](https://github.com/lordmannu993/undertale/pull/52). `tests/test_acceptance_matrix.py` (7 tests): the §15 checklists as one continuous session — Undertale items/EXP → Yellow → home, the same walk/run rule with the pose each state draws, a ten-room render sweep plus the dock/shop/forest scenes, and save/load through both worlds' save points; §16 audits by identity (one `R.player`, one inventory/equipment table, one controller, one `merge.sav`) and by scan (no `cloverInventory`-style spelling, one installer per shared system). Five reverts tabulated in `docs/PORTING.md` fail it by name (`inventory after crossing: Missing Poster,0`; `LV/EXP lost`; `Undertale run distance: 3,3,3,3`; `Undertale run drew spr_maincharar`; the reversed depth comparison puts the dock's water in front of the hull). Native gate now requires `ACCEPTANCE PASS` (a Yellow item and equipped ammo through both packaged crossings). Full local suite **571 passed, 1 skipped** |
 
 ### Piece 6 sub-pieces (finish these before #7)
 
@@ -193,3 +193,39 @@ After a green piece:
 5. Add a short "piece N done, here is the evidence, here is piece N+1" note to the
    PR body (the owner prefers that over option menus), then **merge the PR once CI
    is green** so the piece lands on `master` for the next session.
+
+---
+
+## 7. Acceptance matrix (spec §15, §16 — piece 8)
+
+Piece 8 certifies the fusion by mapping **every** requirement of
+[`UNIFIED_FUSION_SPEC.md`](UNIFIED_FUSION_SPEC.md) to the code that implements
+it, the tests that prove it, and the evidence that was actually run. The
+acceptance suite is `tests/test_acceptance_matrix.py` (7 tests: §15's checklists
+as one continuous session) plus §16's two audits; the packaged archive repeats
+the inventory/equipment claim in the CI native gate (`ACCEPTANCE PASS`).
+
+| spec § | requirement | code path | test / evidence |
+| --- | --- | --- | --- |
+| 1 | one shared inventory, equipment and progression; items usable in either content set; nothing resets on a crossing | `port/player.lua`, `port/inventory.lua`, `tools/item_catalog.py`, `generated/merged/items.lua` | `tests/test_unified_player_state.py`, `tests/test_unified_inventory.py`; acceptance `test_spec15_one_journey_keeps_inventory_equipment_and_progression`; native `CORE PLAYER PASS` + `ACCEPTANCE PASS` |
+| 2 | one fused game, not two games in one executable | `port/merge.lua`, `port/travel.lua`, `port/runtime.lua` | `tests/test_yellow_merge.py` (ID bands, both travel hubs, one player per world); acceptance `test_spec16_one_player_one_inventory_one_controller_one_save` |
+| 3 | Frisk's and Clover's abilities merged (Clover's run available in Undertale areas, Frisk's art in Yellow) | `port/controller.lua`, `port/frisk.lua` | `tests/test_unified_controller.py`, `tests/test_movement_speed.py`; acceptance `test_spec15_movement_and_its_animations_match_in_both_worlds` (the pose drawn per frame) |
+| 4 | overworld rendering: depth/Y-sort, no manual per-sprite moves | `tools/convert.py` (canvas carriage), `port/graphics.lua`, `port/yellow_layers.lua` | `tests/test_depth_sort.py`; acceptance `test_spec15_rendering_sweep_keeps_every_scene_coherent` |
+| 5 | overlap and feet-based depth for the player and NPCs, foreground split from background | `port/graphics.lua`, `port/yellow_layers.lua`, `scripts/scr_depth.gml` path through `port/assetcompat.lua` | `tests/test_depth_sort.py`, `tests/test_boat_water.py`; acceptance named scenes (dock layering) |
+| 6 | River Person's boat and water | `port/graphics.lua`, `tools/recover_sprite_offsets.py`, `port/sprite_offsets.json` | `tests/test_boat_water.py`, `tests/test_sprite_offsets.py`; acceptance named scenes |
+| 7 | Snowdin shopkeeper: two eyes, seated mouth, no duplicated facial features | `tools/recover_asset_arrays.py`, `port/recovered_asset_arrays.json`, `tools/convert.py` | `tests/test_asset_arrays.py`; acceptance named scenes |
+| 8 | no duplicated characters or sprite layers | `port/graphics.lua` (draw provenance), `port/merge.lua` (`double_named`), `port/runtime.lua` | `tests/test_duplicate_draws.py`; acceptance sweep (no instance draws a sprite twice in a frame, in ten rooms) |
+| 9 | one authoritative architecture; no `undertaleLV`/`yellowLV`/`cloverInventory`-style forks | `port/player.lua`, `port/inventory.lua`, `port/controller.lua`, `port/save.lua`, `port/graphics.lua` | acceptance `test_spec16_no_duplicated_player_state_exists_in_the_port` (scan of `port/` and both conversions, one installer per shared system) |
+| 10 | room/area transitions preserve the player | `port/travel.lua`, `port/player.lua` | `tests/test_unified_player_state.py`, `tests/test_yellow_merge.py`; acceptance journey; native `CORE PLAYER PASS` |
+| 11 | one save structure (Player + World) for both worlds | `port/save.lua`, `port/storage.lua` | `tests/test_unified_save.py`; acceptance `test_spec15_both_worlds_save_points_write_and_load_the_one_document` |
+| 12 | asset compatibility layer (origins, frames, speed, collision, hitboxes, anchors, scaling, sheet coordinates) | `port/assetcompat.lua`, `port/collision.lua`, `port/yellow_studio.lua`, `tools/convert.py`, `tools/yellow/assets.py` | `tests/test_asset_sizes.py` (6a), `tests/test_asset_frames.py` (6b), `tests/test_movement_speed.py` (6c), `tests/test_asset_collision.py` (6d) |
+| 13 | no temporary visual hacks; fix the shared system | `port/graphics.lua`, `port/runtime.lua`, `port/collision.lua`, `port/assetcompat.lua` | every piece's "reverting X fails test Y" evidence in `docs/PORTING.md`; the room-specific exemptions §13 permits are listed there, and piece 8 adds none |
+| 14 | game-specific mechanics preserved without a second player state | Yellow ammunition/accessories and Undertale gear through `port/inventory.lua`; battle composition in `port/controller.lua` | `tests/test_unified_inventory.py`, `tests/test_unified_controller.py`, `tests/test_yellow_merge.py` (Yellow's pause menu equipping) |
+| 15 | the §15 test list, run rather than claimed | `tests/test_acceptance_matrix.py` | the six §15 acceptance tests plus the native `ACCEPTANCE PASS` probe in `port/smoke.lua` / `tools/native_smoke.sh` |
+| 16 | one continuous player, inventory, LV/EXP, save, overworld, movement, ability set and rendering system | the whole tree | all of the above, plus §16's two audits; certified only with this piece's PR green (CI tests + native LÖVE gate) |
+
+**What this matrix does not claim** (also stated per piece in `docs/PORTING.md`):
+Android GPU behaviour, audio fidelity, touch latency, a played-through route or
+battle, pixel-perfect parity with either original engine, and the Yellow rooms
+whose source data is absent (they still stop by name — see `manifest.missing_rooms`
+and `port/runtime.lua`'s `room_goto` stop).

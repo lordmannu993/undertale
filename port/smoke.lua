@@ -148,6 +148,13 @@ function Smoke.new(game,touch)
         game:call("scr_levelup",game:scope(frisk))
         game.global.hp=game.global.maxhp+10
         game.global.gold=37
+        -- Piece 8 acceptance: a carried item and equipped gear must cross with
+        -- the player. The item is Yellow-only ("Lemonade") so nothing in the
+        -- Undertale half of the archive can have manufactured it, and the
+        -- ammunition is equipped through the shared equipment layer both
+        -- worlds' spellings read.
+        game.global.item_slot[3]="Lemonade"
+        game.global.player_weapon_modifier="Silver Ammo"
         assert(player and player.level==8 and player.maxHp==48,"shared core player was not initialized")
         hold(88,2)
         assert(game.travel.riverLatch,"Holding X during the boat ride did not arm the fused crossing")
@@ -159,6 +166,14 @@ function Smoke.new(game,touch)
         assert(game.global.current_hp_self==58 and game.global.max_hp_self==48,"the crossing reset overhealed HP")
         assert(game.global.player_attack==24 and game.global.player_defense==11,"the crossing reset base stats")
         assert(game.global.player_gold==37 and game.global.player_name==playerName,"the crossing reset money/name")
+        -- The shared inventory and equipment came along: the carried Yellow
+        -- item is in the same slot, and both worlds' spellings read it.
+        assert(game.player.inventory[3]=="Lemonade","the crossing dropped the carried item: "..
+            tostring(game.player.inventory[3]))
+        assert(game.global.item_slot[3]=="Lemonade" and game.global.item[2]=="Lemonade",
+            "Yellow's and Undertale's inventory spellings disagree after the crossing")
+        assert(game.player.equipment.ammo=="Silver Ammo" or game.global.player_weapon_modifier=="Silver Ammo",
+            "the equipped ammunition did not cross")
         -- Writes through Yellow's spelling must be visible through Undertale's
         -- immediately, not copied from a parked per-world snapshot on return.
         game.global.current_hp_self=game.global.current_hp_self-3
@@ -221,9 +236,20 @@ function Smoke.new(game,touch)
         assert(player.hp==55 and player.maxHp==48 and player.gold==44,"return lost shared HP/money")
         assert(player.stats.attack==24 and player.stats.defense==11 and player.name==playerName,
             "return lost shared stats/name")
+        -- Piece 8's acceptance probe, on the return leg: the carried item and
+        -- the equipped gear are still the same shared state, read through the
+        -- spelling the world on screen uses.
+        assert(game.player.inventory[3]=="Lemonade","the return crossing dropped the carried item: "..
+            tostring(game.player.inventory[3]))
+        assert(game.global.item[2]=="Lemonade","Undertale's inventory spelling lost the Yellow item")
+        assert(game.global.player_weapon_modifier=="Silver Ammo","the return crossing dropped the equipment")
         write("native-unified-player.txt","CORE PLAYER PASS: LV=8 EXP=720 HP=55/48 AT=24 DF=11 gold=44 name="..
             playerName.."; one live record across both worlds. This probe does not drive a save point.\n")
         print("NATIVE SMOKE PASS: shared core Player progression across both worlds")
+        write("native-acceptance.txt","ACCEPTANCE PASS: one shared inventory and one equipment set crossed with the "..
+            "player - the Yellow item stayed in slot 3 (both games' spellings read it) and Silver Ammo stayed "..
+            "equipped on both legs. This probe does not drive a save-point menu or an item-use menu.\n")
+        print("NATIVE SMOKE PASS: spec 15 inventory and equipment survive the packaged crossings")
         game.builtins.ini_open(nil,"merge.sav")
         local savedCrossings=game.builtins.ini_read_real(nil,"merge","crossings",0)
         local savedWorld=game.builtins.ini_read_string(nil,"merge","world","")
@@ -233,7 +259,7 @@ function Smoke.new(game,touch)
         assert(savedVersion==2,"merge.sav version="..tostring(savedVersion))
         assert(savedCrossings==2,"merge.sav crossings="..tostring(savedCrossings))
         assert(savedWorld=="undertale","merge.sav world="..tostring(savedWorld))
-        assert(savedAmmo~="","merge.sav lost the equipment slot record")
+        assert(savedAmmo=="Silver Ammo","merge.sav ammo="..tostring(savedAmmo)..", not the equipped Silver Ammo")
         capture("native-fusion-back")
         write("native-fusion-back.txt","room="..tostring(game.roomState.name).." crossings="..
             tostring(savedCrossings).." world="..savedWorld.." ammo="..savedAmmo.."\n")
