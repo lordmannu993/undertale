@@ -147,9 +147,11 @@ disagree.
   present. `tools/native_smoke.sh` rejects a merged archive that lacks the
   catalog before launching LÖVE.
 - [ ] Publish `love-v1.2.5-fusion-experimental` through the draft-only
-  workflow on `arena/01a0d296-undertale`. Retitle v1.2.4 with the
-  "Superseded — " prefix once that archive is published. Published assets
-  stay immutable; v1.2.4 is not rewritten.
+  workflow on `arena/01a0d296-undertale`. The draft exists; the publisher
+  is [run 35978059651](https://github.com/lordmannu993/undertale/actions/runs/35978059651),
+  building source `05bc25f`. Retitle v1.2.4 with the "Superseded — "
+  prefix once that archive is published. Published assets stay immutable;
+  v1.2.4 is not rewritten.
 
 ## v1.2.4 release task (2026-09-24)
 
