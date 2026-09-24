@@ -189,6 +189,30 @@ converter, or runtime, not generated files. Packaging uses an explicit file list
 no `.git`, credentials, local saves, SDKs, Python packages, or GameMaker XML are
 included. ZIP timestamps and permissions are normalized and a SHA-256 is emitted.
 
+## Merged archive must ship the item catalog (v1.2.5)
+
+v1.2.4's download stopped on boot with `module 'generated.merged.items' not
+found`. `tools/merge.py` writes that module next to
+`generated/merged/manifest.lua`, and `port/inventory.lua` loads it whenever
+`manifest.game == "merged"`. `tools/package.py` listed only the manifest. The
+native gate stayed green because `require` searches `./` after the archive, and
+CI's working directory contained the file `merge.py` had just written. A
+downloaded `.love` has no such neighbour.
+
+`merged_files()` now refuses to package unless both modules exist and returns
+both, plus any later `generated/merged/*.lua`. The zip is checked for those two
+names before it replaces the output. `Inventory.loadCatalog` loads through
+`love.filesystem` when LÖVE is present, so a cwd copy cannot satisfy a packaged
+launch. `tools/native_smoke.sh` rejects a merged archive that lacks the catalog
+before launching LÖVE. Headless tests still `require` the generated file; they
+have no `love.filesystem`.
+
+Evidence: `tests/test_packaging.py::test_merged_package_ships_the_item_catalog_and_stops_without_it`
+fails if the file list drops the catalog; `tests/test_unified_inventory.py::test_catalog_load_uses_the_archive_and_ignores_a_cwd_copy`
+fails if a cwd copy can satisfy a LÖVE load. Not claimed: that v1.2.4's
+already-published archive was rewritten (published assets stay immutable),
+Android behaviour, or any change to item rules.
+
 ## Source repairs (export only)
 
 The original GameMaker files have not been changed.

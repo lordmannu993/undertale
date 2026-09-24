@@ -4,13 +4,34 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 mkdir -p port-test-output
 command -v love >/dev/null || { echo 'Install LOVE, xvfb and xauth for native validation.' >&2; exit 1; }
+archive="${1:-artifacts/undertale-love-experimental.love}"
+# Inspect the archive, not the process cwd. v1.2.4's require() found
+# ./generated/merged/items.lua (merge.py writes it before this gate) and the
+# .love that people download did not contain the module, so every merged
+# launch stopped on boot while this gate stayed green.
+python3 - "$archive" <<'PY'
+import sys
+import zipfile
+from pathlib import Path
+path = Path(sys.argv[1])
+if not path.is_file():
+    sys.exit(f"archive not found: {path}")
+with zipfile.ZipFile(path) as zf:
+    names = set(zf.namelist())
+if "generated/merged/manifest.lua" in names and "generated/merged/items.lua" not in names:
+    sys.exit(
+        "Merged archive is missing generated/merged/items.lua. "
+        "The shared item catalog has to be inside the .love; a copy beside "
+        "the process is not a substitute (v1.2.4 stopped on boot this way)."
+    )
+PY
 set +e
 # The wall timeout covers the scripted Undertale opening plus the fused-world
 # section (three rooms, two crossings, three captures) on a merged archive; it
 # was raised when the fused gates were added - keep it raised, or the gate flakes.
 ALSOFT_DRIVERS=null LIBGL_ALWAYS_SOFTWARE=1 timeout 600s \
   xvfb-run -a -s '-screen 0 1600x900x24' \
-  love "${1:-artifacts/undertale-love-experimental.love}" --smoke-test \
+  love "$archive" --smoke-test \
   >port-test-output/native.log 2>&1
 status=$?
 set -e

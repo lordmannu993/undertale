@@ -43,7 +43,23 @@ def merged_files(generated: Path) -> list[Path]:
         if errors:
             raise ValueError(f"Yellow {section} conversion has {len(errors)} compile errors; refusing to package a merged build.")
     subprocess.run([sys.executable, str(ROOT / "tools/merge.py")], cwd=ROOT, check=True)
-    files = [generated / "merged" / "manifest.lua"]
+    # tools/merge.py writes two modules. v1.2.4 shipped only the manifest, so
+    # every merged archive stopped on boot at require("generated.merged.items").
+    # The native gate did not notice: LOVE's require also searches the process
+    # cwd, and merge.py had just written the catalog there. The archive itself
+    # has to carry it. Any later module written beside those two ships too.
+    merged_dir = generated / "merged"
+    required = ("manifest.lua", "items.lua")
+    missing_modules = [name for name in required if not (merged_dir / name).is_file()]
+    if missing_modules:
+        raise ValueError(
+            "Merged packaging is missing "
+            + ", ".join(f"generated/merged/{name}" for name in missing_modules)
+            + ". tools/merge.py must write the shared item catalog; without "
+            "generated/merged/items.lua the archive stops on boot."
+        )
+    files = [merged_dir / name for name in required]
+    files += sorted(path for path in merged_dir.glob("*.lua") if path.name not in required)
     files += sorted(path for path in yellow.rglob("*")
                     if path.is_file() and not any(part.startswith(".") for part in path.relative_to(ROOT).parts))
     # The converted records open their assets by archive-relative path inside
@@ -114,7 +130,17 @@ def package(output: Path, regenerate=True, merged=False):
                 info.external_attr = 0o100644 << 16
                 archive.writestr(info, path.read_bytes(), compress_type=zipfile.ZIP_DEFLATED, compresslevel=9)
         with zipfile.ZipFile(temp) as archive:
-            assert "main.lua" in archive.namelist() and "conf.lua" in archive.namelist()
+            names = set(archive.namelist())
+            assert "main.lua" in names and "conf.lua" in names
+            if merged:
+                required = {"generated/merged/manifest.lua", "generated/merged/items.lua"}
+                absent = sorted(required - names)
+                if absent:
+                    raise ValueError(
+                        "Merged archive omitted " + ", ".join(absent)
+                        + ". The shared item catalog must be inside the .love; "
+                        "a copy beside the process is not a substitute."
+                    )
             broken = archive.testzip()
             if broken:
                 raise ValueError(f"Archive CRC failed: {broken}")

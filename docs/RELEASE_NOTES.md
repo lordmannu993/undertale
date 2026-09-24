@@ -4,6 +4,38 @@ This prerelease makes the current `.love` package downloadable from GitHub. It
 contains the converted Lua and the assets supplied for both merged games. **It
 is not a completed or native-device-verified game, and it is not an APK.**
 
+## v1.2.5 — the merged archive boots
+
+v1.2.4 stopped on the first frame of every download:
+
+```text
+port/inventory.lua:81: module 'generated.merged.items' not found
+```
+
+`tools/merge.py` writes that module — the shared item catalog piece 5b
+extracts from both games' own item scripts — beside
+`generated/merged/manifest.lua`. `tools/package.py --merged` listed only the
+manifest, so the `.love` people download did not contain the catalog.
+`port/inventory.lua` requires it as soon as a merged runtime starts.
+
+The native Linux gate did not catch the omission. LÖVE's `require` searches
+the process cwd after the archive, and the gate runs in the repository, where
+`merge.py` has just written the file. A phone or a desktop that only has the
+`.love` has no such file.
+
+- **The catalog ships inside the archive.** `generated/merged/items.lua` is
+  on the merged file list, packaging stops if `merge.py` did not write it,
+  and the zip is checked for that name before it replaces the output. Any
+  later module written beside the manifest and the catalog ships too.
+- **A cwd copy is not a substitute.** When LÖVE is present the catalog is
+  loaded from the archive only. `tools/native_smoke.sh` rejects a merged
+  archive that lacks the module before it launches LÖVE, which is the check
+  v1.2.4's gate was missing.
+- **Item rules are unchanged.** This is the catalog piece 5b already
+  extracted, now actually inside the download. v1.2.4's published archive is
+  left as-is (published assets stay immutable) and is superseded by this one.
+  Android device validation and full-game compatibility remain unclaimed.
+
 ## v1.2.4 — the unified fusion, in the download
 
 This build carries the whole **unified-fusion queue** — the owner's sixteen

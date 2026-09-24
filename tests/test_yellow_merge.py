@@ -797,6 +797,11 @@ def test_merged_package_carries_every_referenced_yellow_asset():
     import package as packaging
 
     files = packaging.merged_files(ROOT / "generated")
+    # v1.2.4 listed only generated/merged/manifest.lua. The catalog merge.py
+    # writes beside it has to be in this list, because this list is the zip.
+    catalog = ROOT / "generated/merged/items.lua"
+    assert catalog in files, "generated/merged/items.lua must ship inside the .love"
+    assert "ut" in catalog.read_text(encoding="utf-8")
     carried = {path.as_posix() for path in files if path.is_relative_to(ROOT / "yellow_src")}
     assert len(carried) > 15000, f"only {len(carried)} pinned asset files carried"
     assert all((ROOT / name).is_file() for name in carried)
@@ -821,6 +826,7 @@ def test_merged_packaging_stops_when_a_referenced_asset_is_absent(tmp_path, monk
         'return {[1000023]={["name"]="spr_missing_body",'
         '["frames"]={"yellow_src/sprites/spr_missing_body/no_frame.png"}}}\n')
     (generated / "merged/manifest.lua").write_text("-- test\n")
+    (generated / "merged/items.lua").write_text("return {ut={}, yellow={}, pairs={}}\n")
     # tools/merge.py runs against the real tree; its result is not what this
     # exercises, and the fake tree has no tools/ to run it from.
     monkeypatch.setattr(packaging.subprocess, "run", lambda *args, **kwargs: None)

@@ -20,13 +20,13 @@ workspace. See [port status](docs/PORTING.md) and [validation](docs/VALIDATION.m
 
 ## Download the newest experimental `.love` file
 
-**Newest build: v1.2.4**, published 2026-09-24 — tag
-`love-v1.2.4-fusion-experimental`, source commit `3c3da8a`, SHA-256 in the
+**Newest build: v1.2.5**, published 2026-09-24 — tag
+`love-v1.2.5-fusion-experimental`, source commit `61724b1`, SHA-256 in the
 release notes.
 
-[**Download `undertale-yellow-fusion-v1.2.4-experimental.love` (~390 MB)**](https://github.com/lordmannu993/undertale/releases/download/love-v1.2.4-fusion-experimental/undertale-yellow-fusion-v1.2.4-experimental.love)
+[**Download `undertale-yellow-fusion-v1.2.5-experimental.love` (~390 MB)**](https://github.com/lordmannu993/undertale/releases/download/love-v1.2.5-fusion-experimental/undertale-yellow-fusion-v1.2.5-experimental.love)
 
-- [Release notes, SHA-256 checksum, and both conversion reports](https://github.com/lordmannu993/undertale/releases/tag/love-v1.2.4-fusion-experimental)
+- [Release notes, SHA-256 checksum, and both conversion reports](https://github.com/lordmannu993/undertale/releases/tag/love-v1.2.5-fusion-experimental)
 - [All releases, newest first](https://github.com/lordmannu993/undertale/releases) —
   every older build stays downloadable; each is retitled “Superseded — …” when a
   newer one replaces it.
@@ -42,6 +42,14 @@ to Undertale, and to Yellow's unclaimed battle and story systems (see the
 release notes). The large archive is hosted as a GitHub Release asset rather
 than committed to Git. To regenerate it yourself, follow the build instructions
 below.
+
+### Added in v1.2.5 — the download boots
+
+v1.2.4 stopped on the first frame. The shared item catalog
+(`generated/merged/items.lua`) is what the merged inventory loads, and the
+packager shipped the merged manifest without it. This archive includes that
+module. The native gate now fails if a merged `.love` omits it, instead of
+reading a copy that only exists next to the build machine.
 
 ### Added in v1.2.4 — the unified fusion
 

@@ -42,6 +42,7 @@ git merge --no-edit origin/<that-open-PR-branch>   # clean fast-forward from mas
 | most recent merged piece | **#8 the §15/§16 acceptance matrix — the last piece; the fusion is complete** — [PR #52](https://github.com/lordmannu993/undertale/pull/52), merged to `master` as `43aa57f` on 2026-09-24; [CI + native gate 35965721372](https://github.com/lordmannu993/undertale/actions/runs/35965721372) green (`NATIVE SMOKE PASS`, `CORE PLAYER PASS`, the new `ACCEPTANCE PASS`). Piece 7 before it: [PR #50](https://github.com/lordmannu993/undertale/pull/50) merge `8bc1f89`; piece 8 is also recorded by [PR #53](https://github.com/lordmannu993/undertale/pull/53) |
 | in-flight piece | **none** — piece 8 merged as `43aa57f`; nothing is pending |
 | next ⬜ piece | **none** — with piece 8 green and merged, all 16 requirements and the §15/§16 acceptance matrix are done and the fusion is certified |
+| download boot | **not a fusion piece.** v1.2.4's archive omitted `generated/merged/items.lua` and stopped on launch (`module 'generated.merged.items' not found`). `tools/package.py` now ships that catalog, and the native gate rejects a merged archive that lacks it. The corrected download is v1.2.5 |
 | in-flight open PR | **none** — [#52](https://github.com/lordmannu993/undertale/pull/52) merged; [#53](https://github.com/lordmannu993/undertale/pull/53) only records that landing |
 
 ---

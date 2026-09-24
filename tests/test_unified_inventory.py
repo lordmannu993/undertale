@@ -22,6 +22,56 @@ sys.path.insert(0, str(ROOT))
 LIVE = (ROOT / "yellow_src").is_dir()
 live = pytest.mark.skipif(not LIVE, reason="needs the pinned Yellow source: tools/fetch_yellow.py")
 
+def test_catalog_load_uses_the_archive_and_ignores_a_cwd_copy(tmp_path, monkeypatch):
+    """v1.2.4's require() found the catalog in the process cwd, not in the .love.
+
+    The native gate runs in the repo, where tools/merge.py has just written
+    generated/merged/items.lua. A download has no such file. When LÖVE is
+    present the catalog must come from the archive, and a missing archive copy
+    must stop even if the cwd has one.
+    """
+    monkeypatch.chdir(tmp_path)
+    catalog = tmp_path / "generated" / "merged"
+    catalog.mkdir(parents=True)
+    (catalog / "items.lua").write_text("return {source='cwd'}\n")
+    vm = LuaRuntime(unpack_returned_tuples=True)
+    vm.globals().root = str(ROOT)
+    vm.execute("package.path = root .. '/?.lua;./?.lua;./?/init.lua;' .. package.path")
+    ok, err = vm.execute('''
+        love = {filesystem = {
+            getInfo = function() return nil end,
+            load = function() return nil, "not in archive" end,
+        }}
+        Inventory = require("port.inventory")
+        local ok, err = pcall(Inventory.loadCatalog)
+        return ok, tostring(err)
+    ''')
+    assert ok is False, err
+    assert "generated/merged/items.lua" in err
+    assert "not a substitute" in err
+    source = vm.execute('''
+        love = {filesystem = {
+            getInfo = function(path, kind)
+                if path == "generated/merged/items.lua" and kind == "file" then return {type="file"} end
+                return nil
+            end,
+            load = function()
+                return function() return {source="archive"} end
+            end,
+        }}
+        package.loaded["generated.merged.items"] = nil
+        return Inventory.loadCatalog().source
+    ''')
+    assert source == "archive"
+    # Headless tests have no LÖVE filesystem; they still load via require().
+    cwd = vm.execute('''
+        love = nil
+        package.loaded["generated.merged.items"] = nil
+        return Inventory.loadCatalog().source
+    ''')
+    assert cwd == "cwd"
+
+
 BOOT = '''
     Input=require("port.input")
     Runtime=require("port.runtime")

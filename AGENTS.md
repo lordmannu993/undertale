@@ -133,6 +133,24 @@ disagree.
 - **Issues are disabled** on this repo. Plans, piece lists and verification results go into PR
   descriptions/comments and `docs/`, not issues.
 
+## v1.2.5 release task (2026-09-24)
+
+- [x] Fix the v1.2.4 boot stop. Every download crashed at
+  `port/inventory.lua` with `module 'generated.merged.items' not found`:
+  `tools/merge.py` writes that catalog, `tools/package.py --merged` shipped
+  only `generated/merged/manifest.lua`. The native gate stayed green because
+  `require` also searches the process cwd, where `merge.py` had just written
+  the file.
+- [x] Ship `generated/merged/items.lua` (and any later module beside it).
+  Packaging stops if it is missing, and the zip is checked again before
+  rename. `Inventory.loadCatalog` loads from the archive when LÖVE is
+  present. `tools/native_smoke.sh` rejects a merged archive that lacks the
+  catalog before launching LÖVE.
+- [ ] Publish `love-v1.2.5-fusion-experimental` through the draft-only
+  workflow on `arena/01a0d296-undertale`. Retitle v1.2.4 with the
+  "Superseded — " prefix once that archive is published. Published assets
+  stay immutable; v1.2.4 is not rewritten.
+
 ## v1.2.4 release task (2026-09-24)
 
 - [x] Carry the whole certified unified fusion — PRs #33-#53, pieces 1-8 of
@@ -200,7 +218,7 @@ disagree.
 | item | state |
 | --- | --- |
 | `master` | PRs 1-13 merged (through `229db7a`): the LÖVE port, touch controls and Android tooling, the v0.1.1-v0.1.3 softlock/sprite/scenery fixes, path-recovery pieces 1-5, registry and room-159 evidence, the v0.1.4-v0.1.7 publications, PR #11's Ruins spike-bridge softlock, X-skip text-overlap and touch COLLISION-toggle fixes, and PR #13's monster body-part ID recovery that fixed the reported "cannot battle in Snowdin — instance_create Missing object ID 255" crash. PRs #14-#17 shipped v0.1.8-v0.1.10 (part-ID recovery, one-shot alarms, Glyde 20x + 709 EXP). PRs #18-#22 landed the Undertale Yellow merge pieces 1-5 through the partial piece-5 world. PR #23 finishes piece 5 and publishes the fusion. PRs #24-#53 land the owner's rounds 1-2 and the whole certified unified-fusion queue (pieces 1-8: shared script routing, recovered offsets/IDs, depth sort, boat/water, no duplicated draws, unified Player/inventory/controller/save, one sprite-size and collision model, shopkeeper sweep, §15/§16 acceptance matrix through `43aa57f`); v1.2.4 publishes them |
-| Published release | `love-v1.2.4-fusion-experimental` (prerelease, 4 assets incl. both conversion reports, checksum in notes), source `3c3da8a`, published 2026-09-24 by the pinned workflow after **571 tests** and the fused native gate. Carries the whole certified unified fusion (PRs #33-#53, pieces 1-8) that post-dates the v1.2.3 archive. Prior releases stay available; v1.2.3 (`love-v1.2.3-fusion-experimental`, source `6d59f5d`, **421 tests**) is renamed with a "Superseded —" prefix. Published release assets are immutable: do not re-publish over them |
+| Published release | `love-v1.2.5-fusion-experimental` is the tag the README and the pinned publisher name. It carries the v1.2.4 fusion plus the boot fix (the shared item catalog now ships inside the `.love`). v1.2.4 (`love-v1.2.4-fusion-experimental`, source `3c3da8a`, **571 tests**) stopped on launch and is retitled "Superseded —" once v1.2.5 is published. Prior releases stay available. Published release assets are immutable: do not re-publish over them |
 | Open PR | none — every fusion PR (#33-#53) is merged and the queue has no pending piece. The v1.2.4 publication PR from `arena/01a0d251-undertale` (metadata only: README download section, release notes, pinned publisher, this file) opens once the draft flips; its number is recorded in the v1.2.4 release task above |
 | Yellow merge | **Complete.** `tools/fetch_yellow.py` pins commit `4ec23bd9` of `lordmannu993/UnderTale-Yellow`; `tools/yellow_convert.py --stage rooms` converts 3 796 sprites / 673 sounds / 11 fonts / 1 155 script resources / 3 224 objects with 8 494 events / **287 rooms, 68 paths, 199 454 drawables, 3 006 layers** into `generated/yellow/`, with 1 178 named function exports, 1 explicit GMLive stop (the shipped build's GMLive is inert, so the other 21 convert literally) and 0 compile errors. `tools/merge.py` + `port/merge.lua` build one manifest from both games, `port/travel.lua` connects the River Person boat (hold X during the ride; open below its plot gate) and Yellow's UGPS whale (every stop offered from Yellow's world init), `port/frisk.lua` draws Yellow's player as Frisk (28 walk poses remapped; the 24 run poses, the gun poses, goggles, dance and lying stay Clover - listed and asserted, so a run pose entering the remap stops the build), Yellow's own pause menu equips Clover's ammo/accessories beside Frisk's own gear, and the port's pause menu carries the merged AUTO RUN toggle, and `merge.sav` version 2 is the Player+World save (piece 5d, [PR #46](https://github.com/lordmannu993/undertale/pull/46)) including the loadout. The native LÖVE/xvfb gate crosses between worlds and back. Still unclaimed: Yellow's battle/story systems, shaders (reported, skipped), 25 rooms with named stops, and any Android-device certification |
 | Part-ID recovery | `tools/recover_parts.py` fetches nothing by default: the checked-in `port/recovered_parts.json` is imported by `convert.py`. Regenerate with `GITHUB_TOKEN="$(gh auth token)" python3 tools/recover_parts.py` (pinned to the same `249ffa27` ref as the registry/path recoveries), re-verify offline with `--check`. IDs come from this checkout's own `partN=` literals; only names are paired from upstream; 38 annotated sites are re-validated as anchors. `tests/test_monster_parts.py` guards all of it plus every Snowdin battlegroup end-to-end |
@@ -209,7 +227,7 @@ disagree.
 | Source newer than the archive | none — v1.2.4 (source `3c3da8a`) is the newest published build and carries the entire certified unified-fusion queue (PRs #33-#53); this branch's second commit is metadata only (README source-commit claim, AGENTS.md record), so once it merges, `master` and the newest archive agree in content |
 | Download links | README's download section is guarded by `tests/test_release_docs.py` and `tools/check_download_links.py` (CI, token-authenticated). Publishing a version means the README, the workflow pins, `port/version.lua` and `docs/RELEASE_NOTES.md` all move together, and no superseded `releases/download/<tag>` link may survive in any document |
 | Old releases | `love-v0.1.0`…`love-v1.2.1-fusion-experimental` are **kept on purpose** (owner declined deletion) and renamed with a "Superseded (…)" prefix as each is replaced. Version branches `v0.1.0`..`v0.1.3` point at each tagged build |
-| Release plumbing | `.github/workflows/love-prerelease.yml` publishes on push to one pinned branch (`arena/01a0d251-undertale` for the v1.2.4 fusion; `arena/01a0b9dd-undertale` for the v1.2.3 fusion; `arena/01a0b92c-undertale` for the v1.2.2 fusion, now deleted) and **refuses unless a draft release with that tag already exists**; `workflow_dispatch` re-runs it. The publish job fetches Yellow, converts, runs the suite with `PORT_REQUIRE_YELLOW=1`, packages `--merged`, runs the fused native gate, uploads four assets and flips `--draft=false` |
+| Release plumbing | `.github/workflows/love-prerelease.yml` publishes on push to one pinned branch (`arena/01a0d296-undertale` for the v1.2.5 boot fix; `arena/01a0d251-undertale` for the v1.2.4 fusion; `arena/01a0b9dd-undertale` for the v1.2.3 fusion; `arena/01a0b92c-undertale` for the v1.2.2 fusion, now deleted) and **refuses unless a draft release with that tag already exists**; `workflow_dispatch` re-runs it. The publish job fetches Yellow, converts, runs the suite with `PORT_REQUIRE_YELLOW=1`, packages `--merged`, runs the fused native gate, uploads four assets and flips `--draft=false` |
 
 ### To publish a version (only when a piece list says a release is due)
 

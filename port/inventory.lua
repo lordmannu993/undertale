@@ -75,10 +75,44 @@ local function normalize(value)
     return value
 end
 
+-- The catalog is a generated module, not a port file. A merged *archive* must
+-- contain it. require() also searches the process cwd, which is how v1.2.4's
+-- native gate passed: tools/merge.py had just written generated/merged/items.lua
+-- beside the .love, and the archive itself did not contain the module. Every
+-- download then stopped on boot. When LÖVE is present, load the archive copy
+-- only. Headless tests have no love.filesystem and still use require().
+function Inventory.loadCatalog()
+    local moduleName = "generated.merged.items"
+    local path = "generated/merged/items.lua"
+    local fs = love and love.filesystem
+    if fs and fs.getInfo and fs.load then
+        if not fs.getInfo(path, "file") then
+            error(
+                "The shared item catalog is not in this archive (" .. path .. ").\n\n"
+                .. "A merged build stops on boot without it. A copy beside the\n"
+                .. "process, if any, is not a substitute — v1.2.4 omitted this\n"
+                .. "module from the .love and crashed here.\n\n"
+                .. "Rebuild with:\npython3 tools/merge.py\npython3 tools/package.py --merged",
+                0)
+        end
+        if package.loaded[moduleName] == nil then
+            local chunk, err = fs.load(path)
+            if not chunk then error(err or ("could not load " .. path), 0) end
+            local catalog = chunk()
+            if type(catalog) ~= "table" then
+                error(path .. " did not return the item catalog", 0)
+            end
+            package.loaded[moduleName] = catalog
+        end
+        return package.loaded[moduleName]
+    end
+    return require(moduleName)
+end
+
 function Inventory.install(R)
     if R.manifest.game ~= "merged" then return nil end
     if R.inventoryBridge then return R.inventoryBridge end
-    local catalog = require("generated.merged.items")
+    local catalog = Inventory.loadCatalog()
 
     local utByName = {}
     for item_id, entry in pairs(catalog.ut) do
