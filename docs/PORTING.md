@@ -1,5 +1,13 @@
 # Port status and implementation
 
+> **Debug & repair work is recorded in this file too.** The owner's reported bugs on
+> the Undertale Yellow side and at the world crossing (wrong font, vertical text,
+> heavy lag, a duplicated Player at the River Person, the wrong boat destination) are
+> being fixed piece by piece against the binding [`DEBUG_SPEC.md`](DEBUG_SPEC.md); the
+> live order and progress are in [`DEBUG_QUEUE.md`](DEBUG_QUEUE.md). Each finished
+> piece adds a **"Debug fixes"** entry (root cause, change, evidence, scope), the way
+> the fusion pieces each added their own section in this file.
+
 ## What is converted
 
 The build translates **20,285 source units** (137,558 lines of extracted GML),

@@ -51,6 +51,18 @@ packager shipped the merged manifest without it. This archive includes that
 module. The native gate now fails if a merged `.love` omits it, instead of
 reading a copy that only exists next to the build machine.
 
+### Work in progress — the debug & repair queue
+
+The fusion queue above is **complete and frozen** (its record is
+[docs/FUSION_STATUS.md](docs/FUSION_STATUS.md)). What the owner reports as still
+broken in the shipped build — Undertale Yellow's fonts and vertical text, heavy
+lag on the Yellow side, the River Person transition duplicating the Player, and
+the boat's destination — is being fixed against the owner's binding
+[debug & repair brief](docs/DEBUG_SPEC.md), worked piece by piece in the live
+[debug queue](docs/DEBUG_QUEUE.md). Those fixes are **source-only until they are
+released**: the newest downloadable archive is still v1.2.5, and the README's
+download line above always names whichever build is newest.
+
 ### Added in v1.2.4 — the unified fusion
 
 From the owner's sixteen-requirement [unified-fusion spec](docs/UNIFIED_FUSION_SPEC.md),
@@ -433,9 +445,12 @@ screens still need testing.
 
 Start at [AGENTS.md](AGENTS.md): current state, the open piece list, sandbox gotchas
 (no LOVE in the sandbox, so the native gate runs in CI) and the rules this repo is
-built on. The per-claim detail for recovered data is in [docs/PATHS.md](docs/PATHS.md),
-and the Undertale Yellow merge has its own piece list in
-[docs/YELLOW.md](docs/YELLOW.md).
+built on. What the trigger **"Proceed ❤️"** continues is the live
+[debug & repair queue](docs/DEBUG_QUEUE.md), working the owner's binding
+[debug brief](docs/DEBUG_SPEC.md); the finished fusion's record and requirement map
+are in [docs/FUSION_STATUS.md](docs/FUSION_STATUS.md). The per-claim detail for
+recovered data is in [docs/PATHS.md](docs/PATHS.md), and the Undertale Yellow merge
+has its own piece list in [docs/YELLOW.md](docs/YELLOW.md).
 
 ## Conversion and tests
 
