@@ -8,6 +8,34 @@
 > piece adds a **"Debug fixes"** entry (root cause, change, evidence, scope), the way
 > the fusion pieces each added their own section in this file.
 
+## Debug fixes — D0: architecture map + reproduction harness (no behaviour change)
+
+The debug plan's first piece ([`DEBUG_QUEUE.md`](DEBUG_QUEUE.md) D0, brief §9)
+added the map and the evidence, not a fix:
+
+* [`DEBUG_BASELINE.md`](DEBUG_BASELINE.md) traces GAME START → room init →
+  player init → Undertale play → River Person → boat → transition → Yellow room
+  → player update/draw → dialogue draw → return, and records which code owns
+  fonts, text, rooms, entities and transitions and exactly what changes at a
+  crossing.
+* `tools/debug_probe.py` is the repeatable headless reproduction: it boots the
+  merged manifest like the test suite, taps `draw_set_font`, records every
+  `room_goto` request, counts event dispatches/draws per tick, and prints one
+  evidence section per reported symptom. `tests/test_debug_probe.py` runs its
+  quick budget.
+* **Reproduced headlessly:** the wrong font (Yellow's `dialogue_font = 9` is
+  Yellow's own raw number for `fnt_main`, read here through Undertale's band
+  as `fnt_papyrus`) and the vertical text (`draw_text_ext(..., width=-1)`
+  wraps at every word: 7 words → 7 lines, a 55×126 px column). **Quantified:**
+  Yellow snowdin ≈ 2.9× a quiet Undertale room (806 draws/frame); hotland at
+  parity. **Not reproduced by scripted crossings:** duplicate Player (14
+  crossings, always exactly 1) and wrong boat destination (6/6 packaged cases
+  land as documented) — the harness records the hold-X world flip and the
+  ride-skipping pager latch as D3/D4's leads.
+* **Scope:** headless converted flow + traced draw log only. No native LÖVE
+  rendering, Android, audio or played-route claim. **Nothing in `port/`,
+  `tools/convert.py`, `tools/yellow*` or the converted output changed.**
+
 ## What is converted
 
 The build translates **20,285 source units** (137,558 lines of extracted GML),
