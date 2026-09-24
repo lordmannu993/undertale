@@ -1,4 +1,14 @@
-# Unified fusion — living work queue (the "Proceed ❤️" source of truth)
+# Unified fusion — COMPLETE AND FROZEN (historical record)
+
+> **This queue is finished and no longer the "Proceed ❤️" objective list.**
+> All eight pieces merged; the fusion is certified (piece 8, merge `43aa57f`).
+> The live work queue — the owner's debug & repair brief (Yellow fonts and
+> vertical text, Yellow-side lag, the River Person duplicate Player and boat
+> destination, graphics-state and resource hygiene) — is
+> [`docs/DEBUG_QUEUE.md`](DEBUG_QUEUE.md), against the binding
+> [`docs/DEBUG_SPEC.md`](DEBUG_SPEC.md). Keep this file as the historical record
+> and as the map in §7 (requirement → code → evidence); add to it only if a
+> finished-fusion fact needs correcting.
 
 This file is the **single, authoritative, GitHub-readable record** of the
 Undertale + Undertale Yellow unified-fusion work. It exists so that a brand-new
@@ -15,8 +25,12 @@ disagree on a requirement, the spec wins. Limitations and deviations live in
 > head onto your branch, set up the pipeline, run the suite green, then do the
 > **next pending piece, top-to-bottom**. If a piece is split, finish its next
 > pending sub-piece before advancing to the next numbered piece. One green
-> sub-piece per session is fine. Do **not** merge the final fusion until the §15/§16 acceptance piece is
-> itself green.
+> sub-piece per session is fine.
+>
+> **This queue is complete** — every piece below is ✅ and merged, so a
+> "Proceed ❤️" today continues [`docs/DEBUG_QUEUE.md`](DEBUG_QUEUE.md) instead.
+> Do not merge the final fusion until the §15/§16 acceptance piece is itself
+> green (done: `43aa57f`).
 
 ---
 
@@ -40,8 +54,8 @@ git merge --no-edit origin/<that-open-PR-branch>   # clean fast-forward from mas
 | field | value |
 | --- | --- |
 | most recent merged piece | **#8 the §15/§16 acceptance matrix — the last piece; the fusion is complete** — [PR #52](https://github.com/lordmannu993/undertale/pull/52), merged to `master` as `43aa57f` on 2026-09-24; [CI + native gate 35965721372](https://github.com/lordmannu993/undertale/actions/runs/35965721372) green (`NATIVE SMOKE PASS`, `CORE PLAYER PASS`, the new `ACCEPTANCE PASS`). Piece 7 before it: [PR #50](https://github.com/lordmannu993/undertale/pull/50) merge `8bc1f89`; piece 8 is also recorded by [PR #53](https://github.com/lordmannu993/undertale/pull/53) |
-| in-flight piece | **none** — piece 8 merged as `43aa57f`; nothing is pending |
-| next ⬜ piece | **none** — with piece 8 green and merged, all 16 requirements and the §15/§16 acceptance matrix are done and the fusion is certified |
+| in-flight piece | **none** — piece 8 merged as `43aa57f`; this queue is frozen |
+| next ⬜ piece | **none here** — all 16 requirements and the §15/§16 acceptance matrix are done and the fusion is certified. The live trigger now continues [`docs/DEBUG_QUEUE.md`](DEBUG_QUEUE.md) (its next pending piece is **D0**, the architecture map + reproduction of the owner's reported bugs) |
 | download boot | **not a fusion piece.** v1.2.4's archive omitted `generated/merged/items.lua` and stopped on launch (`module 'generated.merged.items' not found`). Fixed in v1.2.5 ([run 35979772170](https://github.com/lordmannu993/undertale/actions/runs/35979772170), source `c16fb9b`): the catalog ships inside the `.love`, and the native gate rejects a merged archive that lacks it |
 | in-flight open PR | **none** — [#52](https://github.com/lordmannu993/undertale/pull/52) merged; [#53](https://github.com/lordmannu993/undertale/pull/53) only records that landing |
 

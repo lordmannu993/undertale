@@ -7,47 +7,61 @@ via `gh`.
 ## Standing instruction: when the user says "Proceed ❤️"
 
 This is a durable, cross-session trigger. **When the user messages "Proceed ❤️" (or an
-obvious variant), do not ask what to do — continue the Undertale + Undertale Yellow
-**unified fusion** exactly as recorded on GitHub.** The requirement set is
-[docs/UNIFIED_FUSION_SPEC.md](docs/UNIFIED_FUSION_SPEC.md) (binding, owner-issued); the
-**live work queue, progress, and exact steps** are
-[docs/FUSION_STATUS.md](docs/FUSION_STATUS.md). Do these, in order:
+obvious variant), do not ask what to do — continue the owner's
+**debug & repair plan** exactly as recorded on GitHub.** The requirement set is
+[docs/DEBUG_SPEC.md](docs/DEBUG_SPEC.md) (binding, owner-issued, verbatim — Yellow
+fonts and vertical text, Yellow-side lag, the River Person duplicate Player and boat
+destination, graphics-state/resource hygiene, "do not break the Undertale side",
+cleanup and the final report); the **live work queue, progress, and exact steps** are
+[docs/DEBUG_QUEUE.md](docs/DEBUG_QUEUE.md). Do these, in order:
 
-1. **Orient.** `git fetch origin`. Read `docs/FUSION_STATUS.md` §1 (current fusion
-   head) and §3 (ordered piece list). Do the next pending piece top-to-bottom;
-   if the current piece is split, finish its next pending sub-piece first.
+1. **Orient.** `git fetch origin`. Read `docs/DEBUG_QUEUE.md` §1 (where completed work
+   lives) and §3 (ordered piece list, next ⬜ piece). Do the next pending piece
+   top-to-bottom; if the current piece is split, finish its next pending sub-piece
+   first.
 2. **Inherit completed work.** A fresh session is branched from `master`, which
    already contains every **merged** piece — you start current. Only if the next
    piece's PR is still **open** (work in flight, not yet merged) do you bring it in
    first: `git fetch origin && git merge --no-edit origin/<that-PR-branch>` (a clean
-   fast-forward from master). See `docs/FUSION_STATUS.md` §1 for the exact state.
-3. **Set up + get green.** Run `docs/FUSION_STATUS.md` §4 (venv, fetch Yellow,
+   fast-forward from master). See `docs/DEBUG_QUEUE.md` §1 for the exact state.
+3. **Set up + get green.** Run `docs/DEBUG_QUEUE.md` §4 (venv, fetch Yellow,
    `convert` → `yellow_convert --stage rooms` → `merge`, then `pytest -q`). The suite
    **must be green before you change anything.**
-4. **Do the next ⬜ piece** (§3), smallest-green-increment first if a piece is large.
-   Follow the non-negotiable rules in `docs/FUSION_STATUS.md` §2 — one player state,
-   no per-room/character hacks, depth = logical Y + sprite visual bottom point,
-   recovered data pinned & fetched (never hand-typed), missing resources stop by name.
-5. **A piece is done** only when `docs/FUSION_STATUS.md` §5 holds: a test that fails
-   without it, a `docs/` line, a scoped claim, green local + CI, and this file and
-   `FUSION_STATUS.md` updated **in the same commit**.
-6. **Record + push.** Commit on the session branch, push, and **merge the PR once CI
-   is green** so the piece lands on `master` (advance "most recent merged piece" in
-   `FUSION_STATUS.md` §1), and note "piece N done, here is the evidence, here is
-   piece N+1" in the PR body.
+4. **Do the next piece** (§3), smallest-green-increment first if a piece is large.
+   Follow the non-negotiable rules in `docs/DEBUG_QUEUE.md` §2 — fix the root cause,
+   never the symptom or a fake fix; smallest reasonable change, reuse the existing
+   system, no duplicate managers/players/handlers; measure performance before and
+   after instead of lowering resolution, cutting effects or capping the frame rate;
+   load assets once; the certified fusion invariants (one `R.player`, one inventory,
+   one controller, one `merge.sav`) stay intact; recovered data stays script-derived;
+   missing resources stop by name.
+5. **A piece is done** only when `docs/DEBUG_QUEUE.md` §5 holds: root cause written
+   down, a test that fails without the change, a `docs/` line, a scoped claim, both
+   sides re-checked, green local + CI, and this file and `DEBUG_QUEUE.md` updated
+   **in the same commit**.
+6. **PR only after the piece is complete, then merge.** One piece/section per PR —
+   **never merge a partial one**. Commit on the session branch, push, open the PR
+   with "piece N done, here is the root cause and evidence, here is what it does not
+   prove, here is piece N+1", and **merge it once CI is green** (advance "most recent
+   merged piece" and "next ⬜ piece" in `DEBUG_QUEUE.md` §1).
 
 Individual **pieces merge to `master` as they go green** (this repo's history is
-merge commits). The *final fusion* — all 16 requirements plus the §15/§16
-acceptance matrix (piece #8) — is the last step; do not declare the fusion
-**complete** before it. Never force-push `master`; never delete a release.
+merge commits) — this is what makes the trigger idempotent and lets the next session
+start from `master`. Never force-push `master`; never delete a release.
 
-If the top piece is already done/merged, just continue to the next ⬜ piece — the
-trigger is idempotent.
+**History:** the **unified fusion** is complete and certified — the owner's 16
+requirements plus the §15/§16 acceptance matrix, pieces 1–8 of
+[docs/FUSION_STATUS.md](docs/FUSION_STATUS.md), merged through `43aa57f`. That file is
+now a frozen record (and the requirement → code → evidence map in its §7); it is no
+longer the live queue. Read it for what already exists — **do not re-do or rewrite
+it** — and read [docs/UNIFIED_FUSION_SPEC.md](docs/UNIFIED_FUSION_SPEC.md) only as the
+history of the invariants the debug pieces must preserve.
 
-**Where the queue stands:** piece 8 (the §15/§16 acceptance matrix) is the last piece and is
-**merged** (merge `43aa57f`), and `docs/FUSION_STATUS.md` §1/§3/§7 record it. There is no pending piece after it; a later
-"Proceed ❤️" continues wherever the queue points (a new owner request, a scoped gap listed in
-`docs/PORTING.md`, or a release build), not the finished fusion.
+**Where the queue stands:** the fusion queue is finished and frozen; the live trigger
+continues [`docs/DEBUG_QUEUE.md`](docs/DEBUG_QUEUE.md), whose next pending piece is
+recorded in its §1 (currently **D0** — the architecture map plus a repeatable
+reproduction of the reported bugs, brief §9). Nothing from the debug plan is merged
+yet.
 
 ## What this repository is
 
@@ -64,27 +78,41 @@ same runtime. All five conversion pieces shipped (published as
 `love-v1.2.0-fusion-experimental`, since v1.2.3); its piece list and the shipped
 scope are [docs/YELLOW.md](docs/YELLOW.md).
 
-**"Five pieces complete" means the conversion pipeline is complete — it does not
-mean the two games play as one game.** The owner reports that the shipped fusion
-still behaves as two games in one executable (separate inventory/progression,
-swapped-in character controllers, broken overworld depth, duplicated sprite
-layers). The binding requirement set for fixing that is
-[`docs/UNIFIED_FUSION_SPEC.md`](docs/UNIFIED_FUSION_SPEC.md) — read it before
-touching the merge, and treat it as authoritative where it and `docs/YELLOW.md`
-disagree.
+**"Five pieces complete" means the conversion pipeline is complete — it did not
+mean the two games played as one game.** That next step (the owner's 16-requirement
+[`docs/UNIFIED_FUSION_SPEC.md`](docs/UNIFIED_FUSION_SPEC.md): one Player/inventory/
+progression/save, merged rendering, no duplicated characters, both travel hubs) was
+then carried out as fusion pieces 1–8 and is **complete and certified** — see
+[`docs/FUSION_STATUS.md`](docs/FUSION_STATUS.md). Read that file before touching the
+merge: it records what exists and must keep working, and where it and
+`docs/YELLOW.md` disagree, `docs/UNIFIED_FUSION_SPEC.md` is authoritative for the
+invariants.
+
+**The current work is bug-fixing, not fusion:** the owner's
+[`docs/DEBUG_SPEC.md`](docs/DEBUG_SPEC.md) reports the remaining breakage on the
+Undertale Yellow side and the crossing (wrong/missing fonts, vertical text, heavy
+lag, a duplicated Player at the River Person, the wrong boat destination). The live
+queue for that is [`docs/DEBUG_QUEUE.md`](docs/DEBUG_QUEUE.md), and it is what
+"Proceed ❤️" continues.
 
 ## Start here, in order
 
 1. `git fetch origin && git log --oneline origin/master -3` and `gh pr list --state all`.
-2. Read the owner's binding brief, [`docs/UNIFIED_FUSION_SPEC.md`](docs/UNIFIED_FUSION_SPEC.md)
-   (16 numbered requirements + acceptance criteria), then the **fusion work queue**
-   and progress in [`docs/FUSION_STATUS.md`](docs/FUSION_STATUS.md) (this is what
-   "Proceed ❤️" continues), then the Yellow piece list in [`docs/PATHS.md`](docs/PATHS.md),
-   then the limitation set in `docs/PORTING.md`.
+2. Read the owner's binding debug brief, [`docs/DEBUG_SPEC.md`](docs/DEBUG_SPEC.md)
+   (12 numbered sections: Yellow fonts + vertical text, Yellow lag, duplicate Player,
+   boat destination, state, graphics state, resources, do-not-break-Undertale,
+   debugging approach, implementation rules, testing checklist, final report), then
+   the **live work queue** and progress in [`docs/DEBUG_QUEUE.md`](docs/DEBUG_QUEUE.md)
+   (this is what "Proceed ❤️" continues), then the finished-fusion record in
+   [`docs/FUSION_STATUS.md`](docs/FUSION_STATUS.md) and its §7 requirement map, the
+   Yellow piece list in [`docs/PATHS.md`](docs/PATHS.md), and the limitation set in
+   `docs/PORTING.md`.
 3. Set up: `python3 -m venv .venv && .venv/bin/python -m pip install -r requirements-dev.txt`.
 4. Pick the **next pending piece/sub-piece** and treat it as the whole job. Finish
    all sub-pieces of an in-progress parent before advancing. One scoped piece per
-   commit, small commits, one implementation PR.
+   commit, small commits, one implementation PR — and the PR is merged **only after
+   that piece is complete** (root cause + failing-without-it test + docs line +
+   scoped evidence + CI green). Never merge a partial piece.
 5. Before pushing: `.venv/bin/python -m pytest -q` green, and update the piece list in the
    same commit. CI runs the rest (`pytest` **and** the native LÖVE gate).
 
@@ -132,6 +160,33 @@ disagree.
   `GITHUB_TOKEN="$(gh auth token)"`.
 - **Issues are disabled** on this repo. Plans, piece lists and verification results go into PR
   descriptions/comments and `docs/`, not issues.
+
+## Debug & repair task (2026-09-24) — the live "Proceed ❤️" objective list
+
+The owner reports that the *shipped fusion* still has real bugs on the Undertale
+Yellow side and at the crossing. Their 12-section brief is recorded **verbatim** as
+[`docs/DEBUG_SPEC.md`](docs/DEBUG_SPEC.md) and **replaces the finished fusion queue
+as what "Proceed ❤️" continues**; the ordered pieces, rules and the definition of a
+finished piece are in [`docs/DEBUG_QUEUE.md`](docs/DEBUG_QUEUE.md).
+
+- Reported symptoms: (1) Yellow uses the wrong font and some Yellow text draws
+  vertically; (2) the Yellow side lags heavily, possibly including duplicated
+  entities/update loops at the River Person transition; (3) the River Person
+  transition creates **two Players** and the player then cannot get back to the
+  Undertale side; (4) the boat's destination is wrong.
+- Piece order: **D0** architecture map + a repeatable reproduction of all of the
+  above (§9) → **D1a** Yellow font identity, **D1b** vertical text + graphics-state
+  safety (§1, §6) → **D2** Yellow-side performance, measured before/after (§2, §7) →
+  **D3** exactly one Player across repeated crossings (§3, §5) → **D4** explicit,
+  correct boat destination (§4) → **D5** port-wide graphics-state/resource hygiene
+  with a guard test (§6, §7) → **D6** both-side regression pass (TEST A–F), debug
+  cleanup and the owner's ten-point report in `docs/DEBUG_REPORT.md` (§8, §11, §12).
+- Rules that override convenience: **root cause, never a symptom or a fake fix**;
+  no rebuild, no second manager/player/handler, reuse the existing system; measure
+  performance instead of lowering resolution / cutting effects / capping FPS; load
+  assets once; keep the certified fusion invariants and the Undertale side intact;
+  one piece/section per PR, **merged only once that piece is complete** (failing-
+  without-it test + docs line + scoped evidence + green local suite and CI).
 
 ## v1.2.5 release task (2026-09-24)
 
@@ -227,11 +282,12 @@ disagree.
 | --- | --- |
 | `master` | PRs 1-13 merged (through `229db7a`): the LÖVE port, touch controls and Android tooling, the v0.1.1-v0.1.3 softlock/sprite/scenery fixes, path-recovery pieces 1-5, registry and room-159 evidence, the v0.1.4-v0.1.7 publications, PR #11's Ruins spike-bridge softlock, X-skip text-overlap and touch COLLISION-toggle fixes, and PR #13's monster body-part ID recovery that fixed the reported "cannot battle in Snowdin — instance_create Missing object ID 255" crash. PRs #14-#17 shipped v0.1.8-v0.1.10 (part-ID recovery, one-shot alarms, Glyde 20x + 709 EXP). PRs #18-#22 landed the Undertale Yellow merge pieces 1-5 through the partial piece-5 world. PR #23 finishes piece 5 and publishes the fusion. PRs #24-#53 land the owner's rounds 1-2 and the whole certified unified-fusion queue (pieces 1-8: shared script routing, recovered offsets/IDs, depth sort, boat/water, no duplicated draws, unified Player/inventory/controller/save, one sprite-size and collision model, shopkeeper sweep, §15/§16 acceptance matrix through `43aa57f`); v1.2.4 publishes them |
 | Published release | `love-v1.2.5-fusion-experimental` (prerelease, 4 assets incl. both conversion reports, checksum in notes), source `c16fb9b`, published 2026-09-24 by [run 35979772170](https://github.com/lordmannu993/undertale/actions/runs/35979772170) after **573 tests** and the fused native gate. Carries the v1.2.4 fusion plus the boot fix: `generated/merged/items.lua` is inside the `.love` (408,697,434 bytes). v1.2.4 (`love-v1.2.4-fusion-experimental`, source `3c3da8a`, **571 tests**) stopped on launch and is renamed with a "Superseded —" prefix. Prior releases stay available. Published release assets are immutable: do not re-publish over them |
-| Open PR | [#55](https://github.com/lordmannu993/undertale/pull/55) — the v1.2.5 boot fix (ship `generated/merged/items.lua`, archive-only catalog load, native-gate zip check). Merge once CI is green |
+| Open PR | **none** — [#55](https://github.com/lordmannu993/undertale/pull/55) (the v1.2.5 boot fix) is merged. The next PR is the debug queue's first completed piece |
+| Live debug queue | The owner's [`DEBUG_SPEC.md`](docs/DEBUG_SPEC.md) (12-section binding brief) is worked as a **living queue** in [`docs/DEBUG_QUEUE.md`](docs/DEBUG_QUEUE.md) — the single GitHub-readable source of truth for what is done, what is pending (in order), the rules, and the "definition of a finished piece." **"Proceed ❤️" continues it.** Pieces are **D0** (architecture map + reproduction of the reported bugs), **D1a/D1b** (Yellow font identity; vertical text), **D2** (Yellow-side lag), **D3** (exactly one Player across the crossing), **D4** (boat destination), **D5** (graphics-state + resource sweep), **D6** (both-side regression pass, cleanup, the ten-point report). One piece per PR, merged only once complete |
 | Yellow merge | **Complete.** `tools/fetch_yellow.py` pins commit `4ec23bd9` of `lordmannu993/UnderTale-Yellow`; `tools/yellow_convert.py --stage rooms` converts 3 796 sprites / 673 sounds / 11 fonts / 1 155 script resources / 3 224 objects with 8 494 events / **287 rooms, 68 paths, 199 454 drawables, 3 006 layers** into `generated/yellow/`, with 1 178 named function exports, 1 explicit GMLive stop (the shipped build's GMLive is inert, so the other 21 convert literally) and 0 compile errors. `tools/merge.py` + `port/merge.lua` build one manifest from both games, `port/travel.lua` connects the River Person boat (hold X during the ride; open below its plot gate) and Yellow's UGPS whale (every stop offered from Yellow's world init), `port/frisk.lua` draws Yellow's player as Frisk (28 walk poses remapped; the 24 run poses, the gun poses, goggles, dance and lying stay Clover - listed and asserted, so a run pose entering the remap stops the build), Yellow's own pause menu equips Clover's ammo/accessories beside Frisk's own gear, and the port's pause menu carries the merged AUTO RUN toggle, and `merge.sav` version 2 is the Player+World save (piece 5d, [PR #46](https://github.com/lordmannu993/undertale/pull/46)) including the loadout. The native LÖVE/xvfb gate crosses between worlds and back. Still unclaimed: Yellow's battle/story systems, shaders (reported, skipped), 25 rooms with named stops, and any Android-device certification |
 | Part-ID recovery | `tools/recover_parts.py` fetches nothing by default: the checked-in `port/recovered_parts.json` is imported by `convert.py`. Regenerate with `GITHUB_TOKEN="$(gh auth token)" python3 tools/recover_parts.py` (pinned to the same `249ffa27` ref as the registry/path recoveries), re-verify offline with `--check`. IDs come from this checkout's own `partN=` literals; only names are paired from upstream; 38 annotated sites are re-validated as anchors. `tests/test_monster_parts.py` guards all of it plus every Snowdin battlegroup end-to-end |
 | Asset-array ID recovery | The decompiler also leaves bare original IDs *inside instance arrays* read back through a computed index — `facespr[1]= 881; draw_sprite(facespr[global.faceemotion],…)` (Snowdin shopkeeper emotion faces, the owner-reported §7 "four eyes, floating mouth"), `obj_shop1`'s own `facespr`, Asgore's eight `part` sprites, and three `background_index` slots. No annotation covers array literals, so they hit `Unresolved sprite ID`. `tools/recover_asset_arrays.py` pairs each literal with the asset name the pinned upstream decompilation (same `249ffa27` ref) uses for the same statement; 18 IDs / 32 sites land in `port/recovered_asset_arrays.json`, imported by `convert.py`, re-verifiable offline with `--check`. `tests/test_asset_arrays.py` pins it: the shopkeeper's `faceemotion` 1-6 draw in room 311, which fails (and logs `Unresolved sprite ID 881`…`877`) without the converter import. The scalar form (`obj_torielbody` `facespr= 2285`, nine Toriel faces) is a separate, still-open finding |
-| Unified fusion (binding spec) | The owner's 16-requirement [`UNIFIED_FUSION_SPEC.md`](docs/UNIFIED_FUSION_SPEC.md) is being worked as a **living queue** in [`docs/FUSION_STATUS.md`](docs/FUSION_STATUS.md) — that file is the single GitHub-readable source of truth for what is done, what is pending (in order), progress, the non-negotiable rules, and the "definition of a finished piece." **The user trigger "Proceed ❤️" continues it** (see the standing instruction at the top of this file). Pieces **merge to `master` as they go green**: pieces 1 (asset-array IDs, [PR #36](https://github.com/lordmannu993/undertale/pull/36)), 2 (Depth/Y-sort §4 §5, [PR #37](https://github.com/lordmannu993/undertale/pull/37)) and 3 (River Person boat/water §6, [PR #38](https://github.com/lordmannu993/undertale/pull/38)) are merged; piece 4 (no duplicated characters/sprite layers §8 — the doubled base sprite from Yellow's unconverted palette shader is dropped, and the 42 asset names both games share now resolve per world: `manifest.double_named`, `Runtime:assetName`, world-aware `asset_get_index`) is merged too ([PR #39](https://github.com/lordmannu993/undertale/pull/39), 485 tests). Piece 5 is split into **5a–5d** in `FUSION_STATUS.md`: 5a is **merged** ([PR #41](https://github.com/lordmannu993/undertale/pull/41), merge `33ae6c9`, source `68eecca`): one live `R.player` for HP/max HP/LV/EXP/gold/name/base AT/DF, compatibility aliases instead of copies, guarded content defaults, bidirectional crossing-scratch clear. Evidence: 23 new targeted tests; full local suite 508 passed / 1 skipped; [CI + native LÖVE gate 35708911107](https://github.com/lordmannu993/undertale/actions/runs/35708911107) green. 5b is **merged** ([PR #43](https://github.com/lordmannu993/undertale/pull/43), merge `8d3e170`, [CI 35753638069](https://github.com/lordmannu993/undertale/actions/runs/35753638069)): `port/inventory.lua` + `tools/item_catalog.py` (`generated/merged/items.lua`, 64 UT / 78 Yellow rows / 5 name pairs, all extracted) give one shared 8-slot inventory and one four-slot equipment set with live numeric/string views (`global.item`, `global.item_slot`, gear-stat derivations) and catalog-backed item actions for foreign items in either content set; Yellow's initializer can no longer reset the shared loadout (`Travel:applyEquipment` removed). Evidence: 13 new tests (`tests/test_unified_inventory.py`); full local suite 521 passed / 1 skipped. 5c is **merged** ([PR #44](https://github.com/lordmannu993/undertale/pull/44), merge `bdef72f`, [CI + native gate 35810358055](https://github.com/lordmannu993/undertale/actions/runs/35810358055)): one `R.player.controller` over `obj_mainchara` and `obj_pl` (the rooms still place those entities; crossing still leaves exactly one). Undertale runs on X/Shift as one extra 3px lattice step, collided, with Clover's base run cycle; Yellow's own 3+2 step is not rewritten; AUTO RUN stays Yellow-only. Menu and interact are shared abilities. Battle scripts temporarily compose ammo, the armour's weapon bonus and accessory defense; standing views do not fold them. Level-up is Undertale's `scr_levelup` (LV 20 is 99/99/99, EXP caps at 99999); current HP is not a level-up output. Evidence: `tests/test_unified_controller.py` (5 tests; all five fail if the controller is not installed; the wall test also fails with a 6px step if the bonus skips collision); full local suite 526 passed / 1 skipped. Headless + draw log only — no Android, audio, or piece 6 speed claim. 5d is **merged** ([PR #46](https://github.com/lordmannu993/undertale/pull/46), merge `9a3bbae`, [CI + native gate 35815755848](https://github.com/lordmannu993/undertale/actions/runs/35815755848)): `port/save.lua` writes one `merge.sav` version 2 Player+World document; both worlds' save and load scripts use it; version 1 is copied to `merge.sav.v1` and migrated without inventing LV; unknown versions and a foreign `Save.sav` stop by name; re-entering Yellow does not run `scr_initialize`. Evidence: `tests/test_unified_save.py` (8 tests); full local suite 534 passed / 1 skipped. Piece 6 is split in `FUSION_STATUS.md` §3 into 6a–6d: **6a** (sprite canvas + size compatibility, spec §12) is **merged** ([PR #48](https://github.com/lordmannu993/undertale/pull/48), merge `fedae36`, [CI 35831922600](https://github.com/lordmannu993/undertale/actions/runs/35831922600)) — `port/assetcompat.lua` is the one accessor both worlds' size reads go through, `tools/recover_sprite_offsets.py` re-derives `port/sprite_offsets.json` offline from the checked-in `port/recovered_sprite_metadata.json` (814 offsets proven; 553 canvases pinned with no provable offset and never shifted; 61 named with their reason); `tests/test_asset_sizes.py` (13 tests). **6b** (frame selection, animation rate, render anchors), **6c** (one movement speed) and **6d** (collision boxes/hitboxes, scaling, sheet coordinates) are **merged** ([PR #49](https://github.com/lordmannu993/undertale/pull/49), merge `ee9b693`): one sub-image per draw (GameMaker's rounded-down `image_index`, replacing piece 3's crossfade), Studio 2's `image_speed` multiplies the sprite's own playback speed (`AssetCompat.playbackRate`), and the Frisk/Clover remaps stand on the requested sprite's canvas bottom centre at the same animation phase (`AssetCompat.anchor`/`remapFrame`); both worlds walk 3px and run Yellow's `plspd + 2` (`WALK_STEP`/`RUN_BONUS`, a collided +2 bonus over Undertale's walk); precise masks read in canvas pixels and composite every frame unless masks are separate, Studio 2's `collisionKind` 4 is *Precise (per frame)* (`colkind` 0 + `sepmasks` 1, not a rotated rectangle), `place_meeting`/`instance_place` test the caller's collision box, stretched/tiled draws scale from the canvas, and `sprite_get_uvs` answers from the frame (registered in `port/yellow_studio.lua`; the stop-list entry left `port/yellow_builtins.lua`). Evidence: `tests/test_asset_frames.py` (6), `tests/test_movement_speed.py` (3), `tests/test_asset_collision.py` (6); full local suite 562 passed / 1 skipped. **Piece 7** (the shopkeeper §7 visual sweep) is **merged** ([PR #50](https://github.com/lordmannu993/undertale/pull/50), merge `8bc1f89`, [CI + native gate 35893553410](https://github.com/lordmannu993/undertale/actions/runs/35893553410)): the draw log pins room 311's three face layers to the original composite (body `x=130 y=0 ox=1 oy=9`, eyes `x=148 y=40`, mouth `x=157 y=50`, one 25×25 emotion face at `x=150 y=36` origin `(1, 4)` per `faceemotion` 1–6 with the mouth layer swapped out); `tests/test_asset_arrays.py` extended to 12 tests (the seat test fails without the crop carriage, the emotion test without the recovered array IDs); that PR also corrects 6d's evidence write-up (`sprite_get_uvs` is registered in `port/yellow_studio.lua`, and `port/yellow_builtins.lua` was missing from 6d's file list). Full local suite 564 passed / 1 skipped. **Piece 6 is complete (6a–6d), and piece 7 is done.** **Piece 8** (the §15/§16 acceptance matrix + final merge) is the last piece: `tests/test_acceptance_matrix.py` (7 tests) drives the §15 checklists as one continuous session (Undertale items/EXP → Yellow → home; walk/run with the pose each state draws; a ten-room render sweep plus the dock/shop/forest scenes; save/load through both worlds' save points) and audits §16 by identity (one `R.player`, one inventory/equipment table, one controller, one `merge.sav` across two crossings) and by scan (no `cloverInventory`-style spelling anywhere in `port/` or either conversion; one installer per shared system). Five reverts tabulated in `docs/PORTING.md` fail it by name; the CI native gate now requires an `ACCEPTANCE PASS` probe (a Yellow-only item and equipped ammo through both packaged crossings, `merge.sav` ammo included). `docs/FUSION_STATUS.md` §7 is the matrix mapping all 16 requirements → code path / test / evidence. Full local suite 571 passed / 1 skipped. Piece 8 is **merged** ([PR #52](https://github.com/lordmannu993/undertale/pull/52), merge `43aa57f`, [CI + native gate 35965721372](https://github.com/lordmannu993/undertale/actions/runs/35965721372), green with all three pass lines), so **the fusion is certified**: all 16 requirements plus the §15/§16 acceptance matrix are done, and the queue has no pending piece |
+| Unified fusion (binding spec) | **Complete and certified, and this row is now history:** the owner's 16-requirement [`UNIFIED_FUSION_SPEC.md`](docs/UNIFIED_FUSION_SPEC.md) was worked as a **living queue** in [`docs/FUSION_STATUS.md`](docs/FUSION_STATUS.md) — that file is the frozen record of what was done (pieces 1–8) and the requirement → code → evidence map in its §7. **The live queue is now the debug plan** ([`docs/DEBUG_QUEUE.md`](docs/DEBUG_QUEUE.md), what "Proceed ❤️" continues). Pieces **merge to `master` as they go green**: pieces 1 (asset-array IDs, [PR #36](https://github.com/lordmannu993/undertale/pull/36)), 2 (Depth/Y-sort §4 §5, [PR #37](https://github.com/lordmannu993/undertale/pull/37)) and 3 (River Person boat/water §6, [PR #38](https://github.com/lordmannu993/undertale/pull/38)) are merged; piece 4 (no duplicated characters/sprite layers §8 — the doubled base sprite from Yellow's unconverted palette shader is dropped, and the 42 asset names both games share now resolve per world: `manifest.double_named`, `Runtime:assetName`, world-aware `asset_get_index`) is merged too ([PR #39](https://github.com/lordmannu993/undertale/pull/39), 485 tests). Piece 5 is split into **5a–5d** in `FUSION_STATUS.md`: 5a is **merged** ([PR #41](https://github.com/lordmannu993/undertale/pull/41), merge `33ae6c9`, source `68eecca`): one live `R.player` for HP/max HP/LV/EXP/gold/name/base AT/DF, compatibility aliases instead of copies, guarded content defaults, bidirectional crossing-scratch clear. Evidence: 23 new targeted tests; full local suite 508 passed / 1 skipped; [CI + native LÖVE gate 35708911107](https://github.com/lordmannu993/undertale/actions/runs/35708911107) green. 5b is **merged** ([PR #43](https://github.com/lordmannu993/undertale/pull/43), merge `8d3e170`, [CI 35753638069](https://github.com/lordmannu993/undertale/actions/runs/35753638069)): `port/inventory.lua` + `tools/item_catalog.py` (`generated/merged/items.lua`, 64 UT / 78 Yellow rows / 5 name pairs, all extracted) give one shared 8-slot inventory and one four-slot equipment set with live numeric/string views (`global.item`, `global.item_slot`, gear-stat derivations) and catalog-backed item actions for foreign items in either content set; Yellow's initializer can no longer reset the shared loadout (`Travel:applyEquipment` removed). Evidence: 13 new tests (`tests/test_unified_inventory.py`); full local suite 521 passed / 1 skipped. 5c is **merged** ([PR #44](https://github.com/lordmannu993/undertale/pull/44), merge `bdef72f`, [CI + native gate 35810358055](https://github.com/lordmannu993/undertale/actions/runs/35810358055)): one `R.player.controller` over `obj_mainchara` and `obj_pl` (the rooms still place those entities; crossing still leaves exactly one). Undertale runs on X/Shift as one extra 3px lattice step, collided, with Clover's base run cycle; Yellow's own 3+2 step is not rewritten; AUTO RUN stays Yellow-only. Menu and interact are shared abilities. Battle scripts temporarily compose ammo, the armour's weapon bonus and accessory defense; standing views do not fold them. Level-up is Undertale's `scr_levelup` (LV 20 is 99/99/99, EXP caps at 99999); current HP is not a level-up output. Evidence: `tests/test_unified_controller.py` (5 tests; all five fail if the controller is not installed; the wall test also fails with a 6px step if the bonus skips collision); full local suite 526 passed / 1 skipped. Headless + draw log only — no Android, audio, or piece 6 speed claim. 5d is **merged** ([PR #46](https://github.com/lordmannu993/undertale/pull/46), merge `9a3bbae`, [CI + native gate 35815755848](https://github.com/lordmannu993/undertale/actions/runs/35815755848)): `port/save.lua` writes one `merge.sav` version 2 Player+World document; both worlds' save and load scripts use it; version 1 is copied to `merge.sav.v1` and migrated without inventing LV; unknown versions and a foreign `Save.sav` stop by name; re-entering Yellow does not run `scr_initialize`. Evidence: `tests/test_unified_save.py` (8 tests); full local suite 534 passed / 1 skipped. Piece 6 is split in `FUSION_STATUS.md` §3 into 6a–6d: **6a** (sprite canvas + size compatibility, spec §12) is **merged** ([PR #48](https://github.com/lordmannu993/undertale/pull/48), merge `fedae36`, [CI 35831922600](https://github.com/lordmannu993/undertale/actions/runs/35831922600)) — `port/assetcompat.lua` is the one accessor both worlds' size reads go through, `tools/recover_sprite_offsets.py` re-derives `port/sprite_offsets.json` offline from the checked-in `port/recovered_sprite_metadata.json` (814 offsets proven; 553 canvases pinned with no provable offset and never shifted; 61 named with their reason); `tests/test_asset_sizes.py` (13 tests). **6b** (frame selection, animation rate, render anchors), **6c** (one movement speed) and **6d** (collision boxes/hitboxes, scaling, sheet coordinates) are **merged** ([PR #49](https://github.com/lordmannu993/undertale/pull/49), merge `ee9b693`): one sub-image per draw (GameMaker's rounded-down `image_index`, replacing piece 3's crossfade), Studio 2's `image_speed` multiplies the sprite's own playback speed (`AssetCompat.playbackRate`), and the Frisk/Clover remaps stand on the requested sprite's canvas bottom centre at the same animation phase (`AssetCompat.anchor`/`remapFrame`); both worlds walk 3px and run Yellow's `plspd + 2` (`WALK_STEP`/`RUN_BONUS`, a collided +2 bonus over Undertale's walk); precise masks read in canvas pixels and composite every frame unless masks are separate, Studio 2's `collisionKind` 4 is *Precise (per frame)* (`colkind` 0 + `sepmasks` 1, not a rotated rectangle), `place_meeting`/`instance_place` test the caller's collision box, stretched/tiled draws scale from the canvas, and `sprite_get_uvs` answers from the frame (registered in `port/yellow_studio.lua`; the stop-list entry left `port/yellow_builtins.lua`). Evidence: `tests/test_asset_frames.py` (6), `tests/test_movement_speed.py` (3), `tests/test_asset_collision.py` (6); full local suite 562 passed / 1 skipped. **Piece 7** (the shopkeeper §7 visual sweep) is **merged** ([PR #50](https://github.com/lordmannu993/undertale/pull/50), merge `8bc1f89`, [CI + native gate 35893553410](https://github.com/lordmannu993/undertale/actions/runs/35893553410)): the draw log pins room 311's three face layers to the original composite (body `x=130 y=0 ox=1 oy=9`, eyes `x=148 y=40`, mouth `x=157 y=50`, one 25×25 emotion face at `x=150 y=36` origin `(1, 4)` per `faceemotion` 1–6 with the mouth layer swapped out); `tests/test_asset_arrays.py` extended to 12 tests (the seat test fails without the crop carriage, the emotion test without the recovered array IDs); that PR also corrects 6d's evidence write-up (`sprite_get_uvs` is registered in `port/yellow_studio.lua`, and `port/yellow_builtins.lua` was missing from 6d's file list). Full local suite 564 passed / 1 skipped. **Piece 6 is complete (6a–6d), and piece 7 is done.** **Piece 8** (the §15/§16 acceptance matrix + final merge) is the last piece: `tests/test_acceptance_matrix.py` (7 tests) drives the §15 checklists as one continuous session (Undertale items/EXP → Yellow → home; walk/run with the pose each state draws; a ten-room render sweep plus the dock/shop/forest scenes; save/load through both worlds' save points) and audits §16 by identity (one `R.player`, one inventory/equipment table, one controller, one `merge.sav` across two crossings) and by scan (no `cloverInventory`-style spelling anywhere in `port/` or either conversion; one installer per shared system). Five reverts tabulated in `docs/PORTING.md` fail it by name; the CI native gate now requires an `ACCEPTANCE PASS` probe (a Yellow-only item and equipped ammo through both packaged crossings, `merge.sav` ammo included). `docs/FUSION_STATUS.md` §7 is the matrix mapping all 16 requirements → code path / test / evidence. Full local suite 571 passed / 1 skipped. Piece 8 is **merged** ([PR #52](https://github.com/lordmannu993/undertale/pull/52), merge `43aa57f`, [CI + native gate 35965721372](https://github.com/lordmannu993/undertale/actions/runs/35965721372), green with all three pass lines), so **the fusion is certified**: all 16 requirements plus the §15/§16 acceptance matrix are done, and the queue has no pending piece. **Frozen 2026-09-24** — a completed piece is not re-opened here; new work goes to [`docs/DEBUG_QUEUE.md`](docs/DEBUG_QUEUE.md) |
 | Source newer than the archive | none once this branch's README source-commit follow-up is merged — v1.2.5 (source `c16fb9b`) is the newest published build and carries the boot fix. The follow-up only records that commit; it does not change the archive |
 | Download links | README's download section is guarded by `tests/test_release_docs.py` and `tools/check_download_links.py` (CI, token-authenticated). Publishing a version means the README, the workflow pins, `port/version.lua` and `docs/RELEASE_NOTES.md` all move together, and no superseded `releases/download/<tag>` link may survive in any document |
 | Old releases | `love-v0.1.0`…`love-v1.2.1-fusion-experimental` are **kept on purpose** (owner declined deletion) and renamed with a "Superseded (…)" prefix as each is replaced. Version branches `v0.1.0`..`v0.1.3` point at each tagged build |
