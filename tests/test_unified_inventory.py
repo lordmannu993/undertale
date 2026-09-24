@@ -64,9 +64,13 @@ def test_catalog_load_uses_the_archive_and_ignores_a_cwd_copy(tmp_path, monkeypa
     ''')
     assert source == "archive"
     # Headless tests have no LÖVE filesystem; they still load via require().
+    # package.path must prefer this fixture. The rest of the suite writes the
+    # real catalog at the repo root, and a root-first path would load that
+    # (it has no source field) instead of the cwd copy this assertion names.
     cwd = vm.execute('''
         love = nil
         package.loaded["generated.merged.items"] = nil
+        package.path = "./?.lua;./?/init.lua"
         return Inventory.loadCatalog().source
     ''')
     assert cwd == "cwd"
