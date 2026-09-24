@@ -5,6 +5,8 @@ import subprocess
 import sys
 import zipfile
 
+import pytest
+
 from conftest import ROOT
 from tools.package import package
 
@@ -36,6 +38,41 @@ def test_archive_is_self_contained_reproducible_and_excludes_scratch(converted,t
             assert all(i.date_time==(1980,1,1,0,0,0) for i in archive.infolist())
     finally:
         scratch.unlink()
+
+
+def _fake_merged_tree(tmp_path):
+    generated = tmp_path / "generated"
+    (generated / "yellow/assets").mkdir(parents=True)
+    (generated / "merged").mkdir(parents=True)
+    (generated / "yellow/conversion-report.json").write_text(json.dumps(
+        {"stage": "rooms", "scripts": {"compile_errors": []}, "objects": {"compile_errors": []},
+         "rooms": {"compile_errors": []}}))
+    (generated / "yellow/assets/sprites_0.lua").write_text("return {}\n")
+    (generated / "merged/manifest.lua").write_text("-- test\n")
+    return generated
+
+
+def test_merged_package_ships_the_item_catalog_and_stops_without_it(tmp_path, monkeypatch):
+    """v1.2.4 stopped on boot: the .love had the merged manifest and not the catalog.
+
+    tools/merge.py writes generated/merged/items.lua, and port/inventory.lua
+    requires it on every merged launch. The file list that becomes the archive
+    omitted it. This fails if that list drops the module again.
+    """
+    sys.path.insert(0, str(ROOT / "tools"))
+    import package as packaging
+
+    generated = _fake_merged_tree(tmp_path)
+    monkeypatch.setattr(packaging.subprocess, "run", lambda *args, **kwargs: None)
+    monkeypatch.setattr(packaging, "ROOT", tmp_path)
+
+    with pytest.raises(ValueError, match="generated/merged/items.lua"):
+        packaging.merged_files(generated)
+
+    (generated / "merged/items.lua").write_text("return {ut={}, yellow={}, pairs={}}\n")
+    files = packaging.merged_files(generated)
+    assert generated / "merged/items.lua" in files
+    assert generated / "merged/manifest.lua" in files
 
 
 def test_android_builder_requires_explicit_experimental_acknowledgement():
