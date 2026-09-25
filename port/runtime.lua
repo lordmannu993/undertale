@@ -266,6 +266,29 @@ function Runtime:resolveObjectIndex(selector,E)
     end
     return selector
 end
+-- Fonts have the same decompiler gap as objects: a Yellow Create that writes
+-- `dialogue_font = 9` (or `global.font_type_text = 1`) is Yellow's own compiled
+-- font number (Asset_Order: 9 = fnt_main, 1 = fnt_main_battle), but the merged
+-- build would otherwise look 9 up in Undertale's band (fnt_papyrus). Static
+-- `draw_set_font(fnt_main)` calls are already rewritten to merged IDs; only
+-- these raw-number spellings need the sibling of resolveObjectIndex. Undertale
+-- callers, already-banded ids, and numbers that name no Yellow font pass
+-- through, so Undertale's faces are unchanged.
+function Runtime:resolveFontIndex(selector,E)
+    local base=self.manifest.yellow_base or 1000000
+    if type(selector)~="number" or selector<0 or selector>=base then return selector end
+    if not self:callerIsYellow(E) then return selector end
+    selector=math.floor(selector)
+    local banded=base+selector
+    local font=self.assets.fonts[banded]
+    if font then
+        self:warn("font-band:"..selector,
+            "Font "..selector.." is Yellow's own asset number; resolved to "..banded..
+            " ("..tostring(font.name)..") through the merged ID band.")
+        return banded
+    end
+    return selector
+end
 function Runtime:select(selector,E)
     if type(selector)=="table" and rawget(selector,"_instance")==true then return selector.alive and selector.active and {selector} or {} end
     if selector==-1 then return E and E._self and E._self.alive and {E._self} or {} end

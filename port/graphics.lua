@@ -524,7 +524,7 @@ function Graphics.install(R)
     end
     B.draw_set_color=function(_,v) state.color=v end
     B.draw_set_alpha=function(_,v) state.alpha=clamp(v,0,1) end
-    B.draw_set_font=function(_,v) state.font=v end
+    B.draw_set_font=function(E,v) state.font=R:resolveFontIndex(v,E) end
     B.draw_set_halign=function(_,v) state.halign=v end
     B.draw_set_valign=function(_,v) state.valign=v end
     B.draw_set_circle_precision=function(_,v) state.precision=clamp(math.floor(v),4,128) end

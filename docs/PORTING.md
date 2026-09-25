@@ -36,6 +36,40 @@ added the map and the evidence, not a fix:
   rendering, Android, audio or played-route claim. **Nothing in `port/`,
   `tools/convert.py`, `tools/yellow*` or the converted output changed.**
 
+## Debug fixes — D1a: Yellow uses its intended font
+
+The debug plan's next piece ([`DEBUG_QUEUE.md`](DEBUG_QUEUE.md) D1a, brief §1
+font identity) closes the font-ID gap D0 reproduced:
+
+* **Root cause.** Yellow's converter rewrites *static* font names to merged
+  IDs (`draw_set_font(E, 1000009)`), but the decompiler leaves a raw compiled
+  number wherever it could not prove an asset: `obj_dialogue` (and 10 more
+  `obj_dialogue*` Creates) stores `dialogue_font = 9`, and
+  `scr_initialize_battle` stores `global.font_type_text = 1`. In Yellow's
+  pinned Asset_Order those are `fnt_main` and `fnt_main_battle`; in the merged
+  build the same numbers are Undertale's `fnt_papyrus` and `fnt_main`. Objects
+  already re-band that class of number (`Runtime:resolveObjectIndex`); fonts
+  did not. Rejected: substituting a generic/`love.graphics.newFont` face,
+  renaming Yellow's fonts, or patching individual Creates.
+* **Change.** `Runtime:resolveFontIndex` is the sibling of
+  `resolveObjectIndex`: a Yellow caller whose font id sits below
+  `YELLOW_BASE` and names a converted Yellow font is resolved to
+  `YELLOW_BASE + n` (with a one-shot `font-band:<n>` warning).
+  `draw_set_font` consumes it, so `state.font` and the traced text draws
+  carry the Yellow record. Undertale callers, already-banded ids, named
+  lookups (`Runtime:assetName` / `double_named` `fnt_main`), and numbers that
+  name no Yellow font pass through.
+* **Evidence.** `tests/test_yellow_fonts.py` (7 tests). Five fail without
+  the re-band, including the D0 reproduction (`obj_dialogue` drew the marker
+  with `fnt_papyrus`). With it, Yellow raw 9/1 select `fnt_main` /
+  `fnt_main_battle`; all eleven Yellow fonts 0–10 re-band; Undertale
+  `draw_set_font(9/1/2)` still selects papyrus/main/maintext; a traced
+  `draw_text` logs merged id 1000009.
+* **Scope.** Headless converted flow + draw log. Not a native LÖVE, Android,
+  audio, or pixel-parity claim. **Vertical text is not this piece** (D1b:
+  `draw_text_ext` wrap contract for width ≤ 0). Graphics-state survival
+  across crossings remains D5.
+
 ## What is converted
 
 The build translates **20,285 source units** (137,558 lines of extracted GML),
