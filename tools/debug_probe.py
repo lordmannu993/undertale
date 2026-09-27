@@ -291,19 +291,23 @@ if wants("font-text") then
     local B = R.builtins
     local function wrapLines(str, width)
         -- Port of port/graphics.lua's draw_text_ext wrap, verbatim semantics.
-        local linesOut = {}
+        -- GameMaker reserves a non-positive width for no automatic wrapping;
+        -- Yellow's ordinary dialogue deliberately supplies -1.
+        local source, linesOut = {}, {}
         for line in (str .. "\n"):gmatch("([^\n]*)\n") do
             line = line:gsub("\\#", "\1"):gsub("#", "\n")
-            for sub in (line .. "\n"):gmatch("([^\n]*)\n") do
-                local current = ""
-                for word in sub:gmatch("%S+") do
-                    local next = current == "" and word or current .. " " .. word
-                    if current ~= "" and B.string_width(nil, next) > width then
-                        linesOut[#linesOut + 1] = current; current = word
-                    else current = next end
-                end
-                linesOut[#linesOut + 1] = current
+            for sub in (line .. "\n"):gmatch("([^\n]*)\n") do source[#source + 1] = sub end
+        end
+        if not width or width <= 0 then return source end
+        for _, sub in ipairs(source) do
+            local current = ""
+            for word in sub:gmatch("%S+") do
+                local next = current == "" and word or current .. " " .. word
+                if current ~= "" and B.string_width(nil, next) > width then
+                    linesOut[#linesOut + 1] = current; current = word
+                else current = next end
             end
+            linesOut[#linesOut + 1] = current
         end
         return linesOut
     end
@@ -343,6 +347,9 @@ if wants("font-text") then
         say("SYMPTOM VERTICAL: draw_text_ext(..., width=-1) wraps at every word, " ..
             "so the box is taller than it is wide: text stacks as a column. " ..
             "GameMaker treats a negative width as 'no wrapping'; the shared renderer does not.")
+    else
+        say("TEXT ORIENTATION: draw_text_ext(..., width=-1) preserved only explicit " ..
+            "line breaks; no automatic word-wrap column.")
     end
     -- Cleanup of this probe's dialogue so later sections start clean.
     if dlg.alive then R:destroy(dlg, false) end

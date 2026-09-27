@@ -70,6 +70,37 @@ font identity) closes the font-ID gap D0 reproduced:
   `draw_text_ext` wrap contract for width ≤ 0). Graphics-state survival
   across crossings remains D5.
 
+## Debug fixes — D1b: Yellow dialogue remains horizontal
+
+D1b (brief §1 orientation and §6) follows the actual shared text path rather
+than rotating or replacing Yellow dialogue:
+
+* **Root cause.** Yellow's own `obj_dialogue/Draw_64.gml` calls
+  `draw_text_ext(xx, yy + 10, message, line_sep, -1)`. GameMaker treats a
+  non-positive wrap width as **no automatic wrapping**. The shared renderer
+  compared each accumulated word against `-1` (and `0`), so every word after
+  the first overflowed, became its own 18 px row, and formed the reported
+  vertical column. D0's marker reproduced seven words as seven rows. This was
+  a wrap-contract error, not a camera, rotation, font or leaked transform.
+* **Change.** `port/graphics.lua` now sends `width <= 0` straight through with
+  only explicit `#`/newline breaks; positive widths retain the existing
+  word-wrap loop. The existing `text()` helper continues to bracket every text
+  transform with `love.graphics.push()`/`pop()`, so a transformed draw cannot
+  rotate the following dialogue. No Yellow source, font asset, camera or
+  per-dialogue special case was changed.
+* **Evidence.** `tests/test_text_orientation.py` exercises the installed
+  shared builtin with a LÖVE graphics double. It fails against the prior loop
+  (`width=-1` printed four separate words), proves `-1` and `0` emit one
+  horizontal line, preserves positive-width wrapping and explicit `#` breaks,
+  and asserts balanced push/pop with no transform inherited by the next text
+  draw. The D0 harness now reports the corrected layout and its text-orientation
+  status; `tests/test_debug_probe.py` continues to run it.
+* **Scope.** This verifies shared renderer semantics and transform-stack
+  isolation in headless tests, then the converted build path in the full suite.
+  It is not a claim of native LÖVE/Android pixel parity, device FPS, audio or a
+  hand-played route. The wider graphics-state and resource audit remains D5;
+  Undertale's normal positive-width wrapping is explicitly retained.
+
 ## What is converted
 
 The build translates **20,285 source units** (137,558 lines of extracted GML),
