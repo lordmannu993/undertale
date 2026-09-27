@@ -586,14 +586,22 @@ function Graphics.install(R)
         text(x,y,str,sx,sy,angle,alpha);state.color=prior
     end
     B.draw_text_ext=function(_,x,y,str,sep,width)
-        local wrapped={}
-        for _,line in ipairs(lines(str)) do
-            local current=""
-            for word in line:gmatch("%S+") do
-                local next=current=="" and word or current.." "..word
-                if current~="" and measureLine(next,font())>width then wrapped[#wrapped+1]=current;current=word else current=next end
+        -- GameMaker's draw_text_ext uses a non-positive width as its no-wrap
+        -- sentinel. Yellow dialogue deliberately passes -1, preserving only
+        -- the explicit #/newline breaks in its message. Comparing each word
+        -- to that sentinel made every subsequent word overflow and stack into
+        -- the reported vertical column.
+        local wrapped=lines(str)
+        if width and width>0 then
+            wrapped={}
+            for _,line in ipairs(lines(str)) do
+                local current=""
+                for word in line:gmatch("%S+") do
+                    local next=current=="" and word or current.." "..word
+                    if current~="" and measureLine(next,font())>width then wrapped[#wrapped+1]=current;current=word else current=next end
+                end
+                wrapped[#wrapped+1]=current
             end
-            wrapped[#wrapped+1]=current
         end
         text(x,y,str,1,1,0,state.alpha,wrapped,sep)
     end
