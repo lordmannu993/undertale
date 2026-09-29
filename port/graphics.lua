@@ -715,7 +715,28 @@ function Graphics.install(R)
             end
             g.push("all");g.setCanvas(self.canvas);g.origin();g.setBlendMode("alpha");g.clear(rgba(self.vars.background_color,1))
         end
-        local list={}
+        -- Reuse the per-frame draw-list records. Yellow rooms can contain
+        -- hundreds of tile cells; allocating a new list and one record for
+        -- every live instance on every frame was the dominant garbage source
+        -- in the D2 probe (the Snowdin room allocated ~161 KB/tick). The
+        -- records are render-only and are fully overwritten below, so this
+        -- does not retain gameplay objects or change draw ordering.
+        local list=self._drawList or {}
+        local pool=self._drawItemPool or {}
+        self._drawList=list;self._drawItemPool=pool
+        for i=#list,1,-1 do list[i]=nil end
+        local function append(item)
+            local n=#list+1
+            local slot=pool[n]
+            if slot then
+                for key in pairs(slot) do slot[key]=nil end
+                for key,value in pairs(item) do slot[key]=value end
+            else
+                slot=item;pool[n]=slot
+            end
+            list[n]=slot
+            return slot
+        end
         local layers=self.roomState.layers
         local staticTiles=self.roomState.staticTileDrawList
         if not staticTiles then
@@ -738,8 +759,8 @@ function Graphics.install(R)
             if inst.alive and inst.active then
                 local layer=inst.layer and layers[inst.layer]
                 base=base+1
-                list[base]={depth=(layer and layer.depth) or inst.v.depth or 0,order=1000000+i,instance=inst,layer=layer,
-                    slot=inst._homeLayer or inst.layer}
+                append({depth=(layer and layer.depth) or inst.v.depth or 0,order=1000000+i,instance=inst,layer=layer,
+                    slot=inst._homeLayer or inst.layer})
             end
         end
         -- Particle systems draw at their own depth among the instances and
@@ -747,7 +768,7 @@ function Graphics.install(R)
         if self.particles then
             for id,sys in pairs(self.particles.systems) do
                 if sys.autoDraw and #sys.particles>0 and self:particleLayerVisible(sys) then
-                    list[#list+1]={depth=self:particleDepth(sys),order=2000000+id,particles=sys}
+                    append({depth=self:particleDepth(sys),order=2000000+id,particles=sys})
                 end
             end
         end
