@@ -59,7 +59,7 @@ history of the invariants the debug pieces must preserve.
 
 **Where the queue stands:** the fusion queue is finished and frozen; the live trigger
 continues [`docs/DEBUG_QUEUE.md`](docs/DEBUG_QUEUE.md), whose next pending piece is
-recorded in its §1 (currently **D2** — Yellow-side performance, brief §2/§7).
+recorded in its §1 (currently **D3** — exactly one Player across repeated crossings).
 **D0 is merged** (2026-09-24): the architecture map and the reproduction harness
 ([`docs/DEBUG_BASELINE.md`](docs/DEBUG_BASELINE.md), `tools/debug_probe.py`) — read
 the baseline before starting any D2–D5 piece; it records the wrong-font and
