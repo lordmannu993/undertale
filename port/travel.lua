@@ -188,6 +188,7 @@ function Travel.install(R)
     end
     local loadRoom = R.loadRoom
     function R:loadRoom(...)
+        travel:beforeLoadRoom((...))
         local results = {loadRoom(self, ...)}
         travel:afterLoadRoom((...))
         return unpack(results)
@@ -394,13 +395,24 @@ function Travel:landingSpot(world, roomId, coordinates)
     return (room and room.width or 320) / 2, (room and room.height or 240) / 2
 end
 
+-- room_goto only *requests* a room: GameMaker carries the change out at the end
+-- of the step, and every statement after it in the caller's event still runs in
+-- the room being left. resolve therefore decides the destination and nothing
+-- else; the crossing itself belongs to the load (see beforeLoadRoom).
+--
+-- Doing it here instead used to create the second Player. Yellow changes rooms
+-- through its own obj_transition, whose Step is
+--     room_goto(newRoom);
+--     if (instance_exists(obj_pl)) { obj_pl.x = xx; ... } else instance_create(xx, yy, obj_pl);
+-- so when the crossing destroyed the persistent Clover inside that room_goto,
+-- the very next line saw no player and made a new one - persistent, Yellow's,
+-- and still alive when the Undertale room placed its own obj_mainchara.
 function Travel:resolve(index)
     local save = self.runtime.saveBridge
     -- A unified load places the saved room itself. Treating that goto as a
     -- crossing would clear scratch flags and run content initialization over
     -- the document that was just restored.
     if save and save.restoring then
-        self.world = self:worldOf(index)
         return index
     end
     local target = index
@@ -427,9 +439,54 @@ function Travel:resolve(index)
             self.riverDestination = nil
         end
     end
-    local world = self:worldOf(target)
-    if world ~= self.world then self:beginCrossing(world, target) end
     return target
+end
+
+-- The single seam between the two worlds, and the only place a world change
+-- happens: the destination room is about to load, so the world being left is
+-- shut down here and the world being entered is initialised, exactly once,
+-- against the room that is actually being loaded (not a room_goto that a later
+-- one in the same step replaced).
+function Travel:beforeLoadRoom(roomId)
+    local world = self:worldOf(roomId)
+    local save = self.runtime.saveBridge
+    if save and save.restoring then
+        -- A unified load restores its own document: no scratch-flag clear, no
+        -- content initialization, no travel save over what was just read. The
+        -- entity rule still holds, so the other world's persistent instances
+        -- (its player included) do not ride into the restored room.
+        self.world = world
+        self:retireOtherWorld(world)
+        return
+    end
+    if world ~= self.world then
+        self:beginCrossing(world, roomId)
+        return
+    end
+    -- Same-world load: nothing to cross, but the invariant is asserted at the
+    -- one place that owns it rather than assumed.
+    self:retireOtherWorld(world, true)
+end
+
+-- Persistent instances belong to the world they were created in. Leaving them
+-- alive would put a second player and a second set of controllers in the room
+-- being entered, so the world being left is shut down here.
+function Travel:retireOtherWorld(world, unexpected)
+    local R = self.runtime
+    local retired = 0
+    for _, instance in ipairs(R.instances) do
+        if instance.alive and instance.v.persistent
+            and self:worldOf(instance.v.object_index) ~= world then
+            R:destroy(instance, true)
+            retired = retired + 1
+        end
+    end
+    if retired > 0 and unexpected then
+        R:warn("travel-stray-world",
+            "A persistent instance of the other world was still alive when a room of this " ..
+            "world loaded without a crossing; it was retired here, where world lifetime is owned.")
+    end
+    return retired
 end
 
 function Travel:beginCrossing(world, room)
@@ -443,15 +500,10 @@ function Travel:beginCrossing(world, room)
             leavingX, leavingY = instance.v.x, instance.v.y
         end
     end
-    -- Persistent instances belong to the world they were created in. Leaving
-    -- them alive would put a second player and a second set of controllers in
-    -- the room, so the world being left is shut down here and the world being
-    -- entered is initialised once its room has loaded.
-    for _, instance in ipairs(R.instances) do
-        if instance.alive and instance.v.persistent and self:worldOf(instance.v.object_index) ~= world then
-            R:destroy(instance, true)
-        end
-    end
+    -- The world being left is shut down here (its leaving position has just
+    -- been read above); the world being entered is initialised below and its
+    -- player is placed once the room has loaded.
+    self:retireOtherWorld(world)
     -- Both games reuse flag[0..29] with different meanings. The fusion queue
     -- reserves this range as crossing scratch space, never player storage.
     -- Clear it in BOTH directions; scr_initialize used to clear it only when
@@ -588,6 +640,10 @@ end
 
 function Travel:afterLoadRoom(roomId)
     if self.world == "yellow" or self:worldOf(roomId) == "yellow" then
+        -- Yellow's controller belongs to Yellow's rooms. Asking for it again
+        -- below, for either direction, used to put Yellow's obj_controller and
+        -- obj_radio - both persistent - into the Undertale room the player had
+        -- just returned to, where they kept updating behind the Undertale side.
         self:ensureYellowController()
     end
     local pending = self.pendingInit
@@ -595,7 +651,6 @@ function Travel:afterLoadRoom(roomId)
     self.pendingInit = nil
     local R = self.runtime
     local ids = self.ids[pending.world]
-    self:ensureYellowController()
     if ids.player and not self:exists(ids.player) then
         local x, y = self:landingSpot(pending.world, roomId, pending.coordinates)
         if pending.world == "yellow" then

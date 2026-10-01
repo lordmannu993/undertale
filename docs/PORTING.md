@@ -101,6 +101,65 @@ than rotating or replacing Yellow dialogue:
   hand-played route. The wider graphics-state and resource audit remains D5;
   Undertale's normal positive-width wrapping is explicitly retained.
 
+## Debug fixes — D3: exactly one Player, ever
+
+D3 (brief §3 duplicate Player, §5 state management) treats the duplicate as the
+entity-lifecycle bug it is, and leaves both games' own player architectures
+alone:
+
+* **The architecture, as the two games wrote it.** Undertale places
+  `obj_mainchara` in the room (278 of 334 rooms) and the object is **not
+  persistent**, so each room load recreates the player. Yellow creates `obj_pl`
+  **once** (`scr_initialize`, `if (!instance_exists(obj_pl))`) and the object
+  **is persistent**, so one instance is carried from room to room; Yellow rooms
+  never place it (their `obj_pl` entry is the view's follow object). The port
+  follows each world's own rule and the crossing is the single seam between
+  them — no third player system, no "persistent everywhere" rewrite.
+* **Root cause.** `room_goto` only *requests* a room: GameMaker performs the
+  change at the end of the step, and `port/runtime.lua` already defers it
+  (`pendingRoom` → `applyTransitions`). The travel bridge did not: `R:gotoRoom`
+  ran `Travel:resolve`, and `resolve` ran the whole crossing — including
+  destroying the world being left — *inside* the caller's `room_goto` call.
+  Yellow changes room through its own `obj_transition`, whose Step is
+  `room_goto(newRoom); if (instance_exists(obj_pl)) { obj_pl.x = xx; ... } else
+  instance_create(xx, yy, obj_pl);` (the same object the UGPS whale hands its
+  destination to, `obj_mail_whale/Other_11.gml`). With the persistent Clover
+  already destroyed one line earlier, that `else` branch created a **second,
+  persistent Yellow player**, which then rode into the Undertale room next to
+  the room's own `obj_mainchara`: the owner's two identical players (both draw
+  as Frisk through `port/frisk.lua`). A second, smaller leak sat in
+  `Travel:afterLoadRoom`, which asked for Yellow's controller on *either*
+  direction, so returning to Undertale recreated Yellow's persistent
+  `obj_controller` and `obj_radio` in the Undertale room, where they kept
+  updating. Rejected: destroying "the extra" player, hiding or disabling one,
+  making `obj_mainchara` persistent, or giving Yellow a second transition path.
+* **Change** (`port/travel.lua`, ~20 lines): `Travel:resolve` now only decides
+  the destination; the crossing moved to a new `Travel:beforeLoadRoom`, called
+  from the existing `loadRoom` wrapper, so it happens when the destination room
+  actually loads — after the caller's event has finished, against the room that
+  is really being loaded (not a `room_goto` a later one in the same step
+  replaced). The teardown itself is one named step, `Travel:retireOtherWorld`,
+  used by the crossing, by the save-restore path (which deliberately suppresses
+  the rest of a crossing) and as the same-world invariant check, which warns
+  once if it ever has to act. `afterLoadRoom` only ensures Yellow's controller
+  when the room being entered is Yellow's.
+* **Evidence.** `tests/test_player_identity.py` (5 tests, all five fail without
+  the change): the deferred `room_goto` keeps the old world alive until the room
+  loads; Yellow's own transition object leaves exactly one player in the
+  Undertale room; three Undertale → Yellow → Undertale round trips through both
+  doors never let the census exceed one player (counted every tick) with one
+  Yellow controller; a save recorded in the other world restores with one
+  player; and the crossing keeps the same `R.player`, controller and inventory
+  tables with no persistent instance of the world just left still alive. The D0
+  harness now censuses the `obj_transition` return as well
+  (`tools/debug_probe.py` `[player-identity]`: `max simultaneous player
+  instances across all crossings: 1`, and `controllers=0` on the Undertale
+  side). Full local suite: 601 passed, 1 skipped.
+* **Scope.** Headless converted flow, fixed seed, one machine; CI's native gate
+  is the authority for native LÖVE. Not an Android, audio, device-FPS or
+  hand-played-route claim. The boat's *destination* (the hold-X ambiguity and
+  the pager latch the boarding `room_goto` consumes) is **D4**, not this piece.
+
 ## What is converted
 
 The build translates **20,285 source units** (137,558 lines of extracted GML),
