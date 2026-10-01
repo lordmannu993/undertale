@@ -420,12 +420,33 @@ if wants("player-identity") then
         f, c = census("round " .. round .. " -> back to Undertale")
         worst = math.max(worst, f + c)
     end
+    -- The return the owner actually takes: Yellow changes room through its own
+    -- obj_transition (the object the UGPS whale hands its destination to), and
+    -- that object asks `instance_exists(obj_pl)` on the line after room_goto.
+    -- Piece D3's root cause lived exactly there, so the census is taken on
+    -- every tick of the ride, not only at the landing.
+    R:gotoRoom(ROOM.hotland); R:applyTransitions(); tick(5)
+    census("yellow, before its own transition")
+    local scope
+    for _, instance in ipairs(R.instances) do
+        if instance.alive then scope = instance break end
+    end
+    R:call("scr_change_room", R:scope(scope), 140, 220, 160)
+    local ride = 0
+    for _ = 1, 60 do
+        tick(1)
+        ride = math.max(ride, countInstances(OBJ.frisk) + countInstances(OBJ.clover))
+        if R.vars.room == 140 then break end
+    end
+    tick(2)
+    local f, c = census("returned through Yellow's obj_transition")
+    worst = math.max(worst, ride, f + c)
     say("max simultaneous player instances across all crossings:", worst)
     if worst > 1 then
         say("SYMPTOM DUPLICATE-PLAYER: more than one Player instance alive at once.")
     else
-        say("scripted packaged crossings keep exactly one Player; the owner's " ..
-            "duplicate must come from the interactive boat flow - checked next.")
+        say("every crossing keeps exactly one Player, including the return through " ..
+            "Yellow's own transition object (piece D3).")
     end
 end
 
