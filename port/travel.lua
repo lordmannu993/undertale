@@ -409,6 +409,15 @@ end
 -- and still alive when the Undertale room placed its own obj_mainchara.
 function Travel:resolve(index)
     local save = self.runtime.saveBridge
+    -- Room 316 is the River Person's shared boarding/ride room.  It is never
+    -- itself a destination choice: preserve the committed choice until the
+    -- boat's later con=18 disembark room_goto(70/125/140).  Previously the
+    -- latch was treated as a general room switch, so the boarding request
+    -- could consume the choice and skip the ride.
+    local boardingRoom = 316
+    if index == boardingRoom then
+        return index
+    end
     -- A unified load places the saved room itself. Treating that goto as a
     -- crossing would clear scratch flags and run content initialization over
     -- the document that was just restored.
@@ -689,6 +698,11 @@ function Travel:beforeStep()
         for _, code in ipairs(X_BUTTONS) do
             if R.input:check(code) then held = true break end
         end
+        -- X is sampled by the boat ride path.  The headless adapter may arm a
+        -- ride before the deferred room request (its stub has no room-316
+        -- instance yet), so keep the existing boat-presence seam here; the
+        -- committed room-316 guard in resolve prevents boarding from consuming
+        -- the destination.
         if self:exists(self.ids.undertale.boat) and held then
             if not self.riverLatch then
                 R:warn("travel-river",
