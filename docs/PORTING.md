@@ -160,6 +160,25 @@ alone:
   hand-played-route claim. The boat's *destination* (the hold-X ambiguity and
   the pager latch the boarding `room_goto` consumes) is **D4**, not this piece.
 
+## Debug fixes — D4: River Person destination is committed at disembark
+
+* **Root cause.** The River Person has two distinct `room_goto` phases: it first
+  requests room 316 for the boarding/ride animation, then later requests dock
+  room 70, 125 or 140 at `con == 18`. The travel latch was handled as a general
+  room switch, and X was sampled whenever a boat existed; that made a pager
+  destination vulnerable to the boarding request and let holding X at a dock
+  silently retarget the trip. The intended destination is the boat's own final
+  dock switch (`global.flag[459]`) or the explicit Yellow pager record.
+* **Change.** `Travel:resolve` now treats room 316 as an explicit non-destination
+  boarding room and preserves the committed choice until the boat's disembark
+  request. The existing boat-presence seam for X is retained for the deferred
+  headless ride adapter, while the committed destination cannot be consumed by
+  the boarding request. Existing room IDs and landing coordinates are unchanged.
+* **Evidence.** `tests/test_boat_destination.py` checks the boarding request,
+  explicit pager destination, native dock matrix, and both-world landing records.
+  The full headless suite is the authority for converted routing; native LÖVE,
+  Android, audio fidelity and a hand-played route remain out of scope.
+
 ## What is converted
 
 The build translates **20,285 source units** (137,558 lines of extracted GML),
