@@ -7,6 +7,10 @@ local Graphics={}
 -- accessor, so a cropped Undertale export and an uncropped Yellow sprite answer
 -- in the same units (see port/assetcompat.lua and spec section 12).
 local AssetCompat=require("port.assetcompat")
+-- Required once, at load: the reconstructed opening scenery is drawn from the
+-- view loop, and a require() in a per-frame path is a load-once violation
+-- (debug brief section 7) even though package.loaded makes the repeat cheap.
+local OpeningBackdrops=require("port.opening_backdrops")
 local function clamp(n,a,b) return math.max(a,math.min(b,n)) end
 local function rgba(color,alpha)
     color=math.floor(color or 16777215)%16777216
@@ -19,7 +23,11 @@ function Graphics.install(R)
     local B=R.builtins
     local g=love and love.graphics
     if R.options.headless then g=nil end
-    local state={color=16777215,alpha=1,font=-1,halign=0,valign=0,precision=32,images={},quads={},surfaces={},nextSurface=1,nextSprite=40000}
+    -- generation/imageUse: which room load last drew each cached texture. The
+    -- trim below keeps what is still in play instead of emptying the cache at
+    -- every door (see R:trimGraphicsCache).
+    local state={color=16777215,alpha=1,font=-1,halign=0,valign=0,precision=32,
+        images={},imageUse={},generation=0,quads={},surfaces={},nextSurface=1,nextSprite=40000}
     R.graphicsState=state
     -- GameMaker Studio 2 draws its GUI layer in its own coordinate space, sized
     -- by display_set_gui_size and stretched over the presented image. 0 means
@@ -33,17 +41,24 @@ function Graphics.install(R)
     local function color(c,a) if g then g.setColor(rgba(c or state.color,a or state.alpha)) end end
     local function image(file)
         if not g then return nil end
-        if state.images[file] then return state.images[file] end
+        local cached=state.images[file]
+        if cached then state.imageUse[file]=state.generation;return cached end
         local ok,result=pcall(g.newImage,file)
         if not ok then R:warn("image:"..file,"Image unavailable: "..file..": "..tostring(result));return nil end
         result:setFilter("nearest","nearest")
         state.images[file]=result
+        state.imageUse[file]=state.generation
         return result
     end
+    -- Quads live under their own image, so a texture and its source rectangles
+    -- are cached, found and released together.
     local function quad(file,x,y,w,h,iw,ih)
-        local key=file..":"..x..":"..y..":"..w..":"..h
-        if not state.quads[key] then state.quads[key]=g.newQuad(x,y,w,h,iw,ih) end
-        return state.quads[key]
+        local perFile=state.quads[file]
+        if not perFile then perFile={};state.quads[file]=perFile end
+        local key=x..":"..y..":"..w..":"..h
+        local q=perFile[key]
+        if not q then q=g.newQuad(x,y,w,h,iw,ih);perFile[key]=q end
+        return q
     end
     local function partImage(img,key,left,top,width,height,x,y,sx,sy,tint,alpha,transform)
         if not img or width<=0 or height<=0 or sx==0 or sy==0 then return end
@@ -556,7 +571,12 @@ function Graphics.install(R)
         local spacing=sep and sep>=0 and sep or height
         log("text",tostring(str),x,y,state.font)
         if not g then return end
-        g.push();g.translate(x,y);g.rotate(-math.rad(angle));g.scale(sx,sy)
+        -- "all", not the transform alone: this scope also sets the draw colour
+        -- and, on the fallback path below, LÖVE's current font. A plain
+        -- push()/pop() restores neither, so a string drawn without a converted
+        -- font record left the 14px fallback font selected for whatever drew
+        -- next (spec section 6).
+        g.push("all");g.translate(x,y);g.rotate(-math.rad(angle));g.scale(sx,sy)
         color(state.color,alpha or state.alpha)
         local yy=state.valign==1 and -#ls*spacing/2 or state.valign==2 and -#ls*spacing or 0
         for _,line in ipairs(ls) do
@@ -621,9 +641,43 @@ function Graphics.install(R)
         log("circle",x,y,r,outline);if g and r>=0 then color();g.setLineWidth(1);g.circle(R.truth(outline) and "line" or "fill",x,y,r,state.precision) end
     end
     local function vertex(x,y,c,a) local r,gg,b,alpha=rgba(c,a);return {x,y,0,0,r,gg,b,alpha} end
+    -- One reused stream mesh for every coloured primitive (spec section 7).
+    -- draw_line/draw_rectangle_color/draw_triangle*/draw_ellipse_color and
+    -- Yellow's draw_primitive_end each used to create a Mesh and release it
+    -- again on every call, i.e. a GPU buffer per primitive per frame in draw
+    -- paths that run in loops (Yellow's EQ visualiser draws one rectangle per
+    -- bar; Undertale's lasers and graphs draw per-frame lines). The vertex
+    -- layout is LÖVE's default {x,y,u,v,r,g,b,a}, so the same buffer serves
+    -- every caller; it only grows when a primitive needs more vertices than
+    -- the largest one seen so far.
+    local vertexMesh,vertexMeshSize=nil,0
+    local function drawVertices(vertices,mode)
+        if not g then return end
+        local count=#vertices
+        if count<1 then return end
+        if not vertexMesh or vertexMeshSize<count then
+            if vertexMesh then vertexMesh:release() end
+            vertexMeshSize=math.max(count,64)
+            vertexMesh=g.newMesh(vertexMeshSize,mode,"stream")
+        end
+        vertexMesh:setVertices(vertices)
+        vertexMesh:setDrawMode(mode)
+        vertexMesh:setDrawRange(1,count)
+        g.draw(vertexMesh)
+    end
+    -- Shared with port/yellow_studio.lua's draw_primitive_end: one mesh, one
+    -- owner, no second pool.
+    R.drawVertices=drawVertices
     local function mesh(vertices)
         if not g then return end
-        g.setColor(1,1,1,1);local m=g.newMesh(vertices,"fan","stream");g.draw(m);m:release()
+        -- Vertex colours multiply with the draw colour, so the mesh is drawn
+        -- white -- and the previous colour is put back, because a builtin must
+        -- not leave the pipeline in a state its caller did not ask for
+        -- (spec section 6).
+        local pr,pg,pb,pa=g.getColor()
+        g.setColor(1,1,1,1)
+        drawVertices(vertices,"fan")
+        g.setColor(pr,pg,pb,pa)
     end
     B.draw_rectangle_color=function(_,x1,y1,x2,y2,c1,c2,c3,c4,outline)
         if R.truth(outline) then B.draw_line_color(nil,x1,y1,x2,y1,c1,c2);B.draw_line_color(nil,x2,y1,x2,y2,c2,c4);B.draw_line_color(nil,x2,y2,x1,y2,c4,c3);B.draw_line_color(nil,x1,y2,x1,y1,c3,c1)
@@ -699,11 +753,21 @@ function Graphics.install(R)
             end
         end
     end
+    -- The frame start and every view pop put the pipeline back to normal
+    -- blending. The recorded GameMaker GPU state (port/yellow_studio.lua ->
+    -- R.gpuState, which gpu_set_blendmode writes and the duplicate-draw guard
+    -- reads) has to say the same thing at those points, or it describes a
+    -- blend mode that is no longer set.
+    local function normalBlend()
+        local gpu=R.gpuState
+        if gpu then gpu.blendmode=0;gpu.blendmode_ext=nil end
+    end
     function R:renderFrame()
         self.drawLog={}
         -- The duplicate-draw comparison is per frame: every frame paints a fresh
         -- canvas, so the first draw of a frame always happens.
         state.lastSprite=nil
+        normalBlend()
         local views=self:views();local width,height=1,1
         for _,v in ipairs(views) do width=math.max(width,v.px+v.pw);height=math.max(height,v.py+v.ph) end
         self.displayWidth,self.displayHeight=width,height
@@ -825,11 +889,18 @@ function Graphics.install(R)
             view.x=clamp(view.x,0,math.max(0,self.vars.room_width-view.w));view.y=clamp(view.y,0,math.max(0,self.vars.room_height-view.h))
             if #views==1 and self.truth(self.vars.view_visible[view.index]) then self.vars.view_xview[view.index]=view.x;self.vars.view_yview[view.index]=view.y end
             if g then
-                g.push();g.setScissor(view.px,view.py,view.pw,view.ph);g.translate(view.px,view.py);g.scale(view.pw/view.w,view.ph/view.h);g.translate(view.w/2,view.h/2);g.rotate(math.rad(view.angle or 0));g.translate(-view.x-view.w/2,-view.y-view.h/2)
+                -- "all" scopes the viewport scissor with the view transform.
+                -- A plain push() only stacks the transform, so the clip
+                -- rectangle survived the matching pop and the Post Draw pass
+                -- below -- which GameMaker draws over the whole application
+                -- surface -- was still clipped to the last view's port
+                -- (spec section 6). It also contains any colour/font/blend an
+                -- instance Draw event leaves behind within the view.
+                g.push("all");g.setScissor(view.px,view.py,view.pw,view.ph);g.translate(view.px,view.py);g.scale(view.pw/view.w,view.ph/view.h);g.translate(view.w/2,view.h/2);g.rotate(math.rad(view.angle or 0));g.translate(-view.x-view.w/2,-view.y-view.h/2)
             end
             if self.roomState.backdrop then
                 log("reconstructed-background",self.roomState.backdrop)
-                if g then require("port.opening_backdrops").draw(g,self.roomState.backdrop) end
+                if g then OpeningBackdrops.draw(g,self.roomState.backdrop) end
             end
             backgrounds(false,view)
             drawPass(8,72) -- Draw Begin
@@ -870,6 +941,7 @@ function Graphics.install(R)
             drawPass(8,73) -- Draw End
             backgrounds(true,view)
             if g then g.pop() end
+            normalBlend()
         end
         drawPass(8,77) -- Post Draw
         -- Draw GUI is display space: no view transform, no viewport scissor.
@@ -892,13 +964,36 @@ function Graphics.install(R)
         if g then g.setScissor();g.setCanvas();g.pop() end
         self.vars.view_current=0
     end
-    function R:trimGraphicsCache()
+    function R:trimGraphicsCache(everything)
         -- Static textures/masks are lazy and can be reloaded. Retain only
         -- runtime-generated sprites; their pixels do not exist in the archive.
+        --
+        -- This runs at the end of every room load, and it used to release the
+        -- whole texture cache there: the player, the HUD, the dialogue font
+        -- pages and every texture the next room shares with this one were
+        -- thrown away at each door and decoded again on the next frame, which
+        -- is the "repeatedly loads assets ... every interaction" the debug
+        -- brief's section 7 asks about. A texture is now kept while it is
+        -- still in play -- drawn during this room load or the previous one --
+        -- so memory stays bounded to the rooms actually being played while the
+        -- churn at a transition disappears. love.lowmemory (and anything else
+        -- that must free everything now) passes everything=true and gets the
+        -- old behaviour.
+        local generation=state.generation
+        state.generation=generation+1
         for file,img in pairs(state.images) do
-            if file:sub(1,10)~="__surface_" then img:release();state.images[file]=nil end
+            if file:sub(1,10)~="__surface_"
+               and (everything or (state.imageUse[file] or -1)<generation) then
+                img:release();state.images[file]=nil;state.imageUse[file]=nil
+                local perFile=state.quads[file]
+                if perFile then
+                    for key,q in pairs(perFile) do q:release();perFile[key]=nil end
+                    state.quads[file]=nil
+                end
+            end
         end
-        for key,q in pairs(state.quads) do q:release();state.quads[key]=nil end
+        -- Collision masks keep the old policy: they are ImageData read per
+        -- pixel in the collision hot path, so they carry no use marker.
         for file,data in pairs(self.maskData or {}) do
             if file:sub(1,10)~="__surface_" then if data.release then data:release() end;self.maskData[file]=nil end
         end
@@ -907,10 +1002,11 @@ function Graphics.install(R)
     function R:releaseGraphics()
         if self.canvas then self.canvas:release();self.canvas=nil end
         for _,img in pairs(state.images) do img:release() end
-        for _,q in pairs(state.quads) do q:release() end
+        for _,perFile in pairs(state.quads) do for _,q in pairs(perFile) do q:release() end end
         for id,canvas in pairs(state.surfaces) do if id~=0 and canvas.release then canvas:release() end end
         for _,data in pairs(self.maskData or {}) do if data.release then data:release() end end
-        state.images={};state.quads={};state.surfaces={};self.maskData={}
+        if vertexMesh then vertexMesh:release();vertexMesh=nil;vertexMeshSize=0 end
+        state.images={};state.imageUse={};state.quads={};state.surfaces={};self.maskData={}
     end
 end
 return Graphics

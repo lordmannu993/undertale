@@ -253,7 +253,9 @@ end
 function love.visible(value) if smokeMode then return end; if not value then love.focus(false) else focused=true end end
 function love.lowmemory()
     if game then
-        game:trimGraphicsCache();game:trimAudioCache()
+        -- Low memory asks for everything, not just what the last two rooms
+        -- stopped using (port/graphics.lua -> R:trimGraphicsCache).
+        game:trimGraphicsCache(true);game:trimAudioCache()
         game:warn("low-memory","Android reported low memory; unused texture, mask and audio caches were released.")
     end
     collectgarbage("collect")

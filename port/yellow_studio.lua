@@ -37,6 +37,11 @@ return function(R)
     for name,value in pairs({ds_type_map=DS_MAP,ds_type_list=DS_LIST,ds_type_stack=DS_STACK,
         ds_type_queue=DS_QUEUE,ds_type_grid=DS_GRID,ds_type_priority=DS_PRIORITY,
         bm_normal=0,bm_add=3,bm_subtract=1,bm_max=2,
+        -- GameMaker's primitive kinds. Without them every pr_* reference in
+        -- Yellow's drawing code resolved to the undefined-variable 0 and every
+        -- primitive was drawn as the same (invalid) kind.
+        pr_pointlist=1,pr_linelist=2,pr_linestrip=3,
+        pr_trianglelist=4,pr_trianglestrip=5,pr_trianglefan=6,
         gp_face1=32769,gp_face2=32770,gp_face3=32771,gp_face4=32772,
         gp_shoulderl=32773,gp_shoulderlb=32775,gp_shoulderr=32774,gp_shoulderrb=32776,
         gp_select=32777,gp_start=32778,gp_stickl=32779,gp_stickr=32780,
@@ -422,8 +427,21 @@ return function(R)
         B.draw_sprite_part_ext(E,index,sub,l,t,w,h,x,y,sx,sy,c1,alpha)
     end)
     local primitive=nil
-    local PRIMITIVE_KINDS={[0]="trianglelist",[1]="trianglestrip",[2]="linelist",[3]="linestrip",[4]="pointlist"}
-    reg("draw_primitive_begin",function(_,kind) primitive={kind=PRIMITIVE_KINDS[math.floor(kind or 0)],points={}} end)
+    -- GameMaker's primitive kinds are pr_pointlist=1 .. pr_trianglefan=6, and
+    -- the three LÖVE mesh draw modes cover half of them. The previous table
+    -- was keyed from 0 and held GameMaker's own names, which are not LÖVE
+    -- MeshDrawModes: every Yellow primitive (the gradient backgrounds, the
+    -- battle transition, obj_martlet_final_bg) reached newMesh with an
+    -- invalid mode. Line and point kinds have no mesh mode at all and are
+    -- drawn as lines/points below.
+    local PRIMITIVE_KINDS={[1]={points=true},[2]={lines="list"},[3]={lines="strip"},
+        [4]={mode="triangles"},[5]={mode="strip"},[6]={mode="fan"}}
+    reg("draw_primitive_begin",function(_,kind)
+        kind=math.floor(kind or 0)
+        local shape=PRIMITIVE_KINDS[kind]
+        if not shape then R:unsupported("draw_primitive_begin","primitive kind "..tostring(kind)) end
+        primitive={shape=shape,points={}}
+    end)
     reg("draw_vertex",function(_,x,y)
         if primitive then primitive.points[#primitive.points+1]={x,y,state().color,state().alpha} end
     end)
@@ -433,18 +451,48 @@ return function(R)
     reg("draw_vertex_colour",function(_,x,y,colour,alpha) B.draw_vertex_color(nil,x,y,colour,alpha) end)
     reg("draw_primitive_end",function()
         if not primitive then return end
-        local points,kind=primitive.points,(primitive.kind or "trianglelist")
+        local points,shape=primitive.points,primitive.shape
         primitive=nil
         if #points<2 or not love.graphics or R.options.headless then return end
-        local vertices={}
-        for _,point in ipairs(points) do
+        local g=love.graphics
+        -- The pipeline is put back exactly as it was found (spec section 6).
+        local pr,pg,pb,pa=g.getColor()
+        local function colour(point)
             local c=math.floor(point[3] or 16777215)%16777216
-            vertices[#vertices+1]={point[1],point[2],0,0,(c%256)/255,(math.floor(c/256)%256)/255,
-                (math.floor(c/65536)%256)/255,math.max(0,math.min(1,point[4] or 1))}
+            return (c%256)/255,(math.floor(c/256)%256)/255,(math.floor(c/65536)%256)/255,
+                math.max(0,math.min(1,point[4] or 1))
         end
-        love.graphics.setColor(1,1,1,1)
-        local mesh=love.graphics.newMesh(vertices,kind,"stream")
-        love.graphics.draw(mesh);mesh:release()
+        if shape.lines then
+            -- LÖVE has no line mesh mode; a line list joins vertex pairs and a
+            -- line strip joins consecutive vertices, each segment drawn in its
+            -- first vertex's colour (the same first-corner rule the other
+            -- gradient fallbacks in this port use).
+            local step=shape.lines=="list" and 2 or 1
+            for i=1,#points-1,step do
+                local a,b=points[i],points[i+1]
+                if a and b then
+                    g.setColor(colour(a))
+                    g.line(a[1],a[2],b[1],b[2])
+                end
+            end
+        elseif shape.points then
+            for _,point in ipairs(points) do
+                g.setColor(colour(point))
+                g.points(point[1],point[2])
+            end
+        else
+            local vertices={}
+            for i,point in ipairs(points) do
+                local r,gg,b,a=colour(point)
+                vertices[i]={point[1],point[2],0,0,r,gg,b,a}
+            end
+            -- The shared pooled stream mesh in port/graphics.lua: one buffer
+            -- for every coloured primitive in both worlds, instead of a new
+            -- Mesh per draw_primitive_end call.
+            g.setColor(1,1,1,1)
+            R.drawVertices(vertices,shape.mode)
+        end
+        g.setColor(pr,pg,pb,pa)
     end)
 
     -- Shaders and the texture handles they consume.
