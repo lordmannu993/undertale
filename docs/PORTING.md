@@ -179,6 +179,94 @@ alone:
   The full headless suite is the authority for converted routing; native LÖVE,
   Android, audio fidelity and a hand-played route remain out of scope.
 
+## Debug fixes — D5: graphics-state and resource hygiene sweep
+
+D5 (brief §6 graphics state, §7 resource management) audited every
+`push/pop/translate/rotate/scale/origin/setFont/setColor/setShader/setCanvas/
+setScissor/setBlendMode` site and every asset-creation site in the port, and
+fixed the five things that were actually wrong. `tests/test_graphics_state.py`
+(12 tests) is the guard: it drives the **real** runtime against a strict `love`
+double that keeps LÖVE's own display state and stack semantics (`push()` stacks
+the transform, `push("all")` stacks the whole state) and counts every resource
+constructor, so a leak or a per-frame allocation fails a test instead of being
+noticed on a device.
+
+* **Leak 1 — the viewport scissor outlived its view.** The view pass did
+  `g.push()` (transform only) and then `setScissor(view port)`. A scissor is
+  not part of the transform stack, so the matching `pop()` could not take it
+  back, and GameMaker's **Post Draw** pass — which draws over the whole
+  application surface, outside any view — ran clipped to the last view's port.
+  Fixed by scoping the view with `push("all")`, which is the brief's own
+  push → transform → draw → pop shape and also contains any colour/font/blend
+  an instance's Draw event leaves behind.
+* **Leak 2 — the text fallback font stayed selected.** `text()` pushed only the
+  transform, then called `setFont(fallback)` on the path taken when a font id
+  has no converted glyph record; LÖVE kept that 14 px font afterwards.
+  `push("all")` now scopes the font and the draw colour with the transform.
+* **Leak 3 — coloured primitives left the draw colour white.** Every mesh
+  primitive set `setColor(1,1,1,1)` (vertex colours multiply) and never put the
+  previous colour back. Both mesh paths now restore the colour they found.
+* **Leak 4 — the recorded GPU state disagreed with the pipeline.**
+  `renderFrame` forces normal blending at the frame start (and now at each view
+  pop), but `R.gpuState.blendmode`, which `gpu_set_blendmode` writes and the
+  duplicate-draw guard reads, kept Yellow's last value. The record is now reset
+  at exactly the two points where the port resets blending.
+* **Resource 1 — a texture cache emptied at every door.** `Runtime:loadRoom`
+  trims the graphics cache at the end of every room load, and that trim
+  released **everything**: Frisk's own sprite, the HUD, the dialogue font pages
+  and every tile page the next room shares with this one were thrown away and
+  decoded again on the next frame — brief §7's "repeatedly loads assets …
+  every interaction". Textures now carry the room-load generation that last
+  drew them and are kept while still in play (this room load or the previous
+  one); anything older is still released, so memory stays bounded to the rooms
+  being played. `love.lowmemory` passes `trimGraphicsCache(true)` and still
+  frees everything. Measured headlessly with the double, `newImage` calls per
+  room load: Ruins 12→13→14→13→12 **9/9/4/9/9 → 9/6/1/6/6** (−30% overall,
+  −75% on the shared-tileset hop), Yellow snowdin→dunes→snowdin→hotland
+  **10/4/10/3 → 9/3/9/2**. Collision masks keep the old full-trim policy on
+  purpose: they are read per pixel in the collision hot path, so they carry no
+  use marker.
+* **Resource 2 — a `Mesh` per primitive per frame.** `draw_line`,
+  `draw_rectangle_color`, `draw_triangle*`, `draw_ellipse_color` and Yellow's
+  `draw_primitive_end` each created a stream `Mesh` and released it again on
+  every call — in loops (Yellow's EQ visualiser draws one rectangle per bar;
+  Undertale's lasers, radar and graphs draw lines every frame). They now share
+  one pooled stream mesh (`R.drawVertices`) that only grows. Measured: 75
+  primitives create 75 meshes before, 1 after.
+* **Resource 3 — a `require` in the draw path.** The view pass called
+  `require("port.opening_backdrops")` on every frame of the reconstructed
+  opening rooms. Hoisted to module load.
+* **Correctness found by the same sweep — Yellow's primitive kinds.** Nothing
+  defined GameMaker's `pr_*` constants, so every `draw_primitive_begin(pr_…)`
+  in Yellow (gradient backgrounds, the battle transition,
+  `obj_martlet_final_bg`) resolved to the undefined-variable `0`, and the port
+  then asked `newMesh` for GameMaker's own name `"trianglelist"` — not a LÖVE
+  MeshDrawMode, so the call would error on a real GPU. `pr_pointlist=1 …
+  pr_trianglefan=6` are now registered, triangle kinds map to LÖVE's
+  `triangles`/`strip`/`fan`, and the line and point kinds (LÖVE has no mesh
+  mode for them) are drawn as segments/points in their first vertex's colour.
+* **Audited and deliberately unchanged:** shaders (never set in LÖVE — reported
+  and skipped, see §8 of the fusion record), `surface_set_target` /
+  `surface_reset_target` and `draw_getpixel` (canvas changes are restored, and
+  the frame's own `push("all")` contains a dangling surface target),
+  `setLineWidth` (always set immediately before use; the particle shapes
+  restore 1), the touch overlay and `main.lua`'s panels (both already
+  `push("all")`), `port/opening_backdrops.lua` (already `push("all")`), audio
+  (static cues are cached templates that are cloned; streamed music gets its
+  own source per play, which is what streaming means), and the JSON/`require`
+  loads in `port/runtime.lua`, which happen once at startup.
+* **No behaviour change where none was wanted.** D1b's `draw_text_ext` wrap
+  contract is untouched (D5 only widened the push around the same helper), and
+  `tools/debug_probe.py` reports the same draw and event counts before and
+  after: Hotland dock 128 draws/frame and 128.5 events/tick, Snowdin 805.9
+  draws/frame and 93 events/tick, allocations in the same band
+  (μs/tick in this sandbox is too noisy to quote).
+* **Scope.** Headless converted flow under a deterministic LÖVE double, plus
+  the full suite and the CI native LÖVE gate. It is not a measurement of
+  native GPU time, texture memory on a device, Android behaviour or pixel
+  parity; the texture-retention numbers above are counts of `newImage` calls,
+  not milliseconds.
+
 ## What is converted
 
 The build translates **20,285 source units** (137,558 lines of extracted GML),
