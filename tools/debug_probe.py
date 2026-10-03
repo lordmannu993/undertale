@@ -792,7 +792,13 @@ if wants("acceptance") then
             "TEST C: draws/frame drifted across the soak: " .. fmt(hot1.draws) .. " -> " .. fmt(hot2.draws))
         assert(hot2.memory <= hot1.memory * 1.20 + 512,
             "TEST C: memory grew across the soak: " .. fmt(hot1.memory) .. " -> " .. fmt(hot2.memory) .. " KB")
-        assert(hot2.kb <= hot1.kb * 1.25 + 1,
+        -- A soak's first allocation sample can be negative: right after the
+        -- crossing the collector reclaims the leaving world's garbage, so the
+        -- window nets below zero. That is GC settling, not a real allocation
+        -- rate, and it must not become the baseline that any honest ~0 KB/tick
+        -- steady rate would "grow" past (CI hit -7.70 -> 0.06). Clamp the
+        -- baseline at zero: growth is only meaningful from a real rate.
+        assert(hot2.kb <= math.max(hot1.kb, 0) * 1.25 + 1,
             "TEST C: the allocation rate grew across the soak: " .. fmt(hot1.kb) .. " -> " .. fmt(hot2.kb) .. " KB/tick")
         check("C", "Yellow soak",
             ("%d ticks per window, hotland -> snowdin -> dunes -> hotland; one player at every tick; instances %d -> %d; hotland draws/frame %.0f -> %.0f (snowdin %.0f, dunes %.0f); hotland %s -> %s KB/tick; memory %.0f -> %.0f KB; headless has no image backend, so texture reuse is proven by tests/test_graphics_state.py and the native gate's newImage counter")
@@ -938,7 +944,9 @@ if wants("acceptance") then
             hops[#hops + 1] = ("r%d->UT players=1 instances=%d"):format(round, #R.instances)
         end
         assert(worst <= 1, "TEST F: " .. worst .. " players alive at once during the repeated crossings")
-        assert(r3kb <= r1kb * 1.25 + 1,
+        -- Same clamp as TEST C: round 1's hotland sample lands right after a
+        -- crossing, where the settling collector can net below zero.
+        assert(r3kb <= math.max(r1kb, 0) * 1.25 + 1,
             "TEST F: the allocation rate grew across the repeats: " .. fmt(r1kb) .. " -> " .. fmt(r3kb) .. " KB/tick")
         check("F", "repeated transitions",
             ("three UT -> Yellow -> UT round trips (six crossings) end back in Undertale; the every-tick census never saw more than one player; %s; hotland allocations %s -> %s KB/tick across the repeats")
