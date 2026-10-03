@@ -23,7 +23,14 @@ seed) and prints, section by section, the observable evidence for each symptom:
 * ``[boat-destination]``— where the River Person's own disembark code and the
                          packaged crossings actually land for every choice,
                          recorded by wrapping ``R:gotoRoom`` in this probe's VM
-                         only (no repository code is changed).
+                         only (no repository code is changed);
+* ``[acceptance]``      — D6's TEST A-F checklist (brief section 11) run end to
+                         end as ONE continuous session on a fresh runtime:
+                         Undertale opening -> River Person crossing -> Yellow
+                         soak -> Yellow dialogue -> whale return -> repeated
+                         crossings. Prints ``TEST X ...: PASS`` per scenario,
+                         aborts on any failed check and ends with
+                         ``DEBUG ACCEPTANCE PASS: A B C D E F``.
 
 The probe is a *measurement*: it exits 0 when it ran to completion, and its
 output is quoted in ``docs/DEBUG_BASELINE.md``. It fixes nothing; the fixes
@@ -575,6 +582,379 @@ if wants("boat-destination") then
     if mismatches > 0 then
         say("SYMPTOM BOAT-DESTINATION: at least one packaged choice lands somewhere else.")
     end
+end
+
+--------------------------------------------------------------- acceptance ---
+-- D6 (brief section 11): the owner's TEST A-F checklist, run end to end as
+-- ONE continuous session on a fresh runtime - the exact sequence the owner
+-- plays, not isolated fixtures. Each scenario prints "TEST X (...): PASS -
+-- <evidence>"; any failed check aborts the probe, and the section ends with
+-- "DEBUG ACCEPTANCE PASS: A B C D E F".
+if wants("acceptance") then
+    section("acceptance")
+    local input = Input.new()
+    local R = Runtime.new(require("generated.merged.manifest"), input,
+        {headless = true, trace = true, memorySaves = true, seed = 42})
+    R:start()
+    local UN, YN = R.manifest.names, R.manifest.yellow_names
+    local OBJ = {
+        frisk = UN["obj_mainchara"],
+        clover = YN.objects["obj_pl"],
+        boat = UN["obj_dogboat_thing"],
+        dialogue = YN.objects["obj_dialogue"],
+        writer = UN["OBJ_WRITER"],
+    }
+    local ROOM = {
+        hotland = YN.rooms["rm_hotland_02"],
+        snowdin = YN.rooms["rm_snowdin_11_yellow"],
+        dunes = YN.rooms["rm_dunes_05"],
+    }
+    local function tick(n)
+        for _ = 1, n do
+            input:beginFrame(); R:step(); R:renderFrame(); R:finishFrame(); input:endFrame()
+        end
+    end
+    local function hold(k, n)
+        input:setSource("test", {k}); tick(n); input:setSource("test", {}); tick(1)
+    end
+    local function tap(k) hold(k, 1) end
+    local function countInstances(object)
+        local total = 0
+        for _, inst in ipairs(R.instances) do
+            if inst.alive and inst.v.object_index == object then total = total + 1 end
+        end
+        return total
+    end
+    local function playerCount() return countInstances(OBJ.frisk) + countInstances(OBJ.clover) end
+    local function playerInstance() return R:select(OBJ.frisk)[1] or R:select(OBJ.clover)[1] end
+    local function roomName() return R.roomState and R.roomState.name or "?" end
+
+    -- Event census by world band: while one world is on screen, no event may
+    -- reach an instance of the other (brief section 5 - the old world must not
+    -- keep updating in the background).
+    local eventsByWorld = {undertale = 0, yellow = 0}
+    local rawEvent = R.event
+    function R:event(inst, kind, number, ...)
+        if inst and inst.v and type(inst.v.object_index) == "number" then
+            local world = inst.v.object_index >= base and "yellow" or "undertale"
+            eventsByWorld[world] = eventsByWorld[world] + 1
+        end
+        return rawEvent(self, inst, kind, number, ...)
+    end
+    local drawFrames, drawTotal = 0, 0
+    local rawRender = R.renderFrame
+    function R:renderFrame()
+        local result = rawRender(self)
+        drawFrames = drawFrames + 1
+        drawTotal = drawTotal + #self.drawLog
+        return result
+    end
+    local function memoryKB()
+        collectgarbage("collect")
+        return collectgarbage("count")
+    end
+    local function check(letter, name, evidence)
+        say("TEST " .. letter .. " (" .. name .. "): PASS - " .. evidence)
+    end
+
+    -- TEST A (Undertale): the scripted opening - movement, NPC dialogue,
+    -- fonts, rendering, and the corridor's cost against the D0 baseline.
+    do
+        tick(10); tap(90); tick(40); tap(90)
+        assert(roomName() == "room_intromenu", "TEST A: title -> menu failed: " .. roomName())
+        tap(90); tap(90)
+        for _ = 1, 5 do tap(39) end
+        tap(38); tap(90); tap(39); tap(90); tick(200)
+        assert(roomName() == "room_area1" and R.global.charname == "A",
+            "TEST A: naming -> first room failed: " .. roomName())
+        local player = playerInstance()
+        assert(player, "TEST A: no player in room_area1")
+        local x0, y0 = player.v.x, player.v.y
+        hold(40, 10); hold(39, 160)
+        local moved = math.abs(player.v.x - x0) + math.abs(player.v.y - y0)
+        assert(moved > 100, "TEST A: the scripted walk moved only " .. moved .. " px")
+        local yb = playerInstance().v.y
+        hold(38, 20); hold(38, 100)
+        assert(roomName() == "room_area1_2", "TEST A: the corridor doorway failed: " .. roomName())
+        moved = moved + math.max(yb - playerInstance().v.y, 0)
+        tick(90) -- Flowey's greeting types
+        local writer = R:select(OBJ.writer)[1]
+        assert(writer and tostring(writer.v.originalstring):find("Howdy", 1, true),
+            "TEST A: Flowey's greeting is missing")
+        local textDraws, fontsOk, fontNames = 0, true, {}
+        for _, entry in ipairs(R.drawLog) do
+            if entry[1] == "text" then
+                textDraws = textDraws + 1
+                local id = entry[5]
+                local rec = type(id) == "number" and R.assets.fonts[id] or nil
+                if not rec or id >= base then fontsOk = false end
+                if rec then fontNames[rec.name] = true end
+            end
+        end
+        local names = {}
+        for name in pairs(fontNames) do names[#names + 1] = name end
+        table.sort(names)
+        assert(textDraws > 0, "TEST A: no Undertale text drew in the corridor frame")
+        assert(fontsOk, "TEST A: an Undertale text draw used a non-Undertale font record")
+        local mem0 = memoryKB()
+        local f0, d0, t0 = drawFrames, drawTotal, os.clock()
+        tick(PERF_TICKS)
+        local frames = drawFrames - f0
+        local draws = (drawTotal - d0) / frames
+        local us = (os.clock() - t0) / PERF_TICKS * 1e6
+        local kb = (memoryKB() - mem0) / PERF_TICKS
+        assert(draws >= 45 and draws <= 52,
+            "TEST A: corridor draws/frame " .. fmt(draws) .. " drifted from the D0 baseline of 48")
+        assert(kb <= 120, "TEST A: corridor allocations " .. fmt(kb) .. " KB/tick exceed the 120 KB/tick gate")
+        check("A", "Undertale",
+            ("played to %s; the scripted walk moved the player %d px; Flowey's \"Howdy\" dialogue present; %d text draws, all Undertale font records (%s); corridor %.0f draws/frame (D0 baseline: 48), %s us/tick (D0: 2033), %s KB/tick")
+                :format(roomName(), moved, textDraws, table.concat(names, ", "), draws, fmt(us), fmt(kb)))
+    end
+
+    -- TEST B (enter Yellow): the packaged River Person crossing, then the
+    -- landing, movement, collisions and camera in Yellow's own room.
+    do
+        R.global.plot = 122
+        R:gotoRoom(140); R:applyTransitions(); tick(5)
+        assert(roomName() == "room_fire_dock", "TEST B: the Hotland dock did not load: " .. roomName())
+        assert(countInstances(OBJ.boat) >= 1, "TEST B: the dock's boat is missing")
+        local sharedPlayer = R.player
+        hold(88, 2)
+        assert(R.travel.riverLatch, "TEST B: holding X during the ride did not arm the fused crossing")
+        R:gotoRoom(140); R:applyTransitions(); tick(10)
+        assert(R.travel.world == "yellow" and roomName() == "rm_hotland_02",
+            "TEST B: the crossing landed in " .. roomName() .. " (" .. tostring(R.travel.world) .. ")")
+        assert(playerCount() == 1, "TEST B: " .. playerCount() .. " players after the crossing")
+        assert(R.player == sharedPlayer, "TEST B: the crossing replaced the shared Player record")
+        local landed = playerInstance()
+        assert(landed.v.x == 170 and landed.v.y == 120,
+            "TEST B: landed at " .. landed.v.x .. "," .. landed.v.y .. " instead of Yellow's own 170,120")
+        -- Movement + collisions: each direction's leg must move, and no leg may
+        -- walk the player out of the room's bounds. Symmetric holds cancel out
+        -- in net displacement, so every leg is measured on its own.
+        local roomW, roomH = R.vars.room_width, R.vars.room_height
+        local legX, legY = landed.v.x, landed.v.y
+        local legs, total = {}, 0
+        for _, key in ipairs({37, 39, 38, 40}) do
+            hold(key, 40)
+            local p = playerInstance()
+            local d = math.abs(p.v.x - legX) + math.abs(p.v.y - legY)
+            legs[#legs + 1] = d
+            total = total + d
+            legX, legY = p.v.x, p.v.y
+        end
+        assert(total > 0, "TEST B: the player cannot move in rm_hotland_02")
+        assert(legX >= 0 and legX <= roomW and legY >= 0 and legY <= roomH,
+            "TEST B: the player left the room bounds: " .. legX .. "," .. legY)
+        tick(5)
+        local view = R:views()[1]
+        assert(landed.v.x >= view.x and landed.v.x <= view.x + view.w
+            and landed.v.y >= view.y and landed.v.y <= view.y + view.h,
+            "TEST B: the camera view does not contain the player")
+        check("B", "enter Yellow",
+            ("dock 140 + X held -> %s; one player, shared record kept; landed at Yellow's own 170,120; per-direction legs moved %s px inside %dx%d; the %.0fx%.0f camera view at (%.0f,%.0f) contains the player")
+                :format(roomName(), table.concat(legs, "+"), roomW, roomH, view.w, view.h, view.x, view.y))
+    end
+
+    -- TEST C (Yellow performance): an extended stay with room changes, watching
+    -- memory, instance and player counts, draw workload and the allocation
+    -- rate - the quantities piece D2 had to keep stable.
+    do
+        assert(roomName() == "rm_hotland_02", "TEST C: expected to soak from rm_hotland_02: " .. roomName())
+        local SOAK = QUICK and 80 or 150
+        local function soakWindow(ticks)
+            local mem0 = memoryKB()
+            local f0, d0, t0 = drawFrames, drawTotal, os.clock()
+            local worstPlayers = 0
+            for _ = 1, ticks do
+                tick(1)
+                worstPlayers = math.max(worstPlayers, playerCount())
+            end
+            local frames = drawFrames - f0
+            return {draws = (drawTotal - d0) / frames, us = (os.clock() - t0) / ticks * 1e6,
+                kb = (memoryKB() - mem0) / ticks, players = worstPlayers,
+                instances = #R.instances, memory = memoryKB()}
+        end
+        local hot1 = soakWindow(SOAK)
+        R:gotoRoom(ROOM.snowdin); R:applyTransitions(); tick(10)
+        local snow = soakWindow(SOAK)
+        R:gotoRoom(ROOM.dunes); R:applyTransitions(); tick(10)
+        local dunes = soakWindow(SOAK)
+        R:gotoRoom(ROOM.hotland); R:applyTransitions(); tick(10)
+        local hot2 = soakWindow(SOAK)
+        for _, pair in ipairs({{"hotland #1", hot1}, {"snowdin", snow}, {"dunes", dunes}, {"hotland #2", hot2}}) do
+            assert(pair[2].players == 1,
+                "TEST C: " .. pair[2].players .. " players during the " .. pair[1] .. " soak")
+        end
+        assert(hot2.instances == hot1.instances,
+            "TEST C: the instance count grew across the soak: " .. hot1.instances .. " -> " .. hot2.instances)
+        assert(math.abs(hot2.draws - hot1.draws) <= 2,
+            "TEST C: draws/frame drifted across the soak: " .. fmt(hot1.draws) .. " -> " .. fmt(hot2.draws))
+        assert(hot2.memory <= hot1.memory * 1.20 + 512,
+            "TEST C: memory grew across the soak: " .. fmt(hot1.memory) .. " -> " .. fmt(hot2.memory) .. " KB")
+        -- A soak's first allocation sample can be negative: right after the
+        -- crossing the collector reclaims the leaving world's garbage, so the
+        -- window nets below zero. That is GC settling, not a real allocation
+        -- rate, and it must not become the baseline that any honest ~0 KB/tick
+        -- steady rate would "grow" past (CI hit -7.70 -> 0.06). Clamp the
+        -- baseline at zero: growth is only meaningful from a real rate.
+        assert(hot2.kb <= math.max(hot1.kb, 0) * 1.25 + 1,
+            "TEST C: the allocation rate grew across the soak: " .. fmt(hot1.kb) .. " -> " .. fmt(hot2.kb) .. " KB/tick")
+        check("C", "Yellow soak",
+            ("%d ticks per window, hotland -> snowdin -> dunes -> hotland; one player at every tick; instances %d -> %d; hotland draws/frame %.0f -> %.0f (snowdin %.0f, dunes %.0f); hotland %s -> %s KB/tick; memory %.0f -> %.0f KB; headless has no image backend, so texture reuse is proven by tests/test_graphics_state.py and the native gate's newImage counter")
+                :format(SOAK, hot1.instances, hot2.instances, hot1.draws, hot2.draws, snow.draws, dunes.draws,
+                    fmt(hot1.kb), fmt(hot2.kb), hot1.memory, hot2.memory))
+    end
+
+    -- TEST D (Yellow text): dialogue through Yellow's own obj_dialogue, opened
+    -- the way Yellow's NPCs open it.
+    do
+        assert(R.travel.world == "yellow", "TEST D: not in Yellow: " .. tostring(R.travel.world))
+        local dlg = R:create(OBJ.dialogue, 100, 100)
+        local marker = "* Hello! Welcome to#  the Hotland crossing."
+        dlg.v.message = {[0] = marker}
+        dlg.v.talker = {[0] = -4}
+        dlg.v.portrait = 0
+        local deadline, saw = 0, nil
+        while deadline < 240 and not saw do
+            tick(1); deadline = deadline + 1
+            for _, entry in ipairs(R.drawLog) do
+                if entry[1] == "text" and tostring(entry[2]):find("Hotland crossing", 1, true) then saw = entry end
+            end
+        end
+        assert(saw, "TEST D: the marker never drew through obj_dialogue")
+        local fntMain = YN.fonts["fnt_main"]
+        assert(type(saw[5]) == "number" and saw[5] == fntMain,
+            "TEST D: the dialogue drew with font " .. tostring(saw[5]) ..
+            ", not Yellow's own fnt_main (merged " .. tostring(fntMain) .. ")")
+        local allYellow = true
+        for _, entry in ipairs(R.drawLog) do
+            if entry[1] == "text"
+                and not (type(entry[5]) == "number" and entry[5] >= base and R.assets.fonts[entry[5]]) then
+                allYellow = false
+            end
+        end
+        assert(allYellow, "TEST D: a text draw in Yellow used a non-Yellow font record")
+        -- Layout: GameMaker's no-auto-wrap keeps only the explicit # break, so
+        -- the box is wider than it is tall (D0's vertical column was 7 rows).
+        local B = R.builtins
+        local explicitBreaks = select(2, marker:gsub("#", ""))
+        local width = B.string_width(nil, (marker:gsub("#", " ")))
+        local height = (explicitBreaks + 1) * 18
+        assert(width > height, "TEST D: the marker box is " .. width .. "x" .. height ..
+            " - taller than wide, the vertical stacking returned")
+        if dlg.alive then R:destroy(dlg, false) end
+        R.global.dialogue_open = false
+        tick(2)
+        check("D", "Yellow text",
+            ("obj_dialogue drew the marker with Yellow's own fnt_main (merged %d, %d ticks after opening); every text draw in the frame is a Yellow-band record; the %d explicit breaks layout as a %dx%d box, wider than tall (D0 symptom: 55x126)")
+                :format(fntMain, deadline, explicitBreaks, width, height))
+    end
+
+    -- TEST E (return): Yellow's own whale globals carry the player home. The
+    -- whale hands fast_travel_newx/newy to Yellow's transition object, which
+    -- only ever uses them to create a *Yellow* player; an Undertale dock is
+    -- entered the way Undertale itself enters it - the room's own placement.
+    do
+        local roomData = R:roomData(125)
+        local expectX, expectY = nil, nil
+        for _, instance in ipairs(roomData.instances or {}) do
+            if instance.object == OBJ.frisk then expectX, expectY = instance.x, instance.y end
+        end
+        if not expectX then expectX, expectY = R.travel:landingSpot("undertale", 125, nil) end
+        R.global.fast_travel_point = "Waterfall - Dock"
+        tick(2) -- beforeStep publishes the whale's travel globals
+        R:gotoRoom(125); R:applyTransitions(); tick(10)
+        assert(R.travel.world == "undertale" and roomName() == "room_water_dock",
+            "TEST E: the whale landed in " .. roomName() .. " (" .. tostring(R.travel.world) .. ")")
+        assert(playerCount() == 1, "TEST E: " .. playerCount() .. " players after the return")
+        local player = playerInstance()
+        assert(math.abs(player.v.x - expectX) <= 2 and math.abs(player.v.y - expectY) <= 2,
+            "TEST E: landed at " .. player.v.x .. "," .. player.v.y ..
+            " instead of the dock room's own placement " .. expectX .. "," .. expectY)
+        assert(countInstances(OBJ.boat) >= 1, "TEST E: the dock's boat is missing")
+        local boatDistance = 0
+        for _, inst in ipairs(R.instances) do
+            if inst.alive and inst.v.object_index == OBJ.boat then
+                boatDistance = math.abs(inst.v.x - player.v.x) + math.abs(inst.v.y - player.v.y)
+            end
+        end
+        -- Undertale resumes: movement works, and no Yellow instance runs. Each
+        -- leg is measured on its own; symmetric holds cancel in net terms.
+        local legX, legY = player.v.x, player.v.y
+        local e0 = eventsByWorld.yellow
+        local moved = 0
+        for _, key in ipairs({37, 39, 38, 40}) do
+            hold(key, 20)
+            local p = playerInstance()
+            moved = moved + math.abs(p.v.x - legX) + math.abs(p.v.y - legY)
+            legX, legY = p.v.x, p.v.y
+        end
+        tick(10)
+        assert(moved > 0, "TEST E: the player cannot move after returning to Undertale")
+        assert(eventsByWorld.yellow == e0,
+            "TEST E: Yellow instances received events after the return to Undertale")
+        assert(R.pendingRoom == nil, "TEST E: a room change is stuck pending")
+        check("E", "return",
+            ("fast_travel_point=\"Waterfall - Dock\" -> %s; one player at the dock room's own placement %d,%d (the boat is placed %d px away); Undertale movement resumed (%d px) with zero Yellow-side events; no transition is stuck")
+                :format(roomName(), expectX, expectY, boatDistance, moved))
+    end
+
+    -- TEST F (repeated transitions): UT -> Y -> UT -> Y -> UT -> Y -> UT, with
+    -- a player census on every tick of every crossing.
+    do
+        local hops, worst = {}, 0
+        local r1kb, r3kb
+        for round = 1, 3 do
+            hold(88, 2)
+            R:gotoRoom(140)
+            for _ = 1, 12 do
+                tick(1)
+                worst = math.max(worst, playerCount())
+            end
+            R:applyTransitions(); tick(5)
+            assert(R.travel.world == "yellow" and roomName() == "rm_hotland_02",
+                "TEST F round " .. round .. " -> Yellow: landed in " .. roomName() ..
+                " (" .. tostring(R.travel.world) .. ")")
+            assert(playerCount() == 1, "TEST F round " .. round .. ": " .. playerCount() .. " players in Yellow")
+            assert(R.pendingRoom == nil, "TEST F round " .. round .. ": a room change is stuck pending")
+            local e0 = eventsByWorld.undertale
+            tick(10)
+            assert(eventsByWorld.undertale == e0,
+                "TEST F: Undertale instances received events while Yellow was on screen")
+            hops[#hops + 1] = ("r%d->Y players=1 instances=%d"):format(round, #R.instances)
+            if round == 1 or round == 3 then
+                local mem0 = memoryKB()
+                tick(40)
+                local kb = (memoryKB() - mem0) / 40
+                if round == 1 then r1kb = kb else r3kb = kb end
+            end
+            R.global.fast_travel_point = "Waterfall - Dock"
+            R:gotoRoom(125)
+            for _ = 1, 12 do
+                tick(1)
+                worst = math.max(worst, playerCount())
+            end
+            R:applyTransitions(); tick(5)
+            assert(R.travel.world == "undertale" and roomName() == "room_water_dock",
+                "TEST F round " .. round .. " -> Undertale: landed in " .. roomName() ..
+                " (" .. tostring(R.travel.world) .. ")")
+            assert(playerCount() == 1, "TEST F round " .. round .. ": " .. playerCount() .. " players in Undertale")
+            assert(R.pendingRoom == nil, "TEST F round " .. round .. ": a room change is stuck pending")
+            hops[#hops + 1] = ("r%d->UT players=1 instances=%d"):format(round, #R.instances)
+        end
+        assert(worst <= 1, "TEST F: " .. worst .. " players alive at once during the repeated crossings")
+        -- Same clamp as TEST C: round 1's hotland sample lands right after a
+        -- crossing, where the settling collector can net below zero.
+        assert(r3kb <= math.max(r1kb, 0) * 1.25 + 1,
+            "TEST F: the allocation rate grew across the repeats: " .. fmt(r1kb) .. " -> " .. fmt(r3kb) .. " KB/tick")
+        check("F", "repeated transitions",
+            ("three UT -> Yellow -> UT round trips (six crossings) end back in Undertale; the every-tick census never saw more than one player; %s; hotland allocations %s -> %s KB/tick across the repeats")
+                :format(table.concat(hops, "; "), fmt(r1kb), fmt(r3kb)))
+    end
+
+    say("DEBUG ACCEPTANCE PASS: A B C D E F (session frames=" .. R.frame ..
+        " crossings=" .. tostring(R.travel.crossings) .. ")")
 end
 
 --------------------------------------------------------------- summary -----

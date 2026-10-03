@@ -54,14 +54,16 @@ reading a copy that only exists next to the build machine.
 ### Work in progress — the debug & repair queue
 
 The fusion queue above is **complete and frozen** (its record is
-[docs/FUSION_STATUS.md](docs/FUSION_STATUS.md)). What the owner reports as still
+[docs/FUSION_STATUS.md](docs/FUSION_STATUS.md)). What the owner reported as still
 broken in the shipped build — Undertale Yellow's fonts and vertical text, heavy
 lag on the Yellow side, the River Person transition duplicating the Player, and
-the boat's destination — is being fixed against the owner's binding
-[debug & repair brief](docs/DEBUG_SPEC.md), worked piece by piece in the live
-[debug queue](docs/DEBUG_QUEUE.md). Those fixes are **source-only until they are
-released**: the newest downloadable archive is still v1.2.5, and the README's
-download line above always names whichever build is newest.
+the boat's destination — was fixed against the owner's binding
+[debug & repair brief](docs/DEBUG_SPEC.md), worked piece by piece in the
+[debug queue](docs/DEBUG_QUEUE.md); that queue is now **complete** (pieces
+D0–D6, all merged) and the owner's ten-point report is
+[docs/DEBUG_REPORT.md](docs/DEBUG_REPORT.md). Those fixes are **source-only
+until they are released**: the newest downloadable archive is still v1.2.5, and
+the README's download line above always names whichever build is newest.
 
 ### Added in v1.2.4 — the unified fusion
 
@@ -443,11 +445,13 @@ screens still need testing.
 
 ## For agents continuing this port
 
-Start at [AGENTS.md](AGENTS.md): current state, the open piece list, sandbox gotchas
+Start at [AGENTS.md](AGENTS.md): current state, the sandbox gotchas
 (no LOVE in the sandbox, so the native gate runs in CI) and the rules this repo is
-built on. What the trigger **"Proceed ❤️"** continues is the live
-[debug & repair queue](docs/DEBUG_QUEUE.md), working the owner's binding
-[debug brief](docs/DEBUG_SPEC.md); the finished fusion's record and requirement map
+built on. The **"Proceed ❤️"** trigger worked the
+[debug & repair queue](docs/DEBUG_QUEUE.md) (now complete — pieces D0–D6 all
+merged, the ten-point report in [docs/DEBUG_REPORT.md](docs/DEBUG_REPORT.md))
+against the owner's binding [debug brief](docs/DEBUG_SPEC.md); the finished
+fusion's record and requirement map
 are in [docs/FUSION_STATUS.md](docs/FUSION_STATUS.md). The per-claim detail for
 recovered data is in [docs/PATHS.md](docs/PATHS.md), and the Undertale Yellow merge
 has its own piece list in [docs/YELLOW.md](docs/YELLOW.md).

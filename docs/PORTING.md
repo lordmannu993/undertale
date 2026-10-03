@@ -267,6 +267,52 @@ noticed on a device.
   parity; the texture-retention numbers above are counts of `newImage` calls,
   not milliseconds.
 
+## Debug fixes — D6: both-side regression pass (TEST A–F)
+
+The owner's closing piece (brief §11/§12): one continuous session that plays
+the Undertale opening, crosses into Yellow, soaks there, opens Yellow's
+dialogue, returns through the whale and repeats the crossings — then the §12
+cleanup and the ten-point report (`docs/DEBUG_REPORT.md`). The pass found (and
+fixed) two ways the returned-to Undertale side was dead even though the player
+count was already one:
+
+* **Undertale's boot controllers never came back.** `room_start` places the
+  persistent `obj_time` (whose alarms spawn each room's collision solids and
+  markers, and whose Begin-Step key reads gate `obj_mainchara`'s movement) and
+  `obj_screen` (`keyboard_set_map`, the Z/X/C maps the boat latch also
+  honours). The outbound crossing retires them with the Undertale world, and
+  nothing recreated them on the return: after one round trip the room had no
+  collision geometry and the player could not move. `Travel:ensureUndertaleControllers`
+  (`port/travel.lua`) now recreates room_start's persistent placements when an
+  Undertale room loads without them, from the same `afterLoadRoom` seam that
+  restores Yellow's controller — only their Create events run, and the Game
+  Start event stays on the first room load alone.
+* **A stale interaction lock froze the player anyway.** `global.interact` is
+  set by the world being left (its open dialogue, boat text or whale menu),
+  and the crossing retires every instance that would release it, while
+  `obj_mainchara` only moves at `interact == 0`. `Travel:beginCrossing` now
+  releases the lock together with the existing `flag[0..29]` scratch. In the
+  games' own flows any post-`room_goto` release still runs before the change
+  is carried out, so this only clears what nothing else would.
+
+Verification: `tests/test_player_identity.py` gained three guards (boot
+controllers across two round trips, movement after the return, the lock
+released in both directions) that each fail without their fix; the new
+`tests/test_debug_acceptance.py` runs `tools/debug_probe.py --phases
+acceptance` (TEST A–F with per-scenario PASS lines and an every-tick player
+census) and checks the native gate's wiring. `port/smoke.lua` gained the
+native halves — a `newImage` counter proving a steady room decodes **0**
+textures per window, a one-frame intercept of `fnt_main`'s glyph quads (≤ 2
+rows, ≥ 6 glyphs on the widest row, > 60 px span) with a `native-yellow-text`
+capture, and two more packaged round trips with the census and the
+controller/lock checks — and `tools/native_smoke.sh` now requires
+`DEBUG ACCEPTANCE PASS` and its file (wall timeout 600 s → 720 s). The §12
+sweep found one dead local (`setEquipment` in `port/inventory.lua`, a piece 5b
+draft) and nothing else across 353 definitions. TEST A pins Undertale's
+corridor to the D0 baseline (48 draws/frame); the soak holds draws, instances
+and memory flat; all six scenarios pass headless and the packaged run is
+required in CI.
+
 ## What is converted
 
 The build translates **20,285 source units** (137,558 lines of extracted GML),
