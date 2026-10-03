@@ -85,10 +85,19 @@ def test_the_live_queue_lists_the_debug_pieces_in_order():
             f"piece {row['#']} must name the files it touches"
         )
         assert row["Evidence (PR / test)"], f"piece {row['#']} must record evidence once done"
-    assert any(row["Status"].strip("*") == "⬜" for row in rows), (
-        "an unfinished queue has at least one pending piece; if the debug plan is ever "
-        "finished, record that in the queue and update this test in the same commit"
-    )
+    if any(row["Status"].strip("*") == "⬜" for row in rows):
+        assert "complete" not in section(QUEUE, "## 1. Where completed work lives (read this first)").lower(), (
+            "a pending piece exists, so §1 must not claim the queue is complete"
+        )
+    else:
+        # The debug plan finished with D6 (merged 2026-10-02): every piece is
+        # ✅ with evidence, and the queue says so instead of dangling a piece.
+        assert all(row["Status"].strip("*") == "✅" for row in rows), (
+            "a 🚧 piece must not be left behind on a queue claimed complete"
+        )
+        assert "docs/DEBUG_REPORT.md" in section(
+            QUEUE, "## 1. Where completed work lives (read this first)"
+        ), "a completed queue must point at the owner's ten-point report"
 
 
 def test_the_queue_and_the_brief_cover_every_brief_section():

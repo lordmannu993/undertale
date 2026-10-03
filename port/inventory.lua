@@ -157,11 +157,6 @@ function Inventory.install(R)
         state.inventory[index] = normalize(value)
     end
 
-    local function setEquipment(field, value)
-        if guarding() and state.equipment[field] ~= nil then return end
-        state.equipment[field] = normalize(value)
-    end
-
     local function toUT(token)
         if type(token) == "number" then return token end
         if type(token) == "string" then return utByName[token] or token end

@@ -519,6 +519,20 @@ function Travel:beginCrossing(world, room)
     -- entering Yellow. Leave all other flags/story globals to their content.
     local flags = R:array(R.global, "flag")
     for index = 0, 29 do flags[index] = 0 end
+    -- The interaction lock is the same class of crossing scratch, and it is
+    -- owned by the world being left: global.interact is set to 1 by that
+    -- world's open dialogue, boat-ride text or whale menu, and every instance
+    -- that would release it was just retired above. Undertale's obj_mainchara
+    -- only moves at interact == 0, so a stale lock froze the returned-to side
+    -- after the crossing (the "cannot properly return" report). In the games'
+    -- own flows any post-room_goto release still runs before this load (the
+    -- room change is deferred), so this only removes what nothing else would.
+    if R.global.interact ~= 0 then
+        R:warn("travel-interact",
+            "The world being left held global.interact=" .. tostring(R.global.interact) ..
+            " (an open dialogue, ride or menu); the crossing releases it so the destination world is not frozen.")
+        R.global.interact = 0
+    end
     -- Before the room loads: Yellow's own room creation code registers fast
     -- travel points, which needs the globals scr_initialize creates. Shared
     -- Player fields remain authoritative throughout this initialization.
@@ -575,6 +589,37 @@ function Travel:ensureYellowController()
     if self.yellowReady then
         if roomName ~= nil then R.global.saveroom = roomName end
         if puzzle ~= nil then R.global.tinypuzzle = puzzle end
+    end
+end
+
+-- Undertale's boot controllers. room_start - the boot room room_order[1]
+-- loads before the title - places exactly two persistent instances:
+-- obj_time (the movement gates obj_mainchara's Step reads, play time, quit)
+-- and obj_screen (keyboard_set_map, the Z/X/C maps the boat latch also
+-- honours). A crossing into Yellow retires them with the rest of the
+-- Undertale world (Travel:retireOtherWorld), and before this seam nothing
+-- brought them back: after one round trip obj_time was gone, so
+-- obj_mainchara's Step never saw left/right/up/down again and the Undertale
+-- side could not move - the "cannot properly return" half of the owner's
+-- duplicate-Player report. The set is read from room_start's own placement
+-- list, not hand-picked. Recreating an instance runs only its Create event:
+-- obj_time's Create resets its direction flags and obj_screen's re-applies
+-- the key maps; the Game Start event that calls SCR_GAMESTART fires on the
+-- first room load alone (Runtime:loadRoom), never here.
+function Travel:ensureUndertaleControllers()
+    local R = self.runtime
+    local startId = (R.manifest.names or {})["room_start"]
+    local path = startId and (R.manifest.rooms or {})[startId] or nil
+    if not path then return end
+    local room = require(path)
+    for _, placed in ipairs(room.instances or {}) do
+        local object = placed.object and R:object(placed.object) or nil
+        if object and R.truth(object.persistent) and not self:exists(placed.object) then
+            R:warn("travel-undertale-boot",
+                "Recreated " .. tostring(object.name or placed.object) ..
+                " after the crossing home: room_start's persistent boot controller was retired with the Undertale world and nothing else restores it.")
+            R:create(placed.object, placed.x, placed.y)
+        end
     end
 end
 
@@ -654,6 +699,11 @@ function Travel:afterLoadRoom(roomId)
         -- obj_radio - both persistent - into the Undertale room the player had
         -- just returned to, where they kept updating behind the Undertale side.
         self:ensureYellowController()
+    else
+        -- The symmetric Undertale case: the boot controllers a crossing
+        -- retired have to come back with the world they belong to, or the
+        -- returned-to side cannot move (obj_time) or map its keys (obj_screen).
+        self:ensureUndertaleControllers()
     end
     local pending = self.pendingInit
     if not pending or pending.room ~= roomId then return end

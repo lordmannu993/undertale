@@ -9,6 +9,15 @@ local function write(name,bytes)
 end
 function Smoke.new(game,touch)
     local self=setmetatable({game=game,touch=touch,frames=0,capture=nil,pending=false,done=false},Smoke)
+    -- D6 TEST C: count real texture decodes. The runtime's image cache keys on
+    -- the file path, so only string-argument newImage calls are file loads
+    -- (surface snapshots pass ImageData). A steady room must decode nothing.
+    local rawNewImage=love.graphics.newImage
+    local imageLoads=0
+    love.graphics.newImage=function(source,...)
+        if type(source)=="string" then imageLoads=imageLoads+1 end
+        return rawNewImage(source,...)
+    end
     local function wait(n) for _=1,n do coroutine.yield() end end
     local function down(k)
         local p=touch.pad
@@ -225,6 +234,93 @@ function Smoke.new(game,touch)
         assert(flakes>0,"No snow particles drew natively in the forest")
         capture("native-fusion-snowdin")
         write("native-fusion-snowdin.txt","room="..game.roomState.name.." flakes="..tostring(flakes).."\n")
+        -- D6 TEST C (native): the Yellow soak. Texture reuse is the one fact
+        -- only the real renderer can prove: after a room's first frames have
+        -- warmed the lazy cache, playing on in that room must decode no new
+        -- image, and the Lua heap must not climb while it does. A second
+        -- window in the same room, then a room change and another window.
+        collectgarbage("collect")
+        local soakMem0=collectgarbage("count")
+        local soakInstances0=#game.instances
+        wait(15)
+        local loads0=imageLoads
+        wait(60)
+        local soakWindow1=imageLoads-loads0
+        loads0=imageLoads
+        wait(60)
+        local soakWindow2=imageLoads-loads0
+        assert(soakWindow2==0,
+            "the steady Snowdin soak decoded "..soakWindow2.." textures in 60 frames (window 1: "..soakWindow1..")")
+        local hotlandRoom=game.manifest.yellow_names.rooms["rm_hotland_02"]
+        game:gotoRoom(hotlandRoom);game:applyTransitions();wait(10)
+        wait(10)
+        loads0=imageLoads
+        wait(60)
+        local soakWindowHot=imageLoads-loads0
+        assert(soakWindowHot==0,"the steady Hotland soak decoded "..soakWindowHot.." textures in 60 frames")
+        collectgarbage("collect")
+        local soakMem1=collectgarbage("count")
+        assert(soakMem1<=soakMem0*1.25+2048,
+            "the soak grew the Lua heap "..string.format("%.0f",soakMem0).." -> "..string.format("%.0f",soakMem1).." KB")
+        print("NATIVE SMOKE PASS: D6 TEST C - steady Yellow rooms decode 0 textures per window (warm windows: snowdin "
+            ..soakWindow1.."+"..soakWindow2..", hotland "..soakWindowHot.."), heap "
+            ..string.format("%.0f",soakMem0).." -> "..string.format("%.0f",soakMem1).." KB, instances "
+            ..soakInstances0.." -> "..#game.instances)
+        -- D6 TEST D (native): Yellow's own dialogue, horizontal, in its own
+        -- font. The glyph quads of fnt_main are intercepted for one frame: a
+        -- horizontal layout puts a row of them on one y with x advancing; the
+        -- D0 symptom stacked one word per y.
+        local fntMain=game.manifest.yellow_names.fonts["fnt_main"]
+        local fontRec=game.assets.fonts[fntMain]
+        assert(fontRec,"Yellow's fnt_main record is missing from the merged manifest")
+        local dlg=game:create(game.manifest.yellow_names.objects["obj_dialogue"],100,100)
+        dlg.v.message={[0]="* Hello! Welcome to#  the Hotland crossing."}
+        dlg.v.talker={[0]=-4}
+        dlg.v.portrait=0
+        local sawText=false
+        for _=1,240 do
+            wait(1)
+            for _,entry in ipairs(game.drawLog) do
+                if entry[1]=="text" and tostring(entry[2]):find("Hotland crossing",1,true) then sawText=entry end
+            end
+            if sawText then break end
+        end
+        assert(sawText,"obj_dialogue never drew the marker natively")
+        assert(sawText[5]==fntMain,
+            "the dialogue drew with font "..tostring(sawText[5])..", not Yellow's fnt_main ("..fntMain..")")
+        local page=game.graphicsState.images[fontRec.file]
+        assert(page,"fnt_main's texture page was never decoded")
+        local glyphs={}
+        local rawDraw=love.graphics.draw
+        love.graphics.draw=function(image,quad,x,y,...)
+            if image==page then glyphs[#glyphs+1]={x=x,y=y} end
+            return rawDraw(image,quad,x,y,...)
+        end
+        wait(1)
+        love.graphics.draw=rawDraw
+        local rows,spread={},0
+        for _,g in ipairs(glyphs) do
+            local key=string.format("%.1f",g.y)
+            rows[key]=(rows[key] or 0)+1
+        end
+        local rowCount,largest=0,0
+        for _,count in pairs(rows) do
+            rowCount=rowCount+1
+            if count>largest then largest=count end
+        end
+        local xs={}
+        for _,g in ipairs(glyphs) do xs[#xs+1]=g.x end
+        table.sort(xs)
+        if #xs>0 then spread=xs[#xs]-xs[1] end
+        assert(rowCount<=2,"the dialogue drew its glyphs on "..rowCount.." rows; the vertical stacking returned")
+        assert(largest>=6,"the widest row held only "..largest.." glyphs; the text is not laying out horizontally")
+        assert(spread>60,"the glyph row spans only "..string.format("%.1f",spread).." px; the text is stacked, not horizontal")
+        capture("native-yellow-text")
+        if dlg.alive then game:destroy(dlg,false) end
+        game.global.dialogue_open=false
+        wait(2)
+        print("NATIVE SMOKE PASS: D6 TEST D - obj_dialogue drew the marker in Yellow's own fnt_main as "
+            ..rowCount.." horizontal rows, widest "..largest.." glyphs across "..string.format("%.0f",spread).." px")
         -- Back through the UGPS whale's own travel globals.
         game.global.fast_travel_point="Waterfall - Dock";wait(2)
         game:gotoRoom(125);game:applyTransitions();wait(10)
@@ -264,6 +360,60 @@ function Smoke.new(game,touch)
         write("native-fusion-back.txt","room="..tostring(game.roomState.name).." crossings="..
             tostring(savedCrossings).." world="..savedWorld.." ammo="..savedAmmo.."\n")
         print("NATIVE SMOKE PASS: fused boat ride to Undertale Yellow, one player per world, Frisk rendered in Yellow, versioned merged save with equipment slots")
+        -- D6 TEST F (native): repeated packaged crossings, with a player census
+        -- on every tick of every crossing window. The ride above was round 1;
+        -- two more round trips complete the brief's UT -> Y -> UT -> Y -> UT
+        -- -> Y -> UT sequence and end back in Undertale.
+        local function censusOK(tag,world)
+            assert(game.travel.world==world,tag..": world is "..tostring(game.travel.world))
+            local players=countInstances(game.constants.obj_mainchara)+countInstances(clover)
+            assert(players==1,tag..": "..players.." players")
+            assert(game.pendingRoom==nil,tag..": a room change is stuck pending")
+            return ("(%s players=1 instances=%d)"):format(tag,#game.instances)
+        end
+        local fHops={}
+        for round=1,2 do
+            hold(88,2)
+            game:gotoRoom(140)
+            for _=1,12 do
+                wait(1)
+                local players=countInstances(game.constants.obj_mainchara)+countInstances(clover)
+                assert(players<=1,"two players alive during a D6 TEST F crossing: "..players)
+            end
+            game:applyTransitions();wait(5)
+            assert(game.roomState.name=="rm_hotland_02",
+                "D6 TEST F round "..round.." -> Yellow landed in "..tostring(game.roomState.name))
+            fHops[#fHops+1]=censusOK("D6 r"..round.." -> Yellow","yellow")
+            game.global.fast_travel_point="Waterfall - Dock"
+            game:gotoRoom(125)
+            for _=1,12 do
+                wait(1)
+                local players=countInstances(game.constants.obj_mainchara)+countInstances(clover)
+                assert(players<=1,"two players alive during a D6 TEST F return: "..players)
+            end
+            game:applyTransitions();wait(5)
+            assert(game.roomState.name=="room_water_dock",
+                "D6 TEST F round "..round.." -> Undertale landed in "..tostring(game.roomState.name))
+            fHops[#fHops+1]=censusOK("D6 r"..round.." -> Undertale","undertale")
+        end
+        -- The returned-to side must also still be alive: D6 found that the
+        -- round trip used to lose obj_time (movement gates, collision spawn)
+        -- and obj_screen (key maps), freezing Undertale after one crossing.
+        local bootTime=game.constants.obj_time or game.manifest.names["obj_time"]
+        local bootScreen=game.constants.obj_screen or game.manifest.names["obj_screen"]
+        assert(bootTime and countInstances(bootTime)==1,
+            "room_start's persistent obj_time is missing after the round trips")
+        assert(bootScreen and countInstances(bootScreen)==1,
+            "room_start's persistent obj_screen is missing after the round trips")
+        assert(game.global.interact==0,
+            "the interaction lock leaked across the crossings: interact="..tostring(game.global.interact))
+        write("native-debug-acceptance.txt",
+            "DEBUG ACCEPTANCE PASS: TEST A opening/dialogue/fonts (above), TEST B one player at 170,120, TEST C soak decoded 0 textures per steady window (snowdin "
+            ..soakWindow1.."+"..soakWindow2..", hotland "..soakWindowHot..") with heap "..string.format("%.0f",soakMem0)
+            .." -> "..string.format("%.0f",soakMem1).." KB, TEST D dialogue in fnt_main as "..rowCount
+            .." horizontal rows (widest "..largest.." glyphs, "..string.format("%.0f",spread).." px), TEST E whale return to one player, TEST F three round trips "
+            .."with players=1 on every tick "..table.concat(fHops," ").."; obj_time/obj_screen restored, interact released.\n")
+        print("NATIVE SMOKE PASS: D6 debug acceptance - TEST A-F on the packaged archive; DEBUG ACCEPTANCE PASS")
         self.done=true;love.event.quit(0)
     end)
     return self

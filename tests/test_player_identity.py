@@ -202,3 +202,107 @@ def test_the_crossing_keeps_the_one_shared_player_record(vm):
         end
         return "ok"
     ''') == "ok"
+
+
+# --- D6: the return side of the crossing (found by the acceptance run) -------
+#
+# The both-side regression pass (piece D6, brief section 8/11) found the
+# "cannot properly return" half of the owner's report: two independent locks
+# froze the Undertale side after ONE round trip, even though the player count
+# stayed at one. Both are return-side state the outbound crossing retires and
+# nothing restored.
+
+
+@live
+def test_the_return_restores_room_starts_boot_controllers(vm):
+    """room_start's persistent controllers come back with their world.
+
+    room_start (room_order[1], the boot room) places exactly two persistent
+    instances: obj_time and obj_screen. The outbound crossing retires them with
+    the rest of the Undertale world (Travel:retireOtherWorld), and before the
+    fix nothing brought them back. obj_time is what obj_mainchara's Step reads
+    for its direction gates and its alarms spawn the rooms' collision solids
+    and markers; obj_screen owns keyboard_set_map (the Z/X/C maps the boat
+    latch also honours). After one round trip both were gone: the returned-to
+    room had no collision geometry and the player could never move again.
+    Travel:ensureUndertaleControllers now recreates room_start's persistent
+    placements when an Undertale room loads without them (their Create alone -
+    the Game Start event that runs SCR_GAMESTART fires on the first room load
+    only, never there).
+    """
+    boot(vm)
+    assert vm.execute(CENSUS + '''
+        local TIME = R.manifest.names["obj_time"]
+        local SCREEN = R.manifest.names["obj_screen"]
+        if countInstances(TIME) ~= 1 or countInstances(SCREEN) ~= 1 then
+            return "boot did not place room_start's controllers"
+        end
+        crossTo(YELLOW)
+        if countInstances(TIME) ~= 0 then return "obj_time survived into Yellow" end
+        if countInstances(SCREEN) ~= 0 then return "obj_screen survived into Yellow" end
+        yellowTransitionTo(DOCK)
+        if countInstances(TIME) ~= 1 then return "the return left obj_time at " .. countInstances(TIME) end
+        if countInstances(SCREEN) ~= 1 then return "the return left obj_screen at " .. countInstances(SCREEN) end
+        crossTo(YELLOW); yellowTransitionTo(DOCK)
+        if countInstances(TIME) ~= 1 or countInstances(SCREEN) ~= 1 then
+            return "repeated crossings stacked or lost the boot controllers"
+        end
+        return "ok"
+    ''') == "ok"
+
+
+@live
+def test_the_returned_undertale_side_still_moves(vm):
+    """Movement survives the round trip (both return-side root causes).
+
+    With obj_time restored, a stale ``global.interact`` still froze the player:
+    the interaction lock is set by the world being left (its open dialogue,
+    boat-ride text or whale menu) and every instance that would release it is
+    retired by the crossing, while Undertale's obj_mainchara only moves at
+    ``interact == 0``. The crossing now releases the lock with the rest of the
+    crossing scratch (brief section 5). Before the two fixes every leg of this
+    walk moved 0 px. Each leg is measured on its own: symmetric holds cancel
+    out in net displacement.
+    """
+    boot(vm)
+    assert vm.execute(CENSUS + '''
+        crossTo(YELLOW)
+        yellowTransitionTo(DOCK)
+        if R.travel.world ~= "undertale" then return "never returned to Undertale" end
+        local moved, legs = 0, {}
+        for _, key in ipairs({37, 39, 38, 40}) do
+            local p = R:select(FRISK)[1]
+            local x0, y0 = p.v.x, p.v.y
+            hold(key, 20)
+            p = R:select(FRISK)[1]
+            local d = math.abs(p.v.x - x0) + math.abs(p.v.y - y0)
+            legs[#legs + 1] = d
+            moved = moved + d
+        end
+        if moved == 0 then return "the player cannot move after the round trip" end
+        return "ok"
+    ''') == "ok"
+
+
+@live
+def test_a_crossing_releases_the_leaving_worlds_interaction_lock(vm):
+    """The stale lock itself, in isolation, in both directions.
+
+    In the games' own flows any post-room_goto release still runs before the
+    room change is carried out (the change is deferred to the end of the step),
+    so releasing it at the crossing only removes what nothing else would.
+    """
+    boot(vm)
+    assert vm.execute(CENSUS + '''
+        R.global.interact = 1
+        crossTo(YELLOW)
+        if R.global.interact ~= 0 then
+            return "entering Yellow kept the lock: interact=" .. tostring(R.global.interact)
+        end
+        R.global.interact = 1
+        crossTo(DOCK)
+        if R.global.interact ~= 0 then
+            return "returning to Undertale kept the lock: interact=" .. tostring(R.global.interact)
+        end
+        return "ok"
+    ''') == "ok"
